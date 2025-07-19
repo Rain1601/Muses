@@ -1,0 +1,92 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String    @id @default(cuid())
+  githubId        String    @unique
+  username        String
+  email           String?
+  avatarUrl       String?
+  openaiKey       String?   // 加密存储
+  githubToken     String?   // 加密存储
+  defaultRepoUrl  String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  agents          Agent[]
+  articles        Article[]
+  settings        UserSettings?
+}
+
+model UserSettings {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  language        String    @default("zh-CN")
+  theme           String    @default("light")
+  autoSave        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model Agent {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name            String
+  description     String?
+  avatar          String?
+  
+  // 写作风格配置
+  language        String    @default("zh-CN")
+  tone            String    @default("professional") // professional, casual, humorous, serious
+  lengthPreference String   @default("medium") // short, medium, long
+  targetAudience  String?
+  
+  // 高级配置
+  customPrompt    String?
+  outputFormat    String    @default("markdown") // markdown, mdx
+  specialRules    Json?     // 存储特殊规则的JSON
+  
+  isDefault       Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  articles        Article[]
+}
+
+model Article {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agentId         String
+  agent           Agent     @relation(fields: [agentId], references: [id])
+  
+  title           String
+  content         String    // Markdown内容
+  summary         String?
+  
+  // 发布信息
+  publishStatus   String    @default("draft") // draft, published, scheduled
+  publishedAt     DateTime?
+  githubUrl       String?   // 发布到GitHub后的URL
+  repoPath        String?   // 在仓库中的路径
+  
+  // 元数据
+  sourceFiles     Json?     // 原始素材文件信息
+  metadata        Json?     // 其他元数据
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
