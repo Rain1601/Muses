@@ -23,7 +23,7 @@ rm -rf backend/dist
 # 构建后端
 echo "🔧 构建后端..."
 cd backend
-pnpm build
+npm run build
 cd ..
 echo "✅ 后端构建完成"
 echo ""
@@ -31,7 +31,7 @@ echo ""
 # 构建前端
 echo "🎨 构建前端..."
 cd frontend
-pnpm build
+npm run build
 cd ..
 echo "✅ 前端构建完成"
 echo ""
@@ -60,7 +60,7 @@ cat > dist/start.sh << 'EOF'
 cd backend
 NODE_ENV=production node dist/index.js &
 cd ../frontend
-NODE_ENV=production pnpm start &
+NODE_ENV=production npm start &
 wait
 EOF
 
@@ -81,7 +81,7 @@ module.exports = {
     },
     {
       name: 'muses-frontend',
-      script: 'pnpm',
+      script: 'npm',
       args: 'start',
       cwd: './frontend',
       env: {

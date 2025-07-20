@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+      - "8080:8080"
+    volumes:
+      - ./data:/app/backend/data
+      - ./uploads:/app/backend/uploads
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=file:./data/muses.db
+      - JWT_SECRET=${JWT_SECRET}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - FRONTEND_URL=http://localhost:3000
+    restart: unless-stopped
+    networks:
+      - muses-network
+
+  # 可选: 使用 PostgreSQL 替代 SQLite
+  # postgres:
+  #   image: postgres:15-alpine
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   environment:
+  #     - POSTGRES_DB=muses
+  #     - POSTGRES_USER=muses
+  #     - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+  #   restart: unless-stopped
+  #   networks:
+  #     - muses-network
+
+  # 可选: Redis 缓存
+  # redis:
+  #   image: redis:7-alpine
+  #   command: redis-server --appendonly yes
+  #   volumes:
+  #     - redis_data:/data
+  #   restart: unless-stopped
+  #   networks:
+  #     - muses-network
+
+  # 可选: Nginx 反向代理
+  # nginx:
+  #   image: nginx:alpine
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./nginx.conf:/etc/nginx/nginx.conf:ro
+  #     - ./ssl:/etc/nginx/ssl:ro
+  #   depends_on:
+  #     - app
+  #   restart: unless-stopped
+  #   networks:
+  #     - muses-network
+
+networks:
+  muses-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:

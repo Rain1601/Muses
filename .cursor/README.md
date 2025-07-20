@@ -81,7 +81,7 @@ Muses/
 
 ### 环境要求
 - Node.js >= 18
-- pnpm (推荐)
+- npm (Node.js自带)
 - SQLite3
 
 ### 快速开始
@@ -110,12 +110,19 @@ PORT=8080
 
 - **前端**: http://localhost:3000
 - **后端**: http://localhost:8080
-- **数据库管理**: `pnpm db:studio` (Prisma Studio)
+- **数据库管理**: `npm run db:studio` (Prisma Studio)
 
 ## 🔗 相关文档
 
+### 快速开始
+- [🚀 快速启动指南](.cursor/QUICKSTART.md) - 详细的配置和启动指南
+- [🍳 实操手册](.cursor/COOKBOOK.md) - 30分钟极速上手
+
+### 技术文档
 - [API接口文档](.cursor/api.md)
 - [数据库设计](.cursor/database.md)
 - [前端架构](.cursor/frontend.md)
+- [系统架构](.cursor/architecture.md)
 - [部署指南](.cursor/deployment.md)
-- [开发指南](.cursor/development.md) 
+- [开发指南](.cursor/development.md)
+- [项目总结](.cursor/SUMMARY.md) 

@@ -41,7 +41,7 @@ sleep 2
 # 启动后端
 echo "🔧 启动后端服务 (端口 8080)..."
 cd backend
-pnpm dev &
+npm run dev &
 BACKEND_PID=$!
 cd ..
 
@@ -61,7 +61,7 @@ echo "✅ 后端服务启动成功"
 # 启动前端
 echo "🎨 启动前端服务 (端口 3000)..."
 cd frontend
-pnpm dev &
+npm run dev &
 FRONTEND_PID=$!
 cd ..
 

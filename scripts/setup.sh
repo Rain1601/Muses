@@ -18,19 +18,16 @@ fi
 
 echo "✅ Node.js 版本: $(node -v)"
 
-# 检查 pnpm 是否安装
-if ! command -v pnpm &> /dev/null; then
-    echo "📦 正在安装 pnpm..."
-    npm install -g pnpm
-fi
+# 使用npm legacy安装（更稳定）
+echo "📦 使用npm legacy安装模式..."
 
-echo "✅ pnpm 版本: $(pnpm -v)"
-echo ""
+# 设置npm镜像源
+npm config set registry https://registry.npmjs.org/
 
 # 安装前端依赖
 echo "📦 安装前端依赖..."
 cd frontend
-pnpm install
+npm install --legacy-peer-deps
 cd ..
 echo "✅ 前端依赖安装完成"
 echo ""
@@ -38,15 +35,15 @@ echo ""
 # 安装后端依赖
 echo "📦 安装后端依赖..."
 cd backend
-pnpm install
+npm install --legacy-peer-deps
 
 # 生成 Prisma 客户端
 echo "🔧 生成 Prisma 客户端..."
-pnpm db:generate
+npm run db:generate
 
 # 创建数据库
 echo "🗄️  初始化数据库..."
-pnpm db:push
+npm run db:push
 
 # 创建环境变量文件
 if [ ! -f .env ]; then

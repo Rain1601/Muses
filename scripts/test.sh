@@ -26,7 +26,7 @@ echo ""
 # ESLint 检查
 echo "🔍 ESLint 代码检查..."
 cd frontend
-pnpm lint
+npm run lint
 cd ..
 echo "✅ 代码规范检查通过"
 echo ""
@@ -67,7 +67,7 @@ echo ""
 # 数据库连接测试
 echo "🗄️  数据库连接测试..."
 cd backend
-if npx prisma db push --skip-generate > /dev/null 2>&1; then
+if npm run db:push -- --skip-generate > /dev/null 2>&1; then
     echo "✅ 数据库连接正常"
 else
     echo "❌ 数据库连接失败"

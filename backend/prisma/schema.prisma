@@ -57,7 +57,7 @@ model Agent {
   // 高级配置
   customPrompt    String?
   outputFormat    String    @default("markdown") // markdown, mdx
-  specialRules    Json?     // 存储特殊规则的JSON
+  specialRules    String?   // 存储特殊规则的JSON字符串
   
   isDefault       Boolean   @default(false)
   createdAt       DateTime  @default(now())
@@ -84,8 +84,8 @@ model Article {
   repoPath        String?   // 在仓库中的路径
   
   // 元数据
-  sourceFiles     Json?     // 原始素材文件信息
-  metadata        Json?     // 其他元数据
+  sourceFiles     String?   // 原始素材文件信息JSON字符串
+  metadata        String?   // 其他元数据JSON字符串
   
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
