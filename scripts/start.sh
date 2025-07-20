@@ -59,7 +59,7 @@ fi
 echo "✅ 后端服务启动成功"
 
 # 启动前端
-echo "🎨 启动前端服务 (端口 3000)..."
+echo "🎨 启动前端服务 (端口 3004)..."
 cd frontend
 npm run dev &
 FRONTEND_PID=$!
@@ -73,11 +73,11 @@ echo ""
 echo "✨ Muses 启动成功！"
 echo ""
 echo "🌐 访问地址:"
-echo "   前端: http://localhost:3000"
+echo "   前端: http://localhost:3004"
 echo "   后端: http://localhost:8080"
 echo ""
 echo "📝 使用说明:"
-echo "   1. 访问 http://localhost:3000"
+echo "   1. 访问 http://localhost:3004"
 echo "   2. 使用 GitHub 账号登录"
 echo "   3. 配置 OpenAI API Key"
 echo "   4. 创建 Agent 并开始生成文章"

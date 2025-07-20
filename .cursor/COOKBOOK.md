@@ -18,7 +18,7 @@ cp backend/.env.example backend/.env
 ./scripts/start.sh
 ```
 
-然后在浏览器访问 http://localhost:3000 🎉
+然后在浏览器访问 http://localhost:3004 🎉
 
 ## 📝 详细操作流程
 
@@ -55,7 +55,7 @@ ls backend/node_modules frontend/node_modules
 3. 填写信息：
    ```
    名称: Muses-Local
-   首页: http://localhost:3000  
+   首页: http://localhost:3004  
    回调: http://localhost:8080/api/auth/github/callback
    ```
 4. 复制 Client ID 和 Client Secret
@@ -102,13 +102,13 @@ curl http://localhost:8080/api/health
 # 返回: {"status":"ok","timestamp":"..."}
 
 # 访问前端
-open http://localhost:3000
+open http://localhost:3004
 ```
 
 #### 5.2 完整流程测试
 
 1. **登录测试**
-   - 访问 http://localhost:3000
+   - 访问 http://localhost:3004
    - 点击 "使用 GitHub 登录"
    - 授权后回到引导页面 ✅
 

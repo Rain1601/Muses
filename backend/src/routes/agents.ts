@@ -44,10 +44,10 @@ router.get('/', authenticate, async (req: AuthRequest, res) => {
     // 缓存10分钟
     cache.set(cacheKey, agents, 600);
 
-    res.json({ agents });
+    return res.json({ agents });
   } catch (error) {
     console.error('Get agents error:', error);
-    res.status(500).json({ error: 'Failed to get agents' });
+    return res.status(500).json({ error: 'Failed to get agents' });
   }
 });
 
@@ -68,10 +68,10 @@ router.get('/:id', authenticate, async (req: AuthRequest, res) => {
       return res.status(404).json({ error: 'Agent not found' });
     }
 
-    res.json({ agent });
+    return res.json({ agent });
   } catch (error) {
     console.error('Get agent error:', error);
-    res.status(500).json({ error: 'Failed to get agent' });
+    return res.status(500).json({ error: 'Failed to get agent' });
   }
 });
 
@@ -107,13 +107,13 @@ router.post('/', authenticate, async (req: AuthRequest, res) => {
     // 清除缓存
     cache.del(CacheKeys.USER_AGENTS(userId));
 
-    res.status(201).json({ agent });
+    return res.status(201).json({ agent });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Invalid input', details: error.errors });
     }
     console.error('Create agent error:', error);
-    res.status(500).json({ error: 'Failed to create agent' });
+    return res.status(500).json({ error: 'Failed to create agent' });
   }
 });
 
@@ -152,13 +152,13 @@ router.put('/:id', authenticate, async (req: AuthRequest, res) => {
     cache.del(CacheKeys.USER_AGENTS(userId));
     cache.del(CacheKeys.AGENT(id));
 
-    res.json({ agent });
+    return res.json({ agent });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Invalid input', details: error.errors });
     }
     console.error('Update agent error:', error);
-    res.status(500).json({ error: 'Failed to update agent' });
+    return res.status(500).json({ error: 'Failed to update agent' });
   }
 });
 
@@ -212,15 +212,15 @@ router.delete('/:id', authenticate, async (req: AuthRequest, res) => {
     cache.del(CacheKeys.USER_AGENTS(userId));
     cache.del(CacheKeys.AGENT(id));
 
-    res.json({ success: true });
+    return res.json({ success: true });
   } catch (error) {
     console.error('Delete agent error:', error);
-    res.status(500).json({ error: 'Failed to delete agent' });
+    return res.status(500).json({ error: 'Failed to delete agent' });
   }
 });
 
 // 获取Agent预设模板
-router.get('/templates/list', authenticate, async (req: AuthRequest, res) => {
+router.get('/templates/list', authenticate, async (_req: AuthRequest, res) => {
   const templates = [
     {
       id: 'tech-blogger',

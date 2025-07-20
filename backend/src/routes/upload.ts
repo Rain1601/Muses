@@ -10,12 +10,12 @@ const router = Router();
 
 // 配置文件上传
 const storage = multer.diskStorage({
-  destination: async (req, file, cb) => {
+  destination: async (req, _file, cb) => {
     const uploadDir = path.join(process.cwd(), 'uploads', (req as AuthRequest).user!.id);
     await fs.mkdir(uploadDir, { recursive: true });
     cb(null, uploadDir);
   },
-  filename: (req, file, cb) => {
+  filename: (_req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     cb(null, uniqueSuffix + path.extname(file.originalname));
   }
@@ -26,7 +26,7 @@ const upload = multer({
   limits: {
     fileSize: parseInt(process.env.MAX_FILE_SIZE || '10485760'), // 10MB
   },
-  fileFilter: (req, file, cb) => {
+  fileFilter: (_req, file, cb) => {
     const allowedTypes = ['.pdf', '.md', '.txt', '.doc', '.docx'];
     const ext = path.extname(file.originalname).toLowerCase();
     if (allowedTypes.includes(ext)) {
@@ -52,13 +52,13 @@ router.post('/file', authenticate, upload.single('file'), async (req: AuthReques
       path: req.file.path,
     };
 
-    res.json({ 
+    return res.json({ 
       success: true, 
       file: fileInfo 
     });
   } catch (error) {
     console.error('File upload error:', error);
-    res.status(500).json({ error: '文件上传失败' });
+    return res.status(500).json({ error: '文件上传失败' });
   }
 });
 
@@ -96,14 +96,14 @@ router.post('/parse', authenticate, async (req: AuthRequest, res) => {
         return res.status(400).json({ error: '不支持的文件类型' });
     }
 
-    res.json({ 
+    return res.json({ 
       success: true, 
       content,
       wordCount: content.length,
     });
   } catch (error) {
     console.error('File parse error:', error);
-    res.status(500).json({ error: '文件解析失败' });
+    return res.status(500).json({ error: '文件解析失败' });
   }
 });
 
@@ -117,10 +117,10 @@ router.delete('/:fileId', authenticate, async (req: AuthRequest, res) => {
     
     await fs.unlink(filePath);
     
-    res.json({ success: true });
+    return res.json({ success: true });
   } catch (error) {
     console.error('File delete error:', error);
-    res.status(500).json({ error: '文件删除失败' });
+    return res.status(500).json({ error: '文件删除失败' });
   }
 });
 

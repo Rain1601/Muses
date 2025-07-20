@@ -59,7 +59,7 @@ esac
 
 echo ""
 echo "📝 开发环境说明:"
-echo "   前端: http://localhost:3000 (支持热重载)"
+echo "   前端: http://localhost:3004 (支持热重载)"
 echo "   后端: http://localhost:8080 (支持热重载)"
 echo ""
 echo "🔧 开发工具:"

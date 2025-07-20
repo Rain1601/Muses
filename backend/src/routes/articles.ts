@@ -35,10 +35,10 @@ router.get('/', authenticate, async (req: AuthRequest, res) => {
     // 缓存5分钟
     cache.set(cacheKey, articles, 300);
 
-    res.json({ articles });
+    return res.json({ articles });
   } catch (error) {
     console.error('Get articles error:', error);
-    res.status(500).json({ error: 'Failed to get articles' });
+    return res.status(500).json({ error: 'Failed to get articles' });
   }
 });
 
@@ -62,10 +62,10 @@ router.get('/:id', authenticate, async (req: AuthRequest, res) => {
       return res.status(404).json({ error: 'Article not found' });
     }
 
-    res.json({ article });
+    return res.json({ article });
   } catch (error) {
     console.error('Get article error:', error);
-    res.status(500).json({ error: 'Failed to get article' });
+    return res.status(500).json({ error: 'Failed to get article' });
   }
 });
 
@@ -108,13 +108,13 @@ router.post('/', authenticate, async (req: AuthRequest, res) => {
     // 清除缓存
     cache.del(CacheKeys.USER_ARTICLES(userId));
 
-    res.status(201).json({ article });
+    return res.status(201).json({ article });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Invalid input', details: error.errors });
     }
     console.error('Create article error:', error);
-    res.status(500).json({ error: 'Failed to create article' });
+    return res.status(500).json({ error: 'Failed to create article' });
   }
 });
 
@@ -158,13 +158,13 @@ router.put('/:id', authenticate, async (req: AuthRequest, res) => {
     cache.del(CacheKeys.USER_ARTICLES(userId));
     cache.del(CacheKeys.ARTICLE(id));
 
-    res.json({ article });
+    return res.json({ article });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Invalid input', details: error.errors });
     }
     console.error('Update article error:', error);
-    res.status(500).json({ error: 'Failed to update article' });
+    return res.status(500).json({ error: 'Failed to update article' });
   }
 });
 
@@ -191,10 +191,10 @@ router.delete('/:id', authenticate, async (req: AuthRequest, res) => {
     cache.del(CacheKeys.USER_ARTICLES(userId));
     cache.del(CacheKeys.ARTICLE(id));
 
-    res.json({ success: true });
+    return res.json({ success: true });
   } catch (error) {
     console.error('Delete article error:', error);
-    res.status(500).json({ error: 'Failed to delete article' });
+    return res.status(500).json({ error: 'Failed to delete article' });
   }
 });
 

@@ -29,7 +29,7 @@ router.get('/profile', authenticate, async (req: AuthRequest, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json({
+    return res.json({
       user: {
         id: user.id,
         username: user.username,
@@ -42,7 +42,7 @@ router.get('/profile', authenticate, async (req: AuthRequest, res) => {
     });
   } catch (error) {
     console.error('Get profile error:', error);
-    res.status(500).json({ error: 'Failed to get user profile' });
+    return res.status(500).json({ error: 'Failed to get user profile' });
   }
 });
 
@@ -89,7 +89,7 @@ router.post('/settings', authenticate, async (req: AuthRequest, res) => {
     // 清除缓存
     cache.del(CacheKeys.USER(userId));
 
-    res.json({
+    return res.json({
       success: true,
       user: {
         id: user.id,
@@ -105,7 +105,7 @@ router.post('/settings', authenticate, async (req: AuthRequest, res) => {
       return res.status(400).json({ error: 'Invalid input', details: error.errors });
     }
     console.error('Update settings error:', error);
-    res.status(500).json({ error: 'Failed to update settings' });
+    return res.status(500).json({ error: 'Failed to update settings' });
   }
 });
 
@@ -116,10 +116,11 @@ router.post('/verify-openai-key', authenticate, async (req: AuthRequest, res) =>
     
     // 这里可以添加实际的OpenAI API验证逻辑
     // 例如尝试调用一个简单的API来验证key是否有效
+    console.log('Verifying OpenAI key:', openaiKey.substring(0, 10) + '...');
     
-    res.json({ valid: true });
+    return res.json({ valid: true });
   } catch (error) {
-    res.status(400).json({ error: 'Invalid OpenAI Key' });
+    return res.status(400).json({ error: 'Invalid OpenAI Key' });
   }
 });
 

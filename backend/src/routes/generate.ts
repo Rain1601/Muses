@@ -55,7 +55,7 @@ router.post('/article', authenticate, async (req: AuthRequest, res) => {
           content: result.content,
           summary: result.summary,
           publishStatus: 'draft',
-          sourceFiles: { materials: data.materials },
+          sourceFiles: JSON.stringify({ materials: data.materials }),
         },
         include: {
           agent: true,
@@ -66,7 +66,7 @@ router.post('/article', authenticate, async (req: AuthRequest, res) => {
       cache.del(CacheKeys.USER_ARTICLES(userId));
     }
 
-    res.json({
+    return res.json({
       success: true,
       article: article || result,
       generated: result,
@@ -85,7 +85,7 @@ router.post('/article', authenticate, async (req: AuthRequest, res) => {
       return res.status(404).json({ error: 'Agent不存在' });
     }
     
-    res.status(500).json({ 
+    return res.status(500).json({ 
       error: '文章生成失败，请稍后重试',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
@@ -139,13 +139,13 @@ router.post('/improve', authenticate, async (req: AuthRequest, res) => {
     // 清除缓存
     cache.del(CacheKeys.ARTICLE(data.articleId));
 
-    res.json({
+    return res.json({
       success: true,
       article: updatedArticle,
     });
   } catch (error: any) {
     console.error('Improve article error:', error);
-    res.status(500).json({ 
+    return res.status(500).json({ 
       error: '文章改进失败，请稍后重试',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
@@ -191,7 +191,7 @@ router.post('/chat', authenticate, async (req: AuthRequest, res) => {
           content: result.content,
           summary: result.summary,
           publishStatus: 'draft',
-          metadata: { chatHistory: data.messages },
+          metadata: JSON.stringify({ chatHistory: data.messages }),
         },
         include: {
           agent: true,
@@ -202,14 +202,14 @@ router.post('/chat', authenticate, async (req: AuthRequest, res) => {
       cache.del(CacheKeys.USER_ARTICLES(userId));
     }
 
-    res.json({
+    return res.json({
       success: true,
       article: article || result,
       generated: result,
     });
   } catch (error: any) {
     console.error('Chat generate error:', error);
-    res.status(500).json({ 
+    return res.status(500).json({ 
       error: '文章生成失败，请稍后重试',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });

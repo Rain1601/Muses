@@ -12,10 +12,10 @@ router.get('/repos', authenticate, async (req: AuthRequest, res) => {
     const userId = req.user!.id;
     const repos = await githubService.getUserRepos(userId);
     
-    res.json({ repos });
+    return res.json({ repos });
   } catch (error) {
     console.error('Get repos error:', error);
-    res.status(500).json({ error: '获取仓库列表失败' });
+    return res.status(500).json({ error: '获取仓库列表失败' });
   }
 });
 
@@ -57,12 +57,12 @@ router.post('/github', authenticate, async (req: AuthRequest, res) => {
     });
 
     if (result.success) {
-      res.json({
+      return res.json({
         success: true,
         url: result.url,
       });
     } else {
-      res.status(400).json({
+      return res.status(400).json({
         error: result.error || '发布失败',
       });
     }
@@ -71,7 +71,7 @@ router.post('/github', authenticate, async (req: AuthRequest, res) => {
       return res.status(400).json({ error: '参数错误', details: error.errors });
     }
     console.error('Publish error:', error);
-    res.status(500).json({ error: '发布失败' });
+    return res.status(500).json({ error: '发布失败' });
   }
 });
 
@@ -98,10 +98,10 @@ router.get('/history/:articleId', authenticate, async (req: AuthRequest, res) =>
       return res.status(404).json({ error: '文章不存在' });
     }
 
-    res.json({ publishInfo: article });
+    return res.json({ publishInfo: article });
   } catch (error) {
     console.error('Get publish history error:', error);
-    res.status(500).json({ error: '获取发布历史失败' });
+    return res.status(500).json({ error: '获取发布历史失败' });
   }
 });
 

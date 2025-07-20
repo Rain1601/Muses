@@ -78,7 +78,7 @@ chmod +x scripts/*.sh
 3. 填写应用信息：
    ```
    Application name: Muses Local Dev
-   Homepage URL: http://localhost:3000
+   Homepage URL: http://localhost:3004
    Authorization callback URL: http://localhost:8080/api/auth/github/callback
    ```
 4. 点击 "Register application"
@@ -97,7 +97,7 @@ vim backend/.env
 # 应用配置
 NODE_ENV=development
 PORT=8080
-FRONTEND_URL=http://localhost:3000
+FRONTEND_URL=http://localhost:3004
 
 # 数据库配置
 DATABASE_URL="file:./muses.db"
@@ -169,14 +169,14 @@ curl http://localhost:8080/api/health
 # 期望返回: {"status":"ok","timestamp":"..."}
 
 # 测试前端页面
-open http://localhost:3000
-# 或在浏览器访问 http://localhost:3000
+open http://localhost:3004
+# 或在浏览器访问 http://localhost:3004
 ```
 
 ### 5.2 功能测试流程
 
 1. **访问首页**
-   - 打开 http://localhost:3000
+   - 打开 http://localhost:3004
    - 应该看到Muses登录页面
 
 2. **测试GitHub登录**

@@ -129,7 +129,7 @@ router.get('/verify', async (req, res) => {
       return res.status(401).json({ error: 'User not found' });
     }
 
-    res.json({
+    return res.json({
       user: {
         id: user.id,
         username: user.username,
@@ -139,12 +139,12 @@ router.get('/verify', async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(401).json({ error: 'Invalid token' });
+    return res.status(401).json({ error: 'Invalid token' });
   }
 });
 
 // 登出
-router.post('/logout', (req, res) => {
+router.post('/logout', (_req, res) => {
   // 前端会清除token
   res.json({ success: true });
 });

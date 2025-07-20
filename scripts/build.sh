@@ -86,7 +86,7 @@ module.exports = {
       cwd: './frontend',
       env: {
         NODE_ENV: 'production',
-        PORT: 3000
+        PORT: 3004
       }
     }
   ]

@@ -108,7 +108,7 @@ PORT=8080
 
 ## 📊 服务端口
 
-- **前端**: http://localhost:3000
+- **前端**: http://localhost:3004
 - **后端**: http://localhost:8080
 - **数据库管理**: `npm run db:studio` (Prisma Studio)
 

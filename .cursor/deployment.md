@@ -28,7 +28,7 @@ Muses支持多种部署方式，从简单的本地部署到生产环境的完整
 # 应用配置
 NODE_ENV=production
 PORT=8080
-FRONTEND_URL=http://localhost:3000
+FRONTEND_URL=http://localhost:3004
 
 # 数据库配置
 DATABASE_URL="file:./muses.db"
@@ -170,7 +170,7 @@ server {
 
     # 前端静态文件
     location / {
-        proxy_pass http://localhost:3000;
+        proxy_pass http://localhost:3004;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
