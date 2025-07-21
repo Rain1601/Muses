@@ -34,7 +34,7 @@ export default function HomePage() {
     <div className="min-h-screen flex items-center justify-center bg-background transition-colors duration-300">
       <div className="text-center max-w-lg mx-auto px-6">
         <div className="flex justify-center mb-12">
-          <div className="w-16 h-16 rounded-2xl bg-primary/10 dark:bg-primary/20 flex items-center justify-center text-4xl transition-all duration-300 hover:bg-primary/20 dark:hover:bg-primary/30 hover:scale-110">
+          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/30 dark:from-primary/30 dark:to-accent/40 flex items-center justify-center text-4xl transition-all duration-300 hover:from-primary/30 hover:to-accent/40 dark:hover:from-primary/40 dark:hover:to-accent/50 hover:scale-110 shadow-lg dark:shadow-primary/20">
             🪶
           </div>
         </div>

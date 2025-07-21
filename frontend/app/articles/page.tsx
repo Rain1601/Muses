@@ -86,8 +86,8 @@ export default function ArticlesPage() {
       </div>
 
       {articles.length === 0 ? (
-        <Card className="text-center py-16 border-dashed border-2 border-border/60">
-          <div className="w-16 h-16 rounded-2xl bg-primary/10 dark:bg-primary/20 flex items-center justify-center text-3xl mb-6 mx-auto transition-all duration-300 hover:bg-primary/20 dark:hover:bg-primary/30">
+        <Card className="text-center py-16 border-dashed border-2 border-border/60 bg-gradient-to-br from-secondary/25 to-accent/15 dark:from-secondary/15 dark:to-accent/10">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/30 dark:from-primary/30 dark:to-accent/40 flex items-center justify-center text-3xl mb-6 mx-auto transition-all duration-300 hover:from-primary/30 hover:to-accent/40 dark:hover:from-primary/40 dark:hover:to-accent/50 shadow-lg dark:shadow-primary/20">
             🪶
           </div>
           <h3 className="text-lg font-semibold mb-2">还没有文章</h3>
@@ -104,7 +104,7 @@ export default function ArticlesPage() {
           {articles.map((article) => (
             <Card
               key={article.id}
-              className="relative group cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1"
+              className="relative group cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1 hover:shadow-lg hover:shadow-primary/15 bg-gradient-to-br from-background to-secondary/15 border-secondary/30 dark:hover:shadow-primary/20"
               onClick={() => router.push(`/articles/${article.id}`)}
             >
               {/* 删除按钮 */}
@@ -148,10 +148,10 @@ export default function ArticlesPage() {
                         {user?.username || 'Unknown User'}
                       </span>
                       <span className="text-xs text-muted-foreground">与</span>
-                      <div className="w-4 h-4 rounded-full bg-gradient-to-r from-emerald-500 to-teal-600 flex items-center justify-center text-white text-xs font-bold">
+                      <div className="w-4 h-4 rounded-full bg-gradient-to-r from-primary to-accent flex items-center justify-center text-white text-xs font-bold">
                         {article.agent?.avatar || "✨"}
                       </div>
-                      <span className="text-xs text-emerald-600 font-medium">
+                      <span className="text-xs text-primary font-medium">
                         {article.agent?.name || 'AI助手'}
                       </span>
                     </div>

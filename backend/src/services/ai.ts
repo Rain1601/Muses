@@ -195,6 +195,80 @@ ${instructions}
 
     return completion.choices[0].message.content || currentContent;
   }
+
+  async generateChatResponse({
+    userId,
+    agent,
+    messages,
+    materials,
+  }: {
+    userId: string;
+    agent: any;
+    messages: Array<{ role: string; content: string }>;
+    materials?: string;
+  }): Promise<string> {
+    // 构建对话系统提示词
+    const systemPrompt = this.buildChatSystemPrompt(agent, materials);
+    
+    // 构建对话消息
+    const chatMessages = [
+      { role: "system" as const, content: systemPrompt },
+      ...messages.map(msg => ({
+        role: msg.role as "user" | "assistant",
+        content: msg.content,
+      })),
+    ];
+
+    const openai = await this.getOpenAIClient(userId);
+    
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4-turbo-preview",
+      messages: chatMessages as any, // 临时解决TypeScript类型问题
+      temperature: 0.7,
+      max_tokens: 1000, // 对话回复不需要太长
+    });
+
+    return completion.choices[0].message.content || '抱歉，我无法生成回复。';
+  }
+
+  private buildChatSystemPrompt(agent: any, materials?: string): string {
+    const toneMap: Record<string, string> = {
+      professional: '专业严谨',
+      casual: '轻松随意',
+      humorous: '幽默风趣',
+      serious: '严肃认真',
+    };
+
+    let prompt = `你是一个${agent.name}，正在和用户进行对话，帮助用户生成博客文章。
+
+你的特点：
+- 语言：${agent.language === 'zh-CN' ? '中文' : agent.language === 'en-US' ? '英文' : '中英混合'}
+- 语气：${toneMap[agent.tone] || agent.tone}`;
+
+    if (agent.targetAudience) {
+      prompt += `\n- 目标读者：${agent.targetAudience}`;
+    }
+
+    if (agent.description) {
+      prompt += `\n- 特点描述：${agent.description}`;
+    }
+
+    if (materials) {
+      prompt += `\n\n参考素材：\n${materials}`;
+      prompt += `\n\n你可以在对话中引用这些素材，回答用户关于素材的问题，或者基于素材提供建议。`;
+    }
+
+    prompt += `\n\n请以友好、有帮助的方式与用户对话。你可以：
+1. 回答用户关于写作的问题
+2. 基于素材提供写作建议
+3. 帮助用户梳理文章结构
+4. 提供内容优化建议
+5. 与用户讨论文章主题和方向
+
+保持对话自然流畅，不要太过冗长。`;
+
+    return prompt;
+  }
 }
 
 export const aiService = new AIService();
