@@ -88,7 +88,9 @@ export default function AgentsPage() {
             </div>
           ) : agents.length === 0 ? (
             <div className="text-center py-12 border rounded-lg">
-              <div className="text-4xl mb-4">🤖</div>
+              <div className="w-16 h-16 rounded-full bg-gradient-to-r from-violet-500 to-purple-600 flex items-center justify-center text-white text-2xl font-bold mb-4 mx-auto">
+                ✨
+              </div>
               <p className="text-muted-foreground mb-4">
                 还没有创建任何Agent
               </p>
@@ -108,8 +110,8 @@ export default function AgentsPage() {
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center space-x-3">
-                      <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-2xl">
-                        {agent.avatar || "🤖"}
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-r from-emerald-500 to-teal-600 flex items-center justify-center text-white text-lg font-bold">
+                        {agent.avatar || "✨"}
                       </div>
                       <div>
                         <h3 className="font-semibold">{agent.name}</h3>

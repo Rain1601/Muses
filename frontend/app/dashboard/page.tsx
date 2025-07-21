@@ -128,7 +128,9 @@ export default function DashboardPage() {
               href="/agents"
               className="p-6 border rounded-lg hover:border-primary transition-colors text-center"
             >
-              <div className="text-3xl mb-2">🤖</div>
+              <div className="w-12 h-12 rounded-full bg-gradient-to-r from-emerald-500 to-teal-600 flex items-center justify-center text-white text-xl font-bold mb-2 mx-auto">
+                ✨
+              </div>
               <h3 className="font-medium">管理Agent</h3>
               <p className="text-sm text-muted-foreground mt-1">
                 创建和编辑AI助手

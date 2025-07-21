@@ -7,10 +7,25 @@ import { ProtectedRoute } from "@/components/protected-route";
 import { Navbar } from "@/components/navbar";
 import axios from "axios";
 
+// 创建axios实例，自动包含认证token
+const api = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080',
+});
+
+// 请求拦截器，自动添加token
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 interface Agent {
   id: string;
   name: string;
   avatar?: string;
+  isDefault?: boolean;
 }
 
 export default function NewArticlePage() {
@@ -36,7 +51,7 @@ export default function NewArticlePage() {
 
   const fetchAgents = async () => {
     try {
-      const response = await axios.get("/api/agents");
+      const response = await api.get("/api/agents");
       setAgents(response.data.agents);
       // 设置默认Agent
       const defaultAgent = response.data.agents.find((a: Agent) => a.isDefault);
@@ -58,11 +73,11 @@ export default function NewArticlePage() {
     formData.append("file", file);
 
     try {
-      const uploadResponse = await axios.post("/api/upload/file", formData);
+      const uploadResponse = await api.post("/api/upload/file", formData);
       const fileInfo = uploadResponse.data.file;
       
       // 解析文件内容
-      const parseResponse = await axios.post("/api/upload/parse", {
+      const parseResponse = await api.post("/api/upload/parse", {
         fileId: fileInfo.id,
       });
       
@@ -84,13 +99,18 @@ export default function NewArticlePage() {
       return;
     }
 
+    if (mode === "chat" && chatMessages.length === 0) {
+      alert("请先开始对话");
+      return;
+    }
+
     setIsLoading(true);
 
     try {
       let response;
       
       if (mode === "material") {
-        response = await axios.post("/api/generate/article", {
+        response = await api.post("/api/generate/article", {
           agentId: selectedAgent,
           materials,
           title,
@@ -98,9 +118,10 @@ export default function NewArticlePage() {
           saveAsDraft: true,
         });
       } else if (mode === "chat") {
-        response = await axios.post("/api/generate/chat", {
+        response = await api.post("/api/generate/chat", {
           agentId: selectedAgent,
           messages: chatMessages,
+          materials: materials, // 包含上传的素材
           saveAsDraft: true,
         });
       }
@@ -121,13 +142,34 @@ export default function NewArticlePage() {
     }
   };
 
-  const handleChatSend = () => {
-    if (!chatInput.trim()) return;
+  const handleChatSend = async () => {
+    if (!chatInput.trim() || !selectedAgent) return;
     
-    setChatMessages([...chatMessages, { role: "user", content: chatInput }]);
+    const userMessage = { role: "user", content: chatInput };
+    const newMessages = [...chatMessages, userMessage];
+    setChatMessages(newMessages);
     setChatInput("");
     
-    // 这里可以添加AI回复的逻辑
+    try {
+      // 调用AI对话API，包含素材内容作为上下文
+      const response = await api.post("/api/generate/chat-stream", {
+        agentId: selectedAgent,
+        messages: newMessages,
+        materials: materials || "", // 包含上传的素材内容
+      });
+      
+      // 添加AI回复
+      const aiMessage = { role: "assistant", content: response.data.response };
+      setChatMessages([...newMessages, aiMessage]);
+    } catch (error: any) {
+      console.error("Chat error:", error);
+      // 添加错误提示
+      const errorMessage = { 
+        role: "assistant", 
+        content: "抱歉，我遇到了一些问题。请检查网络连接或稍后重试。" 
+      };
+      setChatMessages([...newMessages, errorMessage]);
+    }
   };
 
   return (
@@ -266,55 +308,100 @@ export default function NewArticlePage() {
                   </div>
                 </>
               ) : mode === "chat" ? (
-                <div className="border rounded-lg h-[600px] flex flex-col">
-                  {/* 对话历史 */}
-                  <div className="flex-1 p-4 overflow-y-auto">
-                    {chatMessages.length === 0 ? (
-                      <div className="text-center text-muted-foreground py-8">
-                        <div className="text-3xl mb-2">💬</div>
-                        <p>开始对话，让AI帮您生成文章</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {chatMessages.map((msg, index) => (
-                          <div
-                            key={index}
-                            className={`flex ${
-                              msg.role === "user" ? "justify-end" : "justify-start"
-                            }`}
-                          >
-                            <div
-                              className={`max-w-[80%] px-4 py-2 rounded-lg ${
-                                msg.role === "user"
-                                  ? "bg-primary text-primary-foreground"
-                                  : "bg-muted"
-                              }`}
-                            >
-                              {msg.content}
-                            </div>
+                <div className="space-y-6">
+                  {/* 文件上传区 - 整合到对话模式 */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      上传素材文件（可选）
+                    </label>
+                    <div className="border-2 border-dashed rounded-lg p-4 text-center hover:border-primary transition-colors">
+                      <input
+                        type="file"
+                        onChange={handleFileUpload}
+                        accept=".pdf,.md,.txt,.doc,.docx"
+                        className="hidden"
+                        id="chat-file-upload"
+                      />
+                      <label
+                        htmlFor="chat-file-upload"
+                        className="cursor-pointer"
+                      >
+                        <div className="text-2xl mb-1">📁</div>
+                        <p className="text-sm text-muted-foreground">
+                          上传文件后可以在对话中引用
+                        </p>
+                      </label>
+                    </div>
+                    {uploadedFiles.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        {uploadedFiles.map((file, index) => (
+                          <div key={index} className="text-sm text-muted-foreground">
+                            ✓ {file.originalName}
                           </div>
                         ))}
                       </div>
                     )}
                   </div>
-                  
-                  {/* 输入区 */}
-                  <div className="border-t p-4">
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={chatInput}
-                        onChange={(e) => setChatInput(e.target.value)}
-                        onKeyPress={(e) => e.key === "Enter" && handleChatSend()}
-                        className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                        placeholder="输入您的想法..."
-                      />
-                      <button
-                        onClick={handleChatSend}
-                        className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90"
-                      >
-                        发送
-                      </button>
+
+                  {/* 对话区域 */}
+                  <div className="border rounded-lg h-[500px] flex flex-col">
+                    {/* 对话历史 */}
+                    <div className="flex-1 p-4 overflow-y-auto">
+                      {chatMessages.length === 0 ? (
+                        <div className="text-center text-muted-foreground py-8">
+                          <div className="text-3xl mb-2">💬</div>
+                          <p>开始对话，让AI帮您生成文章</p>
+                          <p className="text-xs mt-2">提示：可以先上传文件，然后在对话中询问相关问题</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {chatMessages.map((msg, index) => (
+                            <div
+                              key={index}
+                              className={`flex ${
+                                msg.role === "user" ? "justify-end" : "justify-start"
+                              }`}
+                            >
+                              <div
+                                className={`max-w-[80%] px-4 py-2 rounded-lg whitespace-pre-wrap ${
+                                  msg.role === "user"
+                                    ? "bg-primary text-primary-foreground"
+                                    : "bg-muted"
+                                }`}
+                              >
+                                {msg.content}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* 输入区 */}
+                    <div className="border-t p-4">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={chatInput}
+                          onChange={(e) => setChatInput(e.target.value)}
+                          onKeyPress={(e) => e.key === "Enter" && !e.shiftKey && handleChatSend()}
+                          className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                          placeholder="输入您的想法... (Enter发送，Shift+Enter换行)"
+                          disabled={!selectedAgent}
+                        />
+                        <button
+                          onClick={handleChatSend}
+                          disabled={!selectedAgent || !chatInput.trim()}
+                          className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50"
+                        >
+                          发送
+                        </button>
+                      </div>
+                      {materials && (
+                        <div className="mt-2 text-xs text-muted-foreground">
+                          已上传素材内容，AI可以在对话中引用这些信息
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -350,7 +437,9 @@ export default function NewArticlePage() {
                         }`}
                       >
                         <div className="flex items-center space-x-3">
-                          <div className="text-2xl">{agent.avatar || "🤖"}</div>
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-r from-emerald-500 to-teal-600 flex items-center justify-center text-white text-lg font-bold">
+                            {agent.avatar || "✨"}
+                          </div>
                           <div>
                             <div className="font-medium">{agent.name}</div>
                             {agent.isDefault && (

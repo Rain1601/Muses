@@ -29,7 +29,7 @@ export default function NewAgentPage() {
   const [formData, setFormData] = useState({
     name: "",
     description: "",
-    avatar: "🤖",
+    avatar: "✨",
     language: "zh-CN",
     tone: "professional",
     lengthPreference: "medium",
@@ -70,7 +70,7 @@ export default function NewAgentPage() {
     }
   };
 
-  const avatarOptions = ["🤖", "✍️", "📝", "💡", "🎯", "🚀", "💬", "📚"];
+  const avatarOptions = ["✨", "🌟", "💎", "🔮", "⚡", "🎭", "🎨", "🧠", "🚀", "✍️", "📝", "💡"];
 
   return (
     <ProtectedRoute>

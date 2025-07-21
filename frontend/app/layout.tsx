@@ -2,12 +2,23 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
+import { ThemeProvider } from "@/components/theme-provider";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Muses - AI文档生成平台",
+  title: "Muses",
   description: "智能将素材转换为个性化博客文章",
+  icons: {
+    icon: [
+      {
+        url: "/feather-favicon.svg",
+        type: "image/svg+xml",
+      },
+    ],
+    shortcut: "/feather-favicon.svg",
+    apple: "/feather-favicon.svg"
+  },
 };
 
 export default function RootLayout({
@@ -18,7 +29,14 @@ export default function RootLayout({
   return (
     <html lang="zh-CN" suppressHydrationWarning>
       <body className={inter.className}>
-        <Providers>{children}</Providers>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          enableSystem
+          disableTransitionOnChange={false}
+        >
+          <Providers>{children}</Providers>
+        </ThemeProvider>
       </body>
     </html>
   );
