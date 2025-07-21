@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ProtectedRoute } from "@/components/protected-route";
-import { Navbar } from "@/components/navbar";
+import Navigation from "@/components/Navigation";
 import axios from "axios";
 
 interface Template {
@@ -75,7 +75,7 @@ export default function NewAgentPage() {
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-background">
-        <Navbar />
+        <Navigation />
         
         <main className="container mx-auto px-4 py-8 max-w-2xl">
           <div className="mb-8">

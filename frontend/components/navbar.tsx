@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useUserStore } from "@/store/user";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export function Navbar() {
   const pathname = usePathname();
@@ -43,6 +44,7 @@ export function Navbar() {
           </div>
           
           <div className="flex items-center space-x-4">
+            <ThemeToggle />
             <Link
               href="/articles/new"
               className="hidden md:inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 text-sm"

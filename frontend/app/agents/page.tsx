@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ProtectedRoute } from "@/components/protected-route";
-import { Navbar } from "@/components/navbar";
+import Navigation from "@/components/Navigation";
 import axios from "axios";
 
 interface Agent {
@@ -64,7 +64,7 @@ export default function AgentsPage() {
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-background">
-        <Navbar />
+        <Navigation />
         
         <main className="container mx-auto px-4 py-8">
           <div className="flex items-center justify-between mb-8">

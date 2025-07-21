@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ProtectedRoute } from "@/components/protected-route";
-import { Navbar } from "@/components/navbar";
+import Navigation from "@/components/Navigation";
 import axios from "axios";
 
 // 创建axios实例，自动包含认证token
@@ -175,7 +175,7 @@ export default function NewArticlePage() {
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-background">
-        <Navbar />
+        <Navigation />
         
         <main className="container mx-auto px-4 py-8 max-w-6xl">
           <div className="mb-8">

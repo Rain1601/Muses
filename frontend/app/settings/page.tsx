@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { ProtectedRoute } from "@/components/protected-route";
-import { Navbar } from "@/components/navbar";
+import Navigation from "@/components/Navigation";
 import { useUserStore } from "@/store/user";
 import axios from "axios";
 
@@ -112,7 +112,7 @@ export default function SettingsPage() {
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-background">
-        <Navbar />
+        <Navigation />
         
         <main className="container mx-auto px-4 py-8 max-w-4xl">
           <h1 className="text-2xl font-bold mb-8">设置</h1>
