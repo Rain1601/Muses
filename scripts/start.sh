@@ -9,39 +9,41 @@ echo "🚀 启动 Muses 项目..."
 echo ""
 
 # 检查是否已经初始化
-if [ ! -d "frontend/node_modules" ] || [ ! -d "backend/node_modules" ]; then
+if [ ! -d "frontend/node_modules" ] || [ ! -f "backend-python/requirements.txt" ]; then
     echo "⚠️  检测到项目未初始化"
     echo "正在运行初始化脚本..."
     ./scripts/setup.sh
 fi
 
 # 检查环境变量文件
-if [ ! -f "backend/.env" ]; then
-    echo "❌ 错误: backend/.env 文件不存在"
+if [ ! -f "backend-python/.env" ]; then
+    echo "❌ 错误: backend-python/.env 文件不存在"
     echo "请先运行 ./scripts/setup.sh 并配置环境变量"
     exit 1
 fi
 
 # 检查必要的环境变量
-source backend/.env
+source backend-python/.env
 if [ -z "$JWT_SECRET" ] || [ -z "$GITHUB_CLIENT_ID" ] || [ -z "$GITHUB_CLIENT_SECRET" ]; then
     echo "❌ 错误: 环境变量配置不完整"
-    echo "请编辑 backend/.env 文件，确保以下变量已设置："
+    echo "请编辑 backend-python/.env 文件，确保以下变量已设置："
     echo "  - JWT_SECRET"
     echo "  - GITHUB_CLIENT_ID"
     echo "  - GITHUB_CLIENT_SECRET"
+    echo "  - ENCRYPTION_KEY"
     exit 1
 fi
 
 # 清理之前的进程
 echo "🧹 清理之前的进程..."
-pkill -f "pnpm dev" || true
+pkill -f "python.*start.py" || true
+pkill -f "npm.*dev" || true
 sleep 2
 
-# 启动后端
-echo "🔧 启动后端服务 (端口 8080)..."
-cd backend
-npm run dev &
+# 启动Python后端
+echo "🔧 启动Python后端服务 (端口 8080)..."
+cd backend-python
+python start.py &
 BACKEND_PID=$!
 cd ..
 
@@ -50,7 +52,7 @@ echo "⏳ 等待后端服务启动..."
 sleep 5
 
 # 检查后端是否启动成功
-if ! curl -s http://localhost:8080/api/health > /dev/null; then
+if ! curl -s http://localhost:8080/health > /dev/null; then
     echo "❌ 后端服务启动失败"
     kill $BACKEND_PID 2>/dev/null || true
     exit 1
