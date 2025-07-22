@@ -6,13 +6,7 @@ import { useUserStore } from '@/store/user';
 import { api } from '@/lib/api';
 import Navigation from '@/components/Navigation';
 import { Button } from '@/components/ui/button';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import rehypeHighlight from 'rehype-highlight';
-import rehypeKatex from 'rehype-katex';
-
-// 导入样式
-import 'highlight.js/styles/github.css';
+// HTML文章显示，不再需要Markdown相关的导入
 
 interface Article {
   id: string;
@@ -51,51 +45,18 @@ export default function ArticleDetailPage() {
     }
   }, [user, isLoading, router, articleId]);
 
-  // 处理 Mermaid 图表渲染和 katex 加载
+  // 添加代码高亮样式
   useEffect(() => {
-    const loadStylesAndRender = async () => {
-      try {
-        // 动态加载 katex CSS
-        if (typeof document !== 'undefined') {
-          const katexCSS = document.querySelector('link[href*="katex"]');
-          if (!katexCSS) {
-            const link = document.createElement('link');
-            link.rel = 'stylesheet';
-            link.href = 'https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css';
-            document.head.appendChild(link);
-          }
-        }
-        
-        // 处理 Mermaid 图表
-        if (article?.content && article.content.includes('```mermaid')) {
-          const mermaid = (await import('mermaid')).default;
-          mermaid.initialize({
-            theme: 'default',
-            startOnLoad: true,
-            fontFamily: 'inherit',
-            fontSize: 14,
-            flowchart: {
-              useMaxWidth: true,
-              htmlLabels: true
-            },
-            sequence: {
-              useMaxWidth: true
-            },
-            gantt: {
-              useMaxWidth: true
-            }
-          });
-          // 等待 DOM 更新后再渲染
-          setTimeout(() => {
-            mermaid.init(undefined, document.querySelectorAll('.mermaid'));
-          }, 100);
-        }
-      } catch (error) {
-        console.error('Failed to load styles or render Mermaid:', error);
+    // 动态加载代码高亮样式
+    if (typeof document !== 'undefined' && article?.content) {
+      const highlightCSS = document.querySelector('link[href*="highlight"]');
+      if (!highlightCSS) {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = 'https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github.min.css';
+        document.head.appendChild(link);
       }
-    };
-
-    loadStylesAndRender();
+    }
   }, [article?.content]);
 
   const fetchArticle = async () => {
@@ -285,100 +246,26 @@ export default function ArticleDetailPage() {
       )}
 
       {/* 文章内容 */}
-      <div className="prose prose-lg max-w-none">
-        <ReactMarkdown
-          remarkPlugins={[remarkGfm]}
-          rehypePlugins={[
-            [rehypeHighlight, { ignoreMissing: true }],
-            rehypeKatex
-          ]}
-          components={{
-            // 代码块自定义样式
-            code: ({ node, inline, className, children, ...props }: any) => {
-              const match = /language-(\w+)/.exec(className || '');
-              const language = match ? match[1] : '';
-              
-              // Mermaid 图表处理
-              if (language === 'mermaid') {
-                return (
-                  <div className="mermaid bg-white p-4 border rounded-lg my-4" style={{ textAlign: 'center' }}>
-                    {String(children).replace(/\n$/, '')}
-                  </div>
-                );
-              }
-              
-              return inline ? (
-                <code className={`${className} bg-gray-100 px-1 rounded text-sm`} {...props}>
-                  {children}
-                </code>
-              ) : (
-                <pre className="bg-gray-50 p-4 rounded-lg overflow-x-auto border">
-                  <code className={className} {...props}>
-                    {children}
-                  </code>
-                </pre>
-              );
-            },
-            // 图片优化
-            img: ({ src, alt, ...props }: any) => (
-              <img 
-                src={src} 
-                alt={alt} 
-                {...props}
-                className="max-w-full h-auto rounded-lg shadow-sm my-4"
-                loading="lazy"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiBmaWxsPSIjRjVGNUY1IiBzdHJva2U9IiNEOUQ5RDkiLz4KPGC4dGggZD0iTTEyIDhWMTZNOCAxMkgxNiIgc3Ryb2tlPSIjOTk5OTk5IiBzdHJva2Utd2lkdGg9IjIiIGZcUm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4K';
-                  target.alt = alt + ' (图片加载失败)';
-                }}
-              />
-            ),
-            // 表格样式优化
-            table: ({ children, ...props }: any) => (
-              <div className="overflow-x-auto my-4">
-                <table className="min-w-full border-collapse border border-gray-300" {...props}>
-                  {children}
-                </table>
-              </div>
-            ),
-            th: ({ children, ...props }: any) => (
-              <th className="border border-gray-300 px-4 py-2 bg-gray-50 font-medium text-left" {...props}>
-                {children}
-              </th>
-            ),
-            td: ({ children, ...props }: any) => (
-              <td className="border border-gray-300 px-4 py-2" {...props}>
-                {children}
-              </td>
-            ),
-            // 标题样式优化
-            h1: ({ children, ...props }: any) => (
-              <h1 className="text-3xl font-bold mt-8 mb-4 border-b pb-2" {...props}>
-                {children}
-              </h1>
-            ),
-            h2: ({ children, ...props }: any) => (
-              <h2 className="text-2xl font-bold mt-6 mb-3" {...props}>
-                {children}
-              </h2>
-            ),
-            h3: ({ children, ...props }: any) => (
-              <h3 className="text-xl font-bold mt-4 mb-2" {...props}>
-                {children}
-              </h3>
-            ),
-            // 引用块样式
-            blockquote: ({ children, ...props }: any) => (
-              <blockquote className="border-l-4 border-blue-500 pl-4 py-2 my-4 bg-blue-50 italic" {...props}>
-                {children}
-              </blockquote>
-            )
-          }}
-        >
-          {article.content}
-        </ReactMarkdown>
-      </div>
+      <div 
+        className="prose prose-lg max-w-none
+          prose-headings:font-bold
+          prose-h1:text-3xl prose-h1:mt-8 prose-h1:mb-4 prose-h1:border-b prose-h1:pb-2
+          prose-h2:text-2xl prose-h2:mt-6 prose-h2:mb-3
+          prose-h3:text-xl prose-h3:mt-4 prose-h3:mb-2
+          prose-p:my-4 prose-p:leading-relaxed
+          prose-a:text-blue-600 prose-a:underline hover:prose-a:text-blue-800
+          prose-blockquote:border-l-4 prose-blockquote:border-blue-500 prose-blockquote:pl-4 prose-blockquote:py-2 prose-blockquote:my-4 prose-blockquote:bg-blue-50 prose-blockquote:italic
+          prose-code:bg-gray-100 prose-code:px-1 prose-code:rounded prose-code:text-sm
+          prose-pre:bg-gray-50 prose-pre:p-4 prose-pre:rounded-lg prose-pre:overflow-x-auto prose-pre:border
+          prose-img:max-w-full prose-img:h-auto prose-img:rounded-lg prose-img:shadow-sm prose-img:my-4
+          prose-table:min-w-full prose-table:border-collapse prose-table:border prose-table:border-gray-300
+          prose-th:border prose-th:border-gray-300 prose-th:px-4 prose-th:py-2 prose-th:bg-gray-50 prose-th:font-medium prose-th:text-left
+          prose-td:border prose-td:border-gray-300 prose-td:px-4 prose-td:py-2
+          prose-ul:list-disc prose-ul:pl-6 prose-ul:my-4
+          prose-ol:list-decimal prose-ol:pl-6 prose-ol:my-4
+          prose-li:my-2"
+        dangerouslySetInnerHTML={{ __html: article.content }}
+      />
 
       {/* 底部信息 */}
       <div className="mt-12 pt-8 border-t border-gray-200">
