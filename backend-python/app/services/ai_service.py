@@ -1,4 +1,5 @@
 import openai
+import markdown
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 
@@ -56,10 +57,11 @@ class AIService:
         prompt += f"""
 
 输出格式要求：
-1. 文章必须是{agent.outputFormat.upper() if agent.outputFormat == 'mdx' else 'Markdown'}格式
-2. 包含适当的标题层级
+1. 文章必须是Markdown格式（我会自动转换为HTML）
+2. 包含适当的标题层级（使用 #, ##, ### 等）
 3. 如果适合，可以包含代码块、列表、引用等元素
 4. 文章结构清晰，逻辑流畅
+5. 使用标准Markdown语法，确保转换为HTML后格式正确
 
 请直接输出文章内容，不要包含其他说明。"""
         
@@ -105,25 +107,44 @@ class AIService:
         return prompt
     
     @staticmethod
+    def _markdown_to_html(markdown_text: str) -> str:
+        """将Markdown转换为HTML"""
+        # 配置markdown扩展
+        md = markdown.Markdown(extensions=[
+            'extra',  # 包括表格、代码块等
+            'codehilite',  # 代码高亮
+            'fenced_code',  # 围栏代码块
+            'tables',  # 表格支持
+            'toc',  # 目录支持
+            'nl2br',  # 换行转<br>
+            'sane_lists',  # 更好的列表处理
+        ])
+        return md.convert(markdown_text)
+    
+    @staticmethod
     def _parse_article_response(response: str, provided_title: Optional[str] = None) -> Dict[str, str]:
         """解析文章生成响应"""
         lines = response.strip().split('\n')
         title = provided_title or "未命名文章"
-        content = response
+        markdown_content = response
         
         # 如果响应以 # 开头，说明包含了标题
         if lines and lines[0].startswith('# '):
             title = lines[0].replace('# ', '').strip()
-            content = '\n'.join(lines[1:]).strip()
+            markdown_content = '\n'.join(lines[1:]).strip()
+        
+        # 将Markdown转换为HTML
+        html_content = AIService._markdown_to_html(markdown_content)
         
         # 生成摘要（取前200个字符）
-        plain_text = content.replace('#', '').replace('*', '').replace('`', '').strip()
+        plain_text = markdown_content.replace('#', '').replace('*', '').replace('`', '').strip()
         summary = plain_text[:200] + '...' if len(plain_text) > 200 else plain_text
         
         return {
             "title": title,
-            "content": content, 
-            "summary": summary
+            "content": html_content,  # 返回HTML内容
+            "summary": summary,
+            "markdown_content": markdown_content  # 保留原始Markdown内容以备需要
         }
     
     @classmethod
@@ -225,7 +246,7 @@ class AIService:
 改进要求：
 {instructions}
 
-请直接输出改进后的完整文章内容。"""
+请直接输出改进后的完整文章内容（Markdown格式）。"""
         
         try:
             response = client.chat.completions.create(
@@ -238,7 +259,9 @@ class AIService:
                 max_tokens=4000
             )
             
-            return response.choices[0].message.content or current_content
+            markdown_response = response.choices[0].message.content or current_content
+            # 将Markdown转换为HTML
+            return cls._markdown_to_html(markdown_response)
             
         except Exception as e:
             raise ValidationError(f"Article improvement failed: {str(e)}")

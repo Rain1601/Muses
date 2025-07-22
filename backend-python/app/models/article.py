@@ -17,7 +17,7 @@ class Article(Base):
     agentId = Column(String, ForeignKey("Agent.id"), nullable=False)
     
     title = Column(String, nullable=False)
-    content = Column(Text, nullable=False)  # Markdown内容
+    content = Column(Text, nullable=False)  # HTML内容（从Markdown转换而来）
     summary = Column(Text, nullable=True)
     
     # 发布信息

@@ -100,7 +100,55 @@ async def publish_to_github(
         repo = repo_parts[-1]
         
         # 准备文件内容
-        file_content = f"""# {article.title}
+        # 如果文件路径以.html结尾，直接使用HTML内容
+        if file_path.endswith('.html'):
+            file_content = f"""<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{article.title}</title>
+    <style>
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+        }}
+        h1, h2, h3, h4, h5, h6 {{
+            margin-top: 24px;
+            margin-bottom: 16px;
+        }}
+        code {{
+            background-color: #f4f4f4;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+        }}
+        pre {{
+            background-color: #f4f4f4;
+            padding: 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+        }}
+        blockquote {{
+            border-left: 4px solid #ddd;
+            margin: 0;
+            padding-left: 16px;
+            color: #666;
+        }}
+    </style>
+</head>
+<body>
+    <h1>{article.title}</h1>
+    {article.content}
+</body>
+</html>"""
+        else:
+            # 如果是Markdown文件，仍然使用原始格式
+            file_content = f"""# {article.title}
 
 {article.content}
 """
