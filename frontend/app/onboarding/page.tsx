@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useUserStore } from "@/store/user";
 import { auth } from "@/lib/auth";
-import axios from "axios";
+import { api } from "@/lib/api";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -47,7 +47,7 @@ export default function OnboardingPage() {
 
     try {
       // 保存用户设置
-      const response = await axios.post("/api/user/settings", {
+      const response = await api.post("/api/user/settings", {
         openaiKey,
         defaultRepoUrl: repoUrl,
       });

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ProtectedRoute } from "@/components/protected-route";
 import Navigation from "@/components/Navigation";
-import axios from "axios";
+import { api } from "@/lib/api";
 
 interface Template {
   id: string;
@@ -41,7 +41,7 @@ export default function NewAgentPage() {
 
   // 获取模板
   useState(() => {
-    axios.get("/api/agents/templates/list").then((res) => {
+    api.get("/api/agents/templates/list").then((res) => {
       setTemplates(res.data.templates);
     });
   });
@@ -61,7 +61,7 @@ export default function NewAgentPage() {
     setIsLoading(true);
 
     try {
-      await axios.post("/api/agents", formData);
+      await api.post("/api/agents", formData);
       router.push("/agents");
     } catch (error: any) {
       alert(error.response?.data?.error || "创建失败");

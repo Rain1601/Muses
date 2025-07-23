@@ -6,7 +6,7 @@ import { useUserStore } from '@/store/user';
 import { api } from '@/lib/api';
 import Navigation from '@/components/Navigation';
 import { Button } from '@/components/ui/button';
-// HTML文章显示，不再需要Markdown相关的导入
+import MarkdownRenderer from '@/components/MarkdownRenderer';
 
 interface Article {
   id: string;
@@ -45,19 +45,7 @@ export default function ArticleDetailPage() {
     }
   }, [user, isLoading, router, articleId]);
 
-  // 添加代码高亮样式
-  useEffect(() => {
-    // 动态加载代码高亮样式
-    if (typeof document !== 'undefined' && article?.content) {
-      const highlightCSS = document.querySelector('link[href*="highlight"]');
-      if (!highlightCSS) {
-        const link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = 'https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github.min.css';
-        document.head.appendChild(link);
-      }
-    }
-  }, [article?.content]);
+
 
   const fetchArticle = async () => {
     try {
@@ -185,9 +173,9 @@ export default function ArticleDetailPage() {
               className="w-12 h-12 rounded-full border-2 border-gray-200"
             />
           )}
-          <div className="flex-1">
-            <p className="font-bold text-lg">{user?.username || 'Unknown User'}</p>
-            <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                      <div className="flex-1">
+              <p className="font-bold text-lg text-gray-900 dark:text-gray-100">{user?.username || 'Unknown User'}</p>
+            <div className="flex items-center space-x-2 text-sm text-muted-foreground dark:text-gray-400">
               <span>{new Date(article.createdAt).toLocaleString()}</span>
               <span>•</span>
               <div className="flex items-center space-x-1">
@@ -196,7 +184,7 @@ export default function ArticleDetailPage() {
                   <div className="w-4 h-4 rounded-full bg-gradient-to-r from-emerald-500 to-teal-600 flex items-center justify-center text-white text-xs font-bold">
                     {article.agent?.avatar || "✨"}
                   </div>
-                  <span className="font-medium text-emerald-600">{article.agent?.name || 'AI助手'}</span>
+                  <span className="font-medium text-emerald-600 dark:text-emerald-400">{article.agent?.name || 'AI助手'}</span>
                 </div>
                 <span>协作</span>
               </div>
@@ -226,7 +214,7 @@ export default function ArticleDetailPage() {
               href={article.githubUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-blue-600 hover:underline text-sm"
+              className="text-blue-600 dark:text-blue-400 hover:underline text-sm"
             >
               在 GitHub 上查看
             </a>
@@ -235,41 +223,25 @@ export default function ArticleDetailPage() {
       </div>
 
       {/* 文章标题 */}
-      <h1 className="text-4xl font-bold mb-6">{article.title}</h1>
+      <h1 className="text-4xl font-bold mb-6 text-gray-900 dark:text-gray-100">{article.title}</h1>
 
       {/* 文章摘要 */}
       {article.summary && (
-        <div className="bg-gray-50 p-4 rounded-lg mb-8">
-          <h2 className="font-semibold mb-2">摘要</h2>
-          <p className="text-muted-foreground">{article.summary}</p>
+        <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg mb-8 border border-gray-200 dark:border-gray-700">
+          <h2 className="font-semibold mb-2 text-gray-900 dark:text-gray-100">摘要</h2>
+          <p className="text-muted-foreground dark:text-gray-300">{article.summary}</p>
         </div>
       )}
 
       {/* 文章内容 */}
-      <div 
-        className="prose prose-lg max-w-none
-          prose-headings:font-bold
-          prose-h1:text-3xl prose-h1:mt-8 prose-h1:mb-4 prose-h1:border-b prose-h1:pb-2
-          prose-h2:text-2xl prose-h2:mt-6 prose-h2:mb-3
-          prose-h3:text-xl prose-h3:mt-4 prose-h3:mb-2
-          prose-p:my-4 prose-p:leading-relaxed
-          prose-a:text-blue-600 prose-a:underline hover:prose-a:text-blue-800
-          prose-blockquote:border-l-4 prose-blockquote:border-blue-500 prose-blockquote:pl-4 prose-blockquote:py-2 prose-blockquote:my-4 prose-blockquote:bg-blue-50 prose-blockquote:italic
-          prose-code:bg-gray-100 prose-code:px-1 prose-code:rounded prose-code:text-sm
-          prose-pre:bg-gray-50 prose-pre:p-4 prose-pre:rounded-lg prose-pre:overflow-x-auto prose-pre:border
-          prose-img:max-w-full prose-img:h-auto prose-img:rounded-lg prose-img:shadow-sm prose-img:my-4
-          prose-table:min-w-full prose-table:border-collapse prose-table:border prose-table:border-gray-300
-          prose-th:border prose-th:border-gray-300 prose-th:px-4 prose-th:py-2 prose-th:bg-gray-50 prose-th:font-medium prose-th:text-left
-          prose-td:border prose-td:border-gray-300 prose-td:px-4 prose-td:py-2
-          prose-ul:list-disc prose-ul:pl-6 prose-ul:my-4
-          prose-ol:list-decimal prose-ol:pl-6 prose-ol:my-4
-          prose-li:my-2"
-        dangerouslySetInnerHTML={{ __html: article.content }}
+      <MarkdownRenderer 
+        content={article.content}
+        className="prose prose-lg max-w-none"
       />
 
       {/* 底部信息 */}
-      <div className="mt-12 pt-8 border-t border-gray-200">
-        <div className="flex justify-between items-center text-sm text-muted-foreground">
+      <div className="mt-12 pt-8 border-t border-gray-200 dark:border-gray-700">
+        <div className="flex justify-between items-center text-sm text-muted-foreground dark:text-gray-400">
           <span>创建时间: {new Date(article.createdAt).toLocaleString()}</span>
           <span>最后更新: {new Date(article.updatedAt).toLocaleString()}</span>
         </div>

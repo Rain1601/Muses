@@ -5,7 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { ProtectedRoute } from "@/components/protected-route";
 import Navigation from "@/components/Navigation";
-import axios from "axios";
+import { api } from "@/lib/api";
 
 interface Agent {
   id: string;
@@ -48,7 +48,7 @@ export default function EditAgentPage() {
 
   const fetchAgent = async () => {
     try {
-      const response = await axios.get(`/api/agents/${agentId}`);
+      const response = await api.get(`/api/agents/${agentId}`);
       setFormData(response.data.agent);
     } catch (error) {
       console.error("Failed to fetch agent:", error);
@@ -64,7 +64,7 @@ export default function EditAgentPage() {
     setIsLoading(true);
 
     try {
-      await axios.put(`/api/agents/${agentId}`, formData);
+      await api.put(`/api/agents/${agentId}`, formData);
       router.push("/agents");
     } catch (error: any) {
       alert(error.response?.data?.error || "更新失败");

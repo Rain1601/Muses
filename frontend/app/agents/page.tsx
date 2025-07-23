@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ProtectedRoute } from "@/components/protected-route";
 import Navigation from "@/components/Navigation";
-import axios from "axios";
+import { api } from "@/lib/api";
 
 interface Agent {
   id: string;
@@ -28,7 +28,7 @@ export default function AgentsPage() {
 
   const fetchAgents = async () => {
     try {
-      const response = await axios.get("/api/agents");
+      const response = await api.get("/api/agents");
       setAgents(response.data.agents);
     } catch (error) {
       console.error("Failed to fetch agents:", error);
@@ -41,7 +41,7 @@ export default function AgentsPage() {
     if (!confirm("确定要删除这个Agent吗？")) return;
 
     try {
-      await axios.delete(`/api/agents/${id}`);
+      await api.delete(`/api/agents/${id}`);
       await fetchAgents();
     } catch (error: any) {
       alert(error.response?.data?.error || "删除失败");

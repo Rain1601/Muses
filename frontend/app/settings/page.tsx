@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { ProtectedRoute } from "@/components/protected-route";
 import Navigation from "@/components/Navigation";
 import { useUserStore } from "@/store/user";
-import axios from "axios";
+import { api } from "@/lib/api";
 
 export default function SettingsPage() {
   const { user } = useUserStore();
@@ -31,7 +31,7 @@ export default function SettingsPage() {
 
   const fetchUserData = async () => {
     try {
-      const response = await axios.get("/api/user/profile");
+      const response = await api.get("/api/user/profile");
       const userData = response.data.user;
       setFormData({
         openaiKey: userData.hasOpenAIKey ? "••••••••" : "",
@@ -47,8 +47,8 @@ export default function SettingsPage() {
   const fetchStats = async () => {
     try {
       const [articlesRes, agentsRes] = await Promise.all([
-        axios.get("/api/articles"),
-        axios.get("/api/agents"),
+        api.get("/api/articles"),
+        api.get("/api/agents"),
       ]);
       
       setStats({
@@ -75,7 +75,7 @@ export default function SettingsPage() {
         updateData.openaiKey = formData.openaiKey;
       }
 
-      await axios.post("/api/user/settings", updateData);
+      await api.post("/api/user/settings", updateData);
       alert("设置保存成功");
       
       // 如果更改了主题，应用新主题
@@ -93,7 +93,7 @@ export default function SettingsPage() {
 
   const handleExportData = async () => {
     try {
-      const response = await axios.get("/api/user/export", {
+      const response = await api.get("/api/user/export", {
         responseType: "blob",
       });
       

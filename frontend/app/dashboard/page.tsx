@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useUserStore } from "@/store/user";
 import { auth } from "@/lib/auth";
 import Link from "next/link";
-import axios from "axios";
+import { api } from "@/lib/api";
+import Navigation from "@/components/Navigation";
 
 interface Article {
   id: string;
@@ -47,7 +48,7 @@ export default function DashboardPage() {
 
   const fetchArticles = async () => {
     try {
-      const response = await axios.get("/api/articles");
+      const response = await api.get("/api/articles");
       setArticles(response.data.articles);
     } catch (error) {
       console.error("Failed to fetch articles:", error);
@@ -66,45 +67,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* 顶部导航 */}
-      <header className="border-b">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-8">
-              <h1 className="text-2xl font-bold">Muses</h1>
-              <nav className="flex space-x-6">
-                <Link href="/dashboard" className="text-primary font-medium">
-                  工作台
-                </Link>
-                <Link href="/agents" className="text-muted-foreground hover:text-foreground">
-                  Agent管理
-                </Link>
-                <Link href="/settings" className="text-muted-foreground hover:text-foreground">
-                  设置
-                </Link>
-              </nav>
-            </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-muted-foreground">
-                {user.username}
-              </span>
-              {user.avatarUrl && (
-                <img
-                  src={user.avatarUrl}
-                  alt={user.username}
-                  className="w-8 h-8 rounded-full"
-                />
-              )}
-              <button
-                onClick={logout}
-                className="text-sm text-muted-foreground hover:text-foreground"
-              >
-                退出
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <Navigation />
 
       {/* 主内容区 */}
       <main className="container mx-auto px-4 py-8">

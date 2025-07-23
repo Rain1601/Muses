@@ -5,21 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ProtectedRoute } from "@/components/protected-route";
 import Navigation from "@/components/Navigation";
-import axios from "axios";
-
-// 创建axios实例，自动包含认证token
-const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080',
-});
-
-// 请求拦截器，自动添加token
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+import { api } from "@/lib/api";
 
 interface Agent {
   id: string;

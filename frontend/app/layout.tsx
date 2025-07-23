@@ -12,12 +12,12 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
-        url: "/feather-favicon.svg",
+        url: "/favicon.svg",
         type: "image/svg+xml",
       },
     ],
-    shortcut: "/feather-favicon.svg",
-    apple: "/feather-favicon.svg"
+    shortcut: "/favicon.svg",
+    apple: "/favicon.svg"
   },
 };
 
