@@ -81,3 +81,14 @@ class AgentResponse(BaseModel):
 
 class AgentTemplatesResponse(BaseModel):
     templates: list[AgentTemplate]
+
+
+class StyleAnalysisRequest(BaseModel):
+    content: str = Field(..., description="The text content to analyze")
+    contentType: Optional[str] = Field(None, description="Type of content: 'conversation', 'article', or auto-detect")
+
+
+class StyleAnalysisResponse(BaseModel):
+    detectedType: str = Field(..., description="Detected content type: conversation or article")
+    styleDescription: str = Field(..., description="Generated style description for custom prompt")
+    characteristics: dict = Field(..., description="Detailed style characteristics")

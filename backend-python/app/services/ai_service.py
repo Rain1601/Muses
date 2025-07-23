@@ -1,5 +1,6 @@
 import openai
 import markdown
+import json
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 
@@ -265,3 +266,71 @@ class AIService:
             
         except Exception as e:
             raise ValidationError(f"Article improvement failed: {str(e)}")
+    
+    @classmethod
+    async def analyze_writing_style(
+        cls,
+        user: User,
+        content: str,
+        content_type: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """分析文本内容并生成写作风格描述"""
+        
+        client = cls._get_openai_client(user)
+        
+        # 构建系统提示词
+        system_prompt = """你是一个专业的写作风格分析师。你的任务是：
+1. 判断内容类型（对话记录或文章）
+2. 分析写作风格特征
+3. 生成一个适合作为AI Agent customPrompt的风格描述
+
+请分析以下几个维度：
+- 语言风格（正式/非正式、专业/通俗等）
+- 句式特点（长短、复杂度）
+- 用词习惯（专业术语、口语化程度）
+- 表达方式（直接/委婉、理性/感性）
+- 特殊习惯（标点使用、段落组织等）
+
+返回JSON格式，包含：
+{
+    "detectedType": "conversation" 或 "article",
+    "styleDescription": "一段完整的风格描述，可直接用作customPrompt",
+    "characteristics": {
+        "language": "语言特点",
+        "tone": "语气风格",
+        "sentenceStyle": "句式特点",
+        "vocabulary": "用词特征",
+        "specialTraits": "特殊习惯"
+    }
+}"""
+        
+        # 构建用户提示词
+        user_prompt = f"请分析以下内容的写作风格：\n\n{content[:3000]}"  # 限制长度避免超出token限制
+        
+        if content_type:
+            user_prompt = f"内容类型提示：{content_type}\n\n" + user_prompt
+        
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4-turbo-preview",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.3,  # 降低温度以获得更稳定的分析结果
+                max_tokens=1000,
+                response_format={"type": "json_object"}
+            )
+            
+            result = json.loads(response.choices[0].message.content or "{}")
+            
+            # 确保返回格式正确
+            if not all(key in result for key in ["detectedType", "styleDescription", "characteristics"]):
+                raise ValidationError("Invalid response format from AI")
+            
+            return result
+            
+        except json.JSONDecodeError:
+            raise ValidationError("Failed to parse AI response as JSON")
+        except Exception as e:
+            raise ValidationError(f"Writing style analysis failed: {str(e)}")

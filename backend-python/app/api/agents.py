@@ -1,16 +1,20 @@
-from fastapi import APIRouter, Depends, HTTPException, Path
+from fastapi import APIRouter, Depends, HTTPException, Path, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List
+import os
+import json
 
 from ..database import get_db
 from ..models import Agent, Article
 from ..schemas.agent import (
     Agent as AgentSchema, AgentCreate, AgentUpdate, 
-    AgentListResponse, AgentResponse, AgentTemplatesResponse, AgentTemplate
+    AgentListResponse, AgentResponse, AgentTemplatesResponse, AgentTemplate,
+    StyleAnalysisRequest, StyleAnalysisResponse
 )
 from ..schemas.auth import SuccessResponse
 from ..dependencies import get_current_user_db
 from ..utils.exceptions import HTTPNotFoundError, HTTPValidationError
+from ..services.ai_service import AIService
 
 router = APIRouter()
 
@@ -199,3 +203,103 @@ async def get_agent_templates():
     ]
     
     return AgentTemplatesResponse(templates=templates)
+
+
+@router.post("/analyze-style", response_model=StyleAnalysisResponse)
+async def analyze_writing_style(
+    request: StyleAnalysisRequest,
+    current_user = Depends(get_current_user_db),
+    db: Session = Depends(get_db)
+):
+    """分析文本内容并生成写作风格描述"""
+    
+    try:
+        # 调用AI服务分析写作风格
+        result = await AIService.analyze_writing_style(
+            user=current_user,
+            content=request.content,
+            content_type=request.contentType
+        )
+        
+        return StyleAnalysisResponse(**result)
+        
+    except Exception as e:
+        raise HTTPValidationError(f"Failed to analyze writing style: {str(e)}")
+
+
+@router.post("/analyze-style-file", response_model=StyleAnalysisResponse)
+async def analyze_writing_style_from_file(
+    file: UploadFile = File(...),
+    content_type: str = None,
+    current_user = Depends(get_current_user_db),
+    db: Session = Depends(get_db)
+):
+    """从上传的文件中分析写作风格"""
+    
+    # 验证文件类型
+    allowed_extensions = {'.md', '.txt', '.json'}
+    file_ext = os.path.splitext(file.filename or "")[1].lower()
+    
+    if file_ext not in allowed_extensions:
+        raise HTTPValidationError(f"Unsupported file type. Allowed: {', '.join(allowed_extensions)}")
+    
+    # 验证文件大小（限制为1MB）
+    content = await file.read()
+    file_size = len(content)
+    max_size = 1 * 1024 * 1024  # 1MB
+    
+    if file_size > max_size:
+        raise HTTPValidationError("File too large (max 1MB)")
+    
+    try:
+        # 解析文件内容
+        text_content = ""
+        
+        if file_ext in ['.txt', '.md']:
+            text_content = content.decode('utf-8')
+        elif file_ext == '.json':
+            # 处理JSON格式（可能是对话记录）
+            json_data = json.loads(content.decode('utf-8'))
+            
+            # 尝试提取对话内容
+            if isinstance(json_data, list):
+                # 假设是对话数组格式
+                text_content = "\n".join([
+                    f"{item.get('role', 'user')}: {item.get('content', '')}"
+                    for item in json_data
+                    if isinstance(item, dict) and 'content' in item
+                ])
+            elif isinstance(json_data, dict):
+                # 尝试各种可能的格式
+                if 'messages' in json_data:
+                    messages = json_data['messages']
+                    if isinstance(messages, list):
+                        text_content = "\n".join([
+                            f"{msg.get('role', 'user')}: {msg.get('content', '')}"
+                            for msg in messages
+                            if isinstance(msg, dict) and 'content' in msg
+                        ])
+                elif 'content' in json_data:
+                    text_content = json_data['content']
+                else:
+                    # 将整个JSON转为文本
+                    text_content = json.dumps(json_data, ensure_ascii=False, indent=2)
+        
+        if not text_content.strip():
+            raise HTTPValidationError("File is empty or contains no readable content")
+        
+        # 调用AI服务分析写作风格
+        result = await AIService.analyze_writing_style(
+            user=current_user,
+            content=text_content,
+            content_type=content_type
+        )
+        
+        return StyleAnalysisResponse(**result)
+        
+    except json.JSONDecodeError:
+        raise HTTPValidationError("Invalid JSON format")
+    except UnicodeDecodeError:
+        raise HTTPValidationError("File encoding error. Please ensure the file is UTF-8 encoded")
+    except Exception as e:
+        raise HTTPValidationError(f"Failed to analyze writing style: {str(e)}")

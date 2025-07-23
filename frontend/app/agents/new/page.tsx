@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ProtectedRoute } from "@/components/protected-route";
@@ -25,6 +25,9 @@ export default function NewAgentPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [showTemplates, setShowTemplates] = useState(true);
   const [templates, setTemplates] = useState<Template[]>([]);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [styleAnalysisResult, setStyleAnalysisResult] = useState<any>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [formData, setFormData] = useState({
     name: "",
@@ -54,6 +57,72 @@ export default function NewAgentPage() {
       ...template.config,
     });
     setShowTemplates(false);
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // 验证文件类型
+    const allowedTypes = ['.md', '.txt', '.json'];
+    const fileExt = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+    if (!allowedTypes.includes(fileExt)) {
+      alert(`不支持的文件类型。请上传 ${allowedTypes.join(', ')} 格式的文件`);
+      return;
+    }
+
+    // 验证文件大小 (1MB)
+    if (file.size > 1024 * 1024) {
+      alert('文件大小不能超过 1MB');
+      return;
+    }
+
+    setIsAnalyzing(true);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await api.post('/api/agents/analyze-style-file', formData);
+      setStyleAnalysisResult(response.data);
+    } catch (error: any) {
+      alert(error.response?.data?.error || '分析失败，请重试');
+    } finally {
+      setIsAnalyzing(false);
+      // 清空文件输入
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleApplyStyle = () => {
+    if (styleAnalysisResult?.styleDescription) {
+      setFormData({
+        ...formData,
+        customPrompt: styleAnalysisResult.styleDescription
+      });
+      setStyleAnalysisResult(null);
+    }
+  };
+
+  const handleTextAnalysis = async (text: string) => {
+    if (!text.trim()) {
+      alert('请输入要分析的文本');
+      return;
+    }
+
+    setIsAnalyzing(true);
+    try {
+      const response = await api.post('/api/agents/analyze-style', {
+        content: text,
+        contentType: null // 让AI自动检测
+      });
+      setStyleAnalysisResult(response.data);
+    } catch (error: any) {
+      alert(error.response?.data?.error || '分析失败，请重试');
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -250,6 +319,133 @@ export default function NewAgentPage() {
                   rows={3}
                   placeholder="为Agent添加特殊的写作指令..."
                 />
+                
+                {/* 写作风格分析工具 */}
+                <div className="mt-3 p-4 bg-muted/30 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium">AI 风格分析助手</span>
+                    <span className="text-xs text-muted-foreground">上传文件或粘贴文本</span>
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".md,.txt,.json"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                      id="style-file-input"
+                    />
+                    <label
+                      htmlFor="style-file-input"
+                      className="flex-1 px-3 py-2 text-sm border rounded-lg hover:bg-muted cursor-pointer text-center"
+                    >
+                      📁 上传文件 (.md, .txt, .json)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const text = prompt('请粘贴要分析的文本内容：');
+                        if (text) handleTextAnalysis(text);
+                      }}
+                      className="flex-1 px-3 py-2 text-sm border rounded-lg hover:bg-muted"
+                    >
+                      📝 粘贴文本分析
+                    </button>
+                  </div>
+                  
+                  {isAnalyzing && (
+                    <div className="mt-3 text-center text-sm text-muted-foreground">
+                      <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
+                      正在分析写作风格...
+                    </div>
+                  )}
+                  
+                  {styleAnalysisResult && (
+                    <div className="mt-3 p-3 bg-background border rounded-lg">
+                      <div className="text-sm space-y-3">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">检测类型：</span>
+                          <span className={`px-2 py-0.5 rounded text-xs ${
+                            styleAnalysisResult.detectedType === 'conversation' 
+                              ? 'bg-blue-100 text-blue-700' 
+                              : 'bg-green-100 text-green-700'
+                          }`}>
+                            {styleAnalysisResult.detectedType === 'conversation' ? '💬 对话记录' : '📄 文章内容'}
+                          </span>
+                        </div>
+                        
+                        <div>
+                          <span className="font-medium">风格描述：</span>
+                          <div className="mt-1 p-2 bg-muted/50 rounded text-xs leading-relaxed">
+                            {styleAnalysisResult.styleDescription}
+                          </div>
+                        </div>
+                        
+                        {styleAnalysisResult.characteristics && (
+                          <details className="cursor-pointer">
+                            <summary className="font-medium text-xs hover:text-primary">
+                              查看详细特征分析 ▼
+                            </summary>
+                            <div className="mt-2 pl-4 space-y-1 text-xs text-muted-foreground">
+                              {Object.entries(styleAnalysisResult.characteristics).map(([key, value]) => (
+                                <div key={key}>
+                                  <span className="font-medium">
+                                    {key === 'language' ? '语言特点' :
+                                     key === 'tone' ? '语气风格' :
+                                     key === 'sentenceStyle' ? '句式特点' :
+                                     key === 'vocabulary' ? '用词特征' :
+                                     key === 'specialTraits' ? '特殊习惯' : key}：
+                                  </span>
+                                  <span className="ml-1">{value as string}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </details>
+                        )}
+                        
+                        <div className="pt-2 space-y-2">
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={handleApplyStyle}
+                              className="flex-1 px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded hover:opacity-90"
+                            >
+                              ✅ 应用到提示词
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const refinement = prompt('请输入额外的风格要求或修改建议：');
+                                if (refinement) {
+                                  setFormData({
+                                    ...formData,
+                                    customPrompt: styleAnalysisResult.styleDescription + '\n\n额外要求：' + refinement
+                                  });
+                                  setStyleAnalysisResult(null);
+                                }
+                              }}
+                              className="px-3 py-1.5 text-sm border rounded hover:bg-muted"
+                              title="在应用前添加额外要求"
+                            >
+                              ✏️ 调整
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setStyleAnalysisResult(null)}
+                              className="px-3 py-1.5 text-sm border rounded hover:bg-muted"
+                            >
+                              ❌
+                            </button>
+                          </div>
+                          <div className="text-xs text-center text-muted-foreground">
+                            提示：你可以多次分析不同文本，组合生成更准确的风格描述
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div>
