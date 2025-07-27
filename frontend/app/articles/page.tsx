@@ -191,7 +191,19 @@ export default function ArticlesPage() {
                     }}
                     className="flex-1"
                   >
-                    编辑
+                    📝 编辑
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.push(`/articles/${article.id}/notion-edit`);
+                    }}
+                    className="flex-1 bg-gradient-to-r from-blue-50 to-purple-50 hover:from-blue-100 hover:to-purple-100 border-blue-200"
+                    title="使用 Notion 风格编辑器"
+                  >
+                    ✨ Notion
                   </Button>
                   {article.publishStatus === 'draft' && (
                     <Button
@@ -202,7 +214,7 @@ export default function ArticlesPage() {
                       }}
                       className="flex-1"
                     >
-                      发布
+                      🚀 发布
                     </Button>
                   )}
                 </div>

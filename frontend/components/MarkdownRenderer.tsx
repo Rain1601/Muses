@@ -68,7 +68,7 @@ export default function MarkdownRenderer({ content, className = '' }: MarkdownRe
           ),
           // 自定义引用块渲染
           blockquote: ({ children }) => (
-            <blockquote className="border-l-4 border-blue-500 pl-4 py-2 my-4 bg-blue-50 dark:bg-blue-900/20 italic text-gray-900 dark:text-gray-100">
+            <blockquote className="border-l-4 border-primary pl-4 py-2 my-4 bg-primary/10 dark:bg-primary/20 italic text-foreground">
               {children}
             </blockquote>
           ),

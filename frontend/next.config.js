@@ -4,9 +4,9 @@ const nextConfig = {
   // 优化开发体验
   experimental: {
     turbo: {
-      loaders: {
+      rules: {
         // 优化CSS加载
-        '.css': ['css-loader'],
+        '*.css': ['css-loader'],
       },
     },
   },

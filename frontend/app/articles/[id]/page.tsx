@@ -194,12 +194,12 @@ export default function ArticleDetailPage() {
 
         <div className="flex items-center space-x-4">
           <span
-            className={`px-3 py-1 rounded-full text-sm ${
+            className={`px-3 py-1 rounded-full text-sm transition-all duration-200 ${
               article.publishStatus === 'published'
-                ? 'bg-green-100 text-green-800'
+                ? 'bg-primary/10 text-primary'
                 : article.publishStatus === 'scheduled'
-                ? 'bg-blue-100 text-blue-800'
-                : 'bg-gray-100 text-gray-800'
+                ? 'bg-accent/10 text-accent-foreground'
+                : 'bg-muted text-muted-foreground'
             }`}
           >
             {article.publishStatus === 'published'
@@ -223,7 +223,7 @@ export default function ArticleDetailPage() {
       </div>
 
       {/* 文章标题 */}
-      <h1 className="text-4xl font-bold mb-6 text-gray-900 dark:text-gray-100">{article.title}</h1>
+      <h1 className="text-4xl font-bold mb-6 text-foreground">{article.title}</h1>
 
       {/* 文章摘要 */}
       {article.summary && (

@@ -67,10 +67,24 @@ export default function NewArticlePage() {
         fileId: fileInfo.id,
       });
       
-      setUploadedFiles([...uploadedFiles, fileInfo]);
+      setUploadedFiles([...uploadedFiles, { ...fileInfo, content: parseResponse.data.content }]);
       setMaterials(materials + "\n\n" + parseResponse.data.content);
     } catch (error: any) {
       alert(error.response?.data?.error || "文件上传失败");
+    }
+  };
+
+  const handleFileDelete = (index: number) => {
+    const fileToDelete = uploadedFiles[index];
+    
+    // 从文件列表中移除
+    const newUploadedFiles = uploadedFiles.filter((_, i) => i !== index);
+    setUploadedFiles(newUploadedFiles);
+    
+    // 从素材内容中移除该文件的内容
+    if (fileToDelete.content) {
+      const newMaterials = materials.replace(fileToDelete.content, "").replace(/\n\n+/g, "\n\n").trim();
+      setMaterials(newMaterials);
     }
   };
 
@@ -245,8 +259,15 @@ export default function NewArticlePage() {
                     {uploadedFiles.length > 0 && (
                       <div className="mt-2 space-y-1">
                         {uploadedFiles.map((file, index) => (
-                          <div key={index} className="text-sm text-muted-foreground">
-                            ✓ {file.originalName}
+                          <div key={index} className="flex items-center justify-between text-sm text-muted-foreground bg-muted/50 px-3 py-2 rounded">
+                            <span>✓ {file.originalName}</span>
+                            <button
+                              onClick={() => handleFileDelete(index)}
+                              className="text-red-500 hover:text-red-700 ml-2 p-1"
+                              title="删除文件"
+                            >
+                              ✕
+                            </button>
                           </div>
                         ))}
                       </div>
@@ -321,8 +342,15 @@ export default function NewArticlePage() {
                     {uploadedFiles.length > 0 && (
                       <div className="mt-2 space-y-1">
                         {uploadedFiles.map((file, index) => (
-                          <div key={index} className="text-sm text-muted-foreground">
-                            ✓ {file.originalName}
+                          <div key={index} className="flex items-center justify-between text-sm text-muted-foreground bg-muted/50 px-3 py-2 rounded">
+                            <span>✓ {file.originalName}</span>
+                            <button
+                              onClick={() => handleFileDelete(index)}
+                              className="text-red-500 hover:text-red-700 ml-2 p-1"
+                              title="删除文件"
+                            >
+                              ✕
+                            </button>
                           </div>
                         ))}
                       </div>
@@ -370,7 +398,7 @@ export default function NewArticlePage() {
                           type="text"
                           value={chatInput}
                           onChange={(e) => setChatInput(e.target.value)}
-                          onKeyPress={(e) => e.key === "Enter" && !e.shiftKey && handleChatSend()}
+                          onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleChatSend()}
                           className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                           placeholder="输入您的想法... (Enter发送，Shift+Enter换行)"
                           disabled={!selectedAgent}

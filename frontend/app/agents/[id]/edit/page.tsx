@@ -357,8 +357,8 @@ export default function EditAgentPage() {
                           <span className="font-medium">检测类型：</span>
                           <span className={`px-2 py-0.5 rounded text-xs ${
                             styleAnalysisResult.detectedType === 'conversation' 
-                              ? 'bg-blue-100 text-blue-700' 
-                              : 'bg-green-100 text-green-700'
+                              ? 'bg-accent/20 text-accent-foreground' 
+                              : 'bg-primary/20 text-primary-foreground'
                           }`}>
                             {styleAnalysisResult.detectedType === 'conversation' ? '💬 对话记录' : '📄 文章内容'}
                           </span>

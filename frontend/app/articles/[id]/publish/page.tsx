@@ -155,8 +155,8 @@ export default function PublishArticlePage() {
         </div>
 
         {article.githubUrl && (
-          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-sm text-blue-800">
+          <div className="mb-6 p-4 bg-accent/10 border border-accent/30 rounded-lg">
+            <p className="text-sm text-accent-foreground">
               这篇文章已经发布过，重新发布将覆盖原文件
             </p>
             <a
@@ -185,8 +185,8 @@ export default function PublishArticlePage() {
                 {isLoading ? '刷新中...' : '🔄 刷新列表'}
               </button>
             </div>
-            <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-sm text-blue-800 mb-2">
+            <div className="mb-3 p-3 bg-accent/10 border border-accent/30 rounded-lg">
+              <p className="text-sm text-accent-foreground mb-2">
                 💡 <strong>推荐</strong>：创建一个专用的博客仓库来管理你的文章
               </p>
               <div className="flex gap-2 text-xs">
@@ -322,7 +322,7 @@ export default function PublishArticlePage() {
                     }
                   }}
                   disabled={!manualRepoUrl.trim()}
-                  className="mt-2 px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50"
+                  className="mt-2 px-3 py-1 bg-primary text-primary-foreground text-sm rounded hover:bg-primary/90 disabled:opacity-50"
                 >
                   使用此仓库
                 </button>

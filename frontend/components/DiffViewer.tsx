@@ -72,9 +72,9 @@ export function DiffViewer({
     diffs.forEach(part => {
       if (part.removed) {
         originalParts.push(part);
-        modifiedParts.push({ value: '', added: false, removed: false });
+        modifiedParts.push({ value: '', added: false, removed: false, count: 0 });
       } else if (part.added) {
-        originalParts.push({ value: '', added: false, removed: false });
+        originalParts.push({ value: '', added: false, removed: false, count: 0 });
         modifiedParts.push(part);
       } else {
         originalParts.push(part);

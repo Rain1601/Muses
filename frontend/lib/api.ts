@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { ProcessTextRequest, LLMResponse, ArticleImproveRequest, ChatRequest } from './types/llm-response';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
@@ -40,5 +41,26 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// 新的结构化文本处理API
+export const processApi = {
+  // 处理文本并返回结构化响应
+  processText: async (request: ProcessTextRequest): Promise<LLMResponse> => {
+    const response = await api.post('/api/process/process-text', request);
+    return response.data;
+  },
+
+  // 改进文章并返回差异信息
+  improveArticle: async (request: ArticleImproveRequest): Promise<LLMResponse> => {
+    const response = await api.post('/api/process/improve-article', request);
+    return response.data;
+  },
+
+  // 结构化聊天
+  chatStructured: async (request: ChatRequest): Promise<LLMResponse | { response: string }> => {
+    const response = await api.post('/api/process/chat-structured', request);
+    return response.data;
+  }
+};
 
 export default api;
