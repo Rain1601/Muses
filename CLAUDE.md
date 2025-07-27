@@ -202,4 +202,12 @@ cd backend && npx tsc --noEmit
 
 ## Deployment
 
-The project includes Docker configuration and PM2 process management for production deployment. See `docs/DEPLOYMENT.md` for detailed deployment instructions.
+### Mac Mini Auto-Deployment
+The project includes a complete CI/CD solution for Mac Mini deployment:
+- **Quick Start**: See `docs/QUICK_START_MAC_MINI.md` for rapid setup
+- **Detailed Guide**: See `docs/MAC_MINI_DEPLOYMENT.md` for comprehensive instructions
+- **Auto-sync**: Push to GitHub → Mac Mini automatically pulls and deploys
+- **External Access**: Includes Cloudflare Tunnel configuration
+
+### Traditional Deployment
+The project also includes Docker configuration and PM2 process management for traditional deployment. See `docs/DEPLOYMENT.md` for detailed deployment instructions.
