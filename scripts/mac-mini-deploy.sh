@@ -6,7 +6,9 @@
 set -e  # 遇到错误立即退出
 
 # ==================== 配置区域 ====================
-PROJECT_DIR="$HOME/Muses"  # 修改为你的实际路径
+# 自动检测项目路径
+PROJECT_DIR="$PWD"
+
 BACKUP_DIR="$HOME/Muses-backups"
 LOG_FILE="$HOME/muses-deploy.log"
 WEBHOOK_PORT=9000
