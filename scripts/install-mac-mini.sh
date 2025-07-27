@@ -22,10 +22,14 @@ Mac Mini 部署环境安装
 EOF
 echo -e "${NC}"
 
-PROJECT_DIR="$HOME/Muses"
+PROJECT_DIR="$PWD"
 
 # 1. 创建 LaunchAgent 配置
 echo -e "${GREEN}创建系统服务...${NC}"
+
+# 确保 LaunchAgents 目录存在
+mkdir -p "$HOME/Library/LaunchAgents"
+mkdir -p "$HOME/Library/Logs"
 
 cat > "$HOME/Library/LaunchAgents/com.muses.autosync.plist" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -38,12 +42,12 @@ cat > "$HOME/Library/LaunchAgents/com.muses.autosync.plist" << EOF
     <key>ProgramArguments</key>
     <array>
         <string>/bin/bash</string>
-        <string>$PROJECT_DIR/scripts/mac-mini-auto-sync.sh</string>
+        <string>${PROJECT_DIR}/scripts/mac-mini-auto-sync.sh</string>
         <string>run</string>
     </array>
     
     <key>WorkingDirectory</key>
-    <string>$PROJECT_DIR</string>
+    <string>${PROJECT_DIR}</string>
     
     <key>RunAtLoad</key>
     <true/>
@@ -52,17 +56,17 @@ cat > "$HOME/Library/LaunchAgents/com.muses.autosync.plist" << EOF
     <true/>
     
     <key>StandardOutPath</key>
-    <string>$HOME/muses-sync.log</string>
+    <string>${HOME}/Library/Logs/muses-sync.log</string>
     
     <key>StandardErrorPath</key>
-    <string>$HOME/muses-sync-error.log</string>
+    <string>${HOME}/Library/Logs/muses-sync-error.log</string>
     
     <key>EnvironmentVariables</key>
     <dict>
         <key>PATH</key>
         <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin</string>
         <key>HOME</key>
-        <string>$HOME</string>
+        <string>${HOME}</string>
     </dict>
 </dict>
 </plist>
