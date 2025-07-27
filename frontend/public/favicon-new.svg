@@ -1,0 +1,18 @@
+<svg fill="none" height="32" viewBox="0 0 32 32" width="32" xmlns="http://www.w3.org/2000/svg">
+  <!-- 背景色块 - 使用项目的暖色调 -->
+  <rect width="32" height="32" rx="6" fill="url(#gradient)" />
+  
+  <!-- 羽毛图标 - 代表写作和灵感 -->
+  <path d="M21.5 6.5c-2.5 0-4.5 1.5-6 3.5-1.5-2-3.5-3.5-6-3.5-2 0-3.5 1.5-3.5 3.5 0 5 9.5 12 9.5 12s9.5-7 9.5-12c0-2-1.5-3.5-3.5-3.5z" 
+        fill="white" 
+        opacity="0.9"/>
+  
+  <!-- 渐变定义 - 使用项目的主色调 -->
+  <defs>
+    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#d97757;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#e8a68a;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#c5866a;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+</svg>
