@@ -203,7 +203,7 @@ rollback() {
     npm run build
     
     cd ../backend-python
-    pip install -r requirements.txt
+    pip3 install -r requirements.txt
     
     # 启动服务
     start_services
@@ -261,7 +261,7 @@ deploy() {
     # 安装后端依赖
     log "安装后端依赖..."
     cd backend-python
-    if ! pip install -r requirements.txt; then
+    if ! pip3 install -r requirements.txt; then
         error "后端依赖安装失败"
         rollback
         return 1
