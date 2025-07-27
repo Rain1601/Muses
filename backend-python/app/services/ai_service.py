@@ -1,15 +1,72 @@
 import openai
 import markdown
 import json
-from typing import List, Dict, Any, Optional
+import re
+from typing import List, Dict, Any, Optional, Literal, Tuple
 from sqlalchemy.orm import Session
+from difflib import SequenceMatcher
 
 from ..models import User, Agent, Article
 from ..utils.security import decrypt
 from ..utils.exceptions import OpenAIKeyError, ValidationError
 
 
+TaskType = Literal["rewrite", "continue", "custom"]
+
+
 class AIService:
+    
+    @staticmethod
+    def _classify_task_type(user_input: str, context: Optional[str] = None) -> TaskType:
+        """分类任务类型"""
+        rewrite_keywords = ["修改", "改写", "优化", "润色", "改进", "调整", "重写", "编辑"]
+        continue_keywords = ["继续", "续写", "补充", "扩展", "接着写", "添加", "延伸"]
+        
+        input_lower = user_input.lower()
+        
+        # 检查改写关键词
+        for keyword in rewrite_keywords:
+            if keyword in user_input:
+                return "rewrite"
+        
+        # 检查续写关键词
+        for keyword in continue_keywords:
+            if keyword in user_input:
+                return "continue"
+        
+        # 默认为自定义任务
+        return "custom"
+    
+    @staticmethod
+    def _extract_changes(original: str, modified: str) -> List[Dict[str, Any]]:
+        """提取文本修改详情"""
+        changes = []
+        matcher = SequenceMatcher(None, original, modified)
+        
+        for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+            if tag == 'replace':
+                changes.append({
+                    "type": "modify",
+                    "original": original[i1:i2],
+                    "modified": modified[j1:j2],
+                    "position": {"start": i1, "end": i2}
+                })
+            elif tag == 'delete':
+                changes.append({
+                    "type": "delete",
+                    "original": original[i1:i2],
+                    "modified": "",
+                    "position": {"start": i1, "end": i2}
+                })
+            elif tag == 'insert':
+                changes.append({
+                    "type": "add",
+                    "original": "",
+                    "modified": modified[j1:j2],
+                    "position": {"start": i1, "end": i1}
+                })
+        
+        return changes
     
     @staticmethod
     def _get_openai_client(user: User) -> openai.OpenAI:
@@ -334,3 +391,132 @@ class AIService:
             raise ValidationError("Failed to parse AI response as JSON")
         except Exception as e:
             raise ValidationError(f"Writing style analysis failed: {str(e)}")
+    
+    @classmethod
+    async def generate_structured_response(
+        cls,
+        user: User,
+        agent: Agent,
+        user_input: str,
+        context: Optional[str] = None,
+        task_type: Optional[TaskType] = None,
+        original_content: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """生成结构化的JSON响应"""
+        
+        client = cls._get_openai_client(user)
+        
+        # 自动分类任务类型（如果未提供）
+        if not task_type:
+            task_type = cls._classify_task_type(user_input, context)
+        
+        # 根据任务类型构建系统提示词
+        base_system_prompt = cls._build_system_prompt(agent)
+        
+        # 添加JSON格式化要求
+        json_format_prompt = f"""
+{base_system_prompt}
+
+重要：你必须返回一个严格的JSON格式响应，格式如下：
+{{
+    "type": "{task_type}",
+    "result": "处理后的文本内容",
+    "metadata": {{
+        "confidence": 0.95,  // 任务类型判断置信度（0-1）
+        "suggestions": []    // 可选的额外建议
+    }}
+}}
+"""
+        
+        # 根据任务类型定制提示词
+        if task_type == "rewrite":
+            json_format_prompt += """
+对于改写任务，metadata中还需要包含：
+- "original": "原始文本"
+- "changes": [修改详情数组]
+"""
+            user_prompt = f"""任务类型：改写/优化文本
+用户指令：{user_input}
+
+需要改写的文本：
+{original_content or context}
+
+请按照JSON格式返回改写结果。"""
+        
+        elif task_type == "continue":
+            user_prompt = f"""任务类型：续写文本
+用户指令：{user_input}
+
+已有文本：
+{context}
+
+请按照JSON格式返回续写内容。"""
+        
+        else:  # custom
+            user_prompt = f"""任务类型：自定义处理
+用户指令：{user_input}
+
+上下文信息：
+{context}
+
+请按照JSON格式返回处理结果。"""
+        
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4-turbo-preview",
+                messages=[
+                    {"role": "system", "content": json_format_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.7,
+                max_tokens=4000,
+                response_format={"type": "json_object"}
+            )
+            
+            result = json.loads(response.choices[0].message.content or "{}")
+            
+            # 如果是改写任务，计算文本差异
+            if task_type == "rewrite" and original_content:
+                if "metadata" not in result:
+                    result["metadata"] = {}
+                
+                result["metadata"]["original"] = original_content
+                result["metadata"]["changes"] = cls._extract_changes(
+                    original_content, 
+                    result.get("result", "")
+                )
+            
+            return result
+            
+        except json.JSONDecodeError:
+            raise ValidationError("Failed to parse AI response as JSON")
+        except Exception as e:
+            raise ValidationError(f"Structured response generation failed: {str(e)}")
+    
+    @classmethod
+    async def process_text_with_structure(
+        cls,
+        user: User,
+        agent: Agent,
+        input_text: str,
+        context: Optional[str] = None,
+        options: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """处理文本并返回结构化响应（统一API）"""
+        
+        options = options or {}
+        task_type = options.get("task_type")
+        
+        # 如果是改写任务，需要原文
+        original_content = None
+        if task_type == "rewrite" or cls._classify_task_type(input_text) == "rewrite":
+            original_content = context
+        
+        return await cls.generate_structured_response(
+            user=user,
+            agent=agent,
+            user_input=input_text,
+            context=context,
+            task_type=task_type,
+            original_content=original_content
+        )

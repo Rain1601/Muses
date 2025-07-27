@@ -37,7 +37,7 @@ const MermaidBlock = Extension.create({
 
   addCommands() {
     return {
-      insertMermaidBlock: () => ({ commands }) => {
+      insertMermaidBlock: () => ({ commands }: any) => {
         return commands.insertContent(`
           <div class="mermaid-block" data-type="mermaid">
             <pre><code class="language-mermaid">graph TD
@@ -48,7 +48,7 @@ const MermaidBlock = Extension.create({
           </div>
         `);
       },
-    };
+    } as any;
   },
 });
 

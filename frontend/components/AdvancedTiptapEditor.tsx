@@ -107,7 +107,7 @@ const YoutubeEmbed = Extension.create({
 
   addCommands() {
     return {
-      insertYoutube: (url: string) => ({ commands }) => {
+      insertYoutube: (url: string) => ({ commands }: { commands: any }) => {
         const videoId = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/)?.[1];
         if (videoId) {
           return commands.insertContent(`
@@ -124,7 +124,7 @@ const YoutubeEmbed = Extension.create({
         }
         return false;
       },
-    };
+    } as any;
   },
 });
 
@@ -134,7 +134,7 @@ const CollapsibleBlock = Extension.create({
 
   addCommands() {
     return {
-      insertCollapsible: () => ({ commands }) => {
+      insertCollapsible: () => ({ commands }: { commands: any }) => {
         return commands.insertContent(`
           <details class="collapsible-block">
             <summary>点击展开/折叠</summary>
@@ -144,7 +144,7 @@ const CollapsibleBlock = Extension.create({
           </details>
         `);
       },
-    };
+    } as any;
   },
 });
 

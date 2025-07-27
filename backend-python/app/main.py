@@ -7,7 +7,7 @@ from .database import create_tables
 from .config import settings
 
 # Import routers
-from .api import auth, users, agents, articles, generate, upload, publish
+from .api import auth, users, agents, articles, generate, upload, publish, process
 
 
 @asynccontextmanager
@@ -50,6 +50,7 @@ app.include_router(articles.router, prefix="/api/articles", tags=["articles"])
 app.include_router(generate.router, prefix="/api/generate", tags=["generate"])
 app.include_router(upload.router, prefix="/api/upload", tags=["upload"])
 app.include_router(publish.router, prefix="/api/publish", tags=["publish"])
+app.include_router(process.router, prefix="/api/process", tags=["process"])
 
 
 @app.get("/")

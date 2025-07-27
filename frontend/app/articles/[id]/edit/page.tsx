@@ -900,7 +900,7 @@ export default function EditArticlePage() {
                 }}
                 preview={showPreview ? "live" : "edit"}
                 hideToolbar={false}
-                data-color-mode={theme === 'system' ? systemTheme : theme}
+                data-color-mode={(theme === 'system' ? systemTheme : theme) as 'dark' | 'light'}
               previewOptions={{
                 remarkPlugins: editorPlugins.remarkPlugins,
                 rehypePlugins: editorPlugins.rehypePlugins,
