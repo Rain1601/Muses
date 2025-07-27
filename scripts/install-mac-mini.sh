@@ -76,11 +76,19 @@ EOF
 chmod +x "$PROJECT_DIR/scripts/mac-mini-auto-sync.sh"
 
 # 3. 加载服务
-launchctl unload "$HOME/Library/LaunchAgents/com.muses.autosync.plist" 2>/dev/null || true
-launchctl load "$HOME/Library/LaunchAgents/com.muses.autosync.plist"
+echo -e "${GREEN}启动自动同步服务...${NC}"
+launchctl bootout gui/$(id -u) "$HOME/Library/LaunchAgents/com.muses.autosync.plist" 2>/dev/null || true
+launchctl bootstrap gui/$(id -u) "$HOME/Library/LaunchAgents/com.muses.autosync.plist"
 
-echo -e "${GREEN}✅ 服务安装完成！${NC}"
-echo -e "${BLUE}查看日志:${NC} tail -f ~/muses-sync.log"
+if [ $? -eq 0 ]; then
+    echo -e "${GREEN}✅ 服务安装完成！${NC}"
+else
+    echo -e "${RED}⚠️  服务安装遇到问题，请手动启动：${NC}"
+fi
+
+echo ""
+echo -e "${BLUE}管理命令：${NC}"
+echo -e "${BLUE}查看日志:${NC} tail -f ~/Library/Logs/muses-sync.log"
 echo -e "${BLUE}查看状态:${NC} launchctl list | grep muses"
-echo -e "${BLUE}停止服务:${NC} launchctl unload ~/Library/LaunchAgents/com.muses.autosync.plist"
-echo -e "${BLUE}启动服务:${NC} launchctl load ~/Library/LaunchAgents/com.muses.autosync.plist"
+echo -e "${BLUE}停止服务:${NC} launchctl bootout gui/\$(id -u) ~/Library/LaunchAgents/com.muses.autosync.plist"
+echo -e "${BLUE}启动服务:${NC} launchctl bootstrap gui/\$(id -u) ~/Library/LaunchAgents/com.muses.autosync.plist"

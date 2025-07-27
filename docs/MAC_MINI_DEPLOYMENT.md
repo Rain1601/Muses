@@ -79,38 +79,28 @@ chmod +x scripts/install-mac-mini.sh
 
 ### 第三步：配置环境变量
 
-#### 后端环境配置
-```bash
-# 创建后端环境文件
-cat > backend/.env << 'EOF'
-DATABASE_URL="file:./muses.db"
-JWT_SECRET="your-super-secret-jwt-key-change-this"
-GITHUB_CLIENT_ID="your-github-oauth-app-id"
-GITHUB_CLIENT_SECRET="your-github-oauth-app-secret"
-ENCRYPTION_KEY="your-32-character-encryption-key-here"
-EOF
-```
-
 #### Python 后端环境配置
 ```bash
 # 创建 Python 后端环境文件
 cat > backend-python/.env << 'EOF'
-# 添加必要的环境变量
+# Python 后端环境变量
+OPENAI_API_KEY="your-openai-api-key"
+DATA_PATH="./data"
+UPLOADS_PATH="./uploads"
 EOF
 ```
 
-### 第四步：初始化数据库
+
+### 第四步：安装项目依赖
 ```bash
-# 进入后端目录
-cd backend
+# 安装前端依赖
+cd frontend
+npm install
+cd ..
 
-# 生成 Prisma 客户端
-npm run db:generate
-
-# 推送数据库结构
-npm run db:push
-
-# 返回项目根目录
+# 安装 Python 后端依赖
+cd backend-python
+pip3 install -r requirements.txt
 cd ..
 ```
 
