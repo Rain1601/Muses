@@ -1,0 +1,99 @@
+/* Mermaid 图表样式 */
+.mermaid-block {
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  background-color: #f9fafb;
+}
+
+.mermaid-block pre {
+  margin: 0;
+  padding: 0.5rem;
+  background-color: #1f2937;
+  color: #e5e7eb;
+  border-radius: 0.25rem;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.mermaid-block code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+
+/* 代码块语法高亮 */
+.ProseMirror pre {
+  background: #1f2937;
+  color: #e5e7eb;
+  font-family: 'JetBrains Mono', 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  margin: 1rem 0;
+}
+
+.ProseMirror pre code {
+  color: inherit;
+  padding: 0;
+  background: none;
+  font-size: 0.875rem;
+}
+
+/* 增强的编辑器样式 */
+.ProseMirror {
+  outline: none;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.6;
+}
+
+.ProseMirror h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 1.5rem 0 1rem 0;
+  line-height: 1.2;
+}
+
+.ProseMirror h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 1.25rem 0 0.75rem 0;
+  line-height: 1.3;
+}
+
+.ProseMirror h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 1rem 0 0.5rem 0;
+  line-height: 1.4;
+}
+
+.ProseMirror blockquote {
+  border-left: 4px solid #e5e7eb;
+  padding-left: 1rem;
+  margin: 1rem 0;
+  font-style: italic;
+  color: #6b7280;
+}
+
+.ProseMirror ul, .ProseMirror ol {
+  padding-left: 1.5rem;
+  margin: 0.5rem 0;
+}
+
+.ProseMirror li {
+  margin: 0.25rem 0;
+}
+
+.ProseMirror p {
+  margin: 0.75rem 0;
+}
+
+/* 高亮样式 */
+.ProseMirror mark {
+  background-color: #fef3c7;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+}
