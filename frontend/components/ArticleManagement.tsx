@@ -53,6 +53,7 @@ export default function ArticleManagement({
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [isComposing, setIsComposing] = useState(false);
 
   const pageSize = maxItems || 9;
 
@@ -60,7 +61,7 @@ export default function ArticleManagement({
     if (user) {
       fetchArticles();
     }
-  }, [user, searchTerm, statusFilter, sortBy, sortOrder, currentPage]);
+  }, [user, statusFilter, sortBy, sortOrder, currentPage]);
 
   const fetchArticles = async () => {
     try {
@@ -109,6 +110,7 @@ export default function ArticleManagement({
   };
 
   const handleSearch = (e: React.FormEvent) => {
+    if (isComposing) return;
     e.preventDefault();
     setCurrentPage(1);
     fetchArticles();
@@ -132,32 +134,53 @@ export default function ArticleManagement({
 
   return (
     <div>
-      {showTitle && (
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold">文章管理</h2>
-          <Button
-            onClick={() => router.push("/articles/new")}
-            size="sm"
-          >
-            新建文章
-          </Button>
-        </div>
-      )}
+      {/* 标题栏和快速操作 */}
+      <div className="mb-6">
+        {showTitle && (
+          <div className="flex items-center gap-4 mb-4">
+            <h2 className="text-xl font-semibold">文章管理</h2>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => router.push("/articles/new")}
+                size="sm"
+              >
+                新建文章
+              </Button>
+              <Button
+                onClick={() => router.push("/articles/notion-new")}
+                size="sm"
+                variant="outline"
+              >
+                ✨ Notion编辑器
+              </Button>
+            </div>
+          </div>
+        )}
 
-      {/* 搜索和筛选 */}
-      <div className="mb-6 space-y-4">
-        <form onSubmit={handleSearch} className="flex gap-2">
-          <div className="flex-1">
+        {/* 搜索框 */}
+        <form onSubmit={handleSearch} className="flex gap-2 mb-4">
+          <div className="flex-1 max-w-md">
             <Input
               placeholder="搜索标题、摘要或内容..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              onCompositionStart={() => setIsComposing(true)}
+              onCompositionEnd={() => setIsComposing(false)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !isComposing) {
+                  handleSearch(e);
+                }
+              }}
             />
           </div>
           <Button type="submit" variant="outline">
             搜索
           </Button>
         </form>
+      </div>
+
+      {/* 筛选和排序 */}
+      <div className="mb-6 space-y-4">{/* This block was split to separate search from filters */}
 
         <div className="flex gap-4 flex-wrap items-center">
           <div className="flex items-center gap-2">
@@ -237,7 +260,7 @@ export default function ArticleManagement({
             {articles.map((article) => (
               <Card
                 key={article.id}
-                className="relative group cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1 hover:shadow-lg border-border/50 bg-background"
+                className="relative group cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1 hover:shadow-lg border-border/50 bg-background flex flex-col"
                 onClick={() => router.push(`/articles/${article.id}`)}
               >
                 {/* 删除按钮 */}
@@ -260,7 +283,7 @@ export default function ArticleManagement({
                   </h3>
                 </CardHeader>
 
-                <CardContent className="pt-0">
+                <CardContent className="pt-0 flex-1">
                   {article.summary && (
                     <p className="text-muted-foreground text-sm mb-4 line-clamp-3">
                       {article.summary}
@@ -314,7 +337,7 @@ export default function ArticleManagement({
                 </CardContent>
 
                 <CardFooter className="pt-0">
-                  <div className="w-full flex gap-2">
+                  <div className="w-full flex gap-1 items-center">
                     <Button
                       variant="outline"
                       size="sm"
@@ -322,7 +345,7 @@ export default function ArticleManagement({
                         e.stopPropagation();
                         router.push(`/articles/${article.id}/edit`);
                       }}
-                      className="flex-1"
+                      className="flex-1 text-xs whitespace-nowrap"
                     >
                       📝 编辑
                     </Button>
@@ -333,23 +356,22 @@ export default function ArticleManagement({
                         e.stopPropagation();
                         router.push(`/articles/${article.id}/notion-edit`);
                       }}
-                      className="flex-1 bg-gradient-to-r from-blue-50 to-purple-50 hover:from-blue-100 hover:to-purple-100 border-blue-200 text-black hover:text-black"
+                      className="flex-1 text-xs whitespace-nowrap"
                       title="使用 Notion 风格编辑器"
                     >
                       ✨ Notion
                     </Button>
-                    {article.publishStatus === 'draft' && (
-                      <Button
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          router.push(`/articles/${article.id}/publish`);
-                        }}
-                        className="flex-1"
-                      >
-                        🚀 发布
-                      </Button>
-                    )}
+                    <Button
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/articles/${article.id}/publish`);
+                      }}
+                      className="flex-1 text-xs whitespace-nowrap"
+                      disabled={article.publishStatus === 'published'}
+                    >
+                      🚀 {article.publishStatus === 'published' ? '已发布' : '发布'}
+                    </Button>
                   </div>
                 </CardFooter>
               </Card>

@@ -11,6 +11,14 @@ import { Input } from '@/components/ui/input';
 import { ArrowLeft, Save, Eye, Share2 } from 'lucide-react';
 import AdvancedTiptapWrapper from '@/components/AdvancedTiptapWrapper';
 import '@/app/editor-demo/mermaid-styles.css';
+import { marked } from 'marked';
+import dynamic from 'next/dynamic';
+
+// 动态导入 TurndownService
+const getTurndownService = async () => {
+  const TurndownService = (await import('turndown')).default;
+  return new TurndownService();
+};
 
 interface Article {
   id: string;
@@ -49,7 +57,14 @@ export default function NotionEditPage() {
       const articleData = response.data.article;
       setArticle(articleData);
       setTitle(articleData.title);
-      setContent(articleData.content || '');
+      
+      // 将Markdown转换为HTML
+      if (articleData.content) {
+        const htmlContent = await marked(articleData.content);
+        setContent(htmlContent);
+      } else {
+        setContent('');
+      }
     } catch (error) {
       console.error('Failed to fetch article:', error);
       router.push('/dashboard');
@@ -63,13 +78,17 @@ export default function NotionEditPage() {
 
     setSaving(true);
     try {
+      // 将HTML转换回Markdown
+      const turndownService = await getTurndownService();
+      const markdownContent = turndownService.turndown(content);
+      
       await api.put(`/api/articles/${article.id}`, {
         title: title.trim(),
-        content,
+        content: markdownContent,
       });
       
       // 更新本地状态
-      setArticle({ ...article, title: title.trim(), content });
+      setArticle({ ...article, title: title.trim(), content: markdownContent });
       
       // 显示保存成功提示
       const successDiv = document.createElement('div');
@@ -93,8 +112,12 @@ export default function NotionEditPage() {
   useEffect(() => {
     if (!article) return;
     
-    const autoSaveTimer = setTimeout(() => {
-      if (title !== article.title || content !== article.content) {
+    const autoSaveTimer = setTimeout(async () => {
+      // 将HTML转换为Markdown进行比较
+      const turndownService = await getTurndownService();
+      const currentMarkdown = turndownService.turndown(content);
+      
+      if (title !== article.title || currentMarkdown !== article.content) {
         handleSave();
       }
     }, 5000); // 5秒后自动保存
@@ -202,7 +225,10 @@ export default function NotionEditPage() {
 
         {/* Notion 编辑器 */}
         <div className="mb-8">
-          <AdvancedTiptapWrapper />
+          <AdvancedTiptapWrapper 
+            initialContent={content}
+            onChange={setContent}
+          />
         </div>
 
         {/* 底部状态栏 */}

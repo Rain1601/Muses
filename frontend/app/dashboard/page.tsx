@@ -40,51 +40,7 @@ function DashboardContent() {
 
       {/* 主内容区 */}
       <main className="container mx-auto px-4 py-8">
-        {/* 快捷操作 */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">快捷操作</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Link
-              href="/articles/new"
-              className="p-4 border rounded-lg hover:border-primary transition-colors text-center"
-            >
-              <div className="text-2xl mb-2">📝</div>
-              <h3 className="font-medium">新建文章</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                从素材生成新文章
-              </p>
-            </Link>
-            <Link
-              href="/agents"
-              className="p-4 border rounded-lg hover:border-primary transition-colors text-center"
-            >
-              <div className="w-10 h-10 rounded-full bg-gradient-to-r from-emerald-500 to-teal-600 flex items-center justify-center text-white text-lg font-bold mb-2 mx-auto">
-                ✨
-              </div>
-              <h3 className="font-medium">管理Agent</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                创建和编辑AI助手
-              </p>
-            </Link>
-            <Link
-              href="/settings"
-              className="p-4 border rounded-lg hover:border-primary transition-colors text-center"
-            >
-              <div className="text-2xl mb-2">⚙️</div>
-              <h3 className="font-medium">设置</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                配置和偏好设置
-              </p>
-            </Link>
-          </div>
-        </div>
-
-        {/* 文章管理 */}
-        <div>
-          <ArticleManagement showTitle={true} showPagination={true} />
-        </div>
+        <ArticleManagement showTitle={true} showPagination={true} />
       </main>
     </div>
   );

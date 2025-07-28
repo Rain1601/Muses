@@ -2,6 +2,11 @@
 
 import dynamic from 'next/dynamic';
 
+interface AdvancedTiptapWrapperProps {
+  initialContent?: string;
+  onChange?: (content: string) => void;
+}
+
 // 动态导入，禁用SSR
 const AdvancedTiptapEditor = dynamic(
   () => import('./AdvancedTiptapEditor').then((mod) => ({ default: mod.AdvancedTiptapEditor })),
@@ -18,6 +23,6 @@ const AdvancedTiptapEditor = dynamic(
   }
 );
 
-export default function AdvancedTiptapWrapper() {
-  return <AdvancedTiptapEditor />;
+export default function AdvancedTiptapWrapper({ initialContent, onChange }: AdvancedTiptapWrapperProps) {
+  return <AdvancedTiptapEditor initialContent={initialContent} onChange={onChange} />;
 }

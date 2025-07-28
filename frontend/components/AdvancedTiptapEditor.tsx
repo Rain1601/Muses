@@ -346,7 +346,12 @@ const CommandKExtension = Extension.create({
   },
 });
 
-export function AdvancedTiptapEditor() {
+interface AdvancedTiptapEditorProps {
+  initialContent?: string;
+  onChange?: (content: string) => void;
+}
+
+export function AdvancedTiptapEditor({ initialContent, onChange }: AdvancedTiptapEditorProps = {}) {
   const [mounted, setMounted] = useState(false);
   const [showSlashMenu, setShowSlashMenu] = useState(false);
   const [showTableOfContents, setShowTableOfContents] = useState(false);
@@ -469,7 +474,7 @@ export function AdvancedTiptapEditor() {
       YoutubeEmbed,
       CollapsibleBlock,
     ],
-    content: `
+    content: initialContent === '' ? '' : initialContent || `
       <h1>🚀 全功能 Notion 风格编辑器</h1>
       <p>这是一个功能完整的现代化编辑器，支持 Notion 的大部分核心功能。</p>
       
@@ -543,6 +548,11 @@ export function AdvancedTiptapEditor() {
       
       <p>现在开始创作你的内容吧！🎉</p>
     `,
+    onUpdate: ({ editor }) => {
+      if (onChange) {
+        onChange(editor.getHTML());
+      }
+    },
     onSelectionUpdate: ({ editor }) => {
       const { from, to } = editor.state.selection;
       const text = editor.state.doc.textBetween(from, to, ' ');

@@ -16,20 +16,19 @@ interface Agent {
 
 export default function NewArticlePage() {
   const router = useRouter();
-  const [mode, setMode] = useState<"material" | "chat" | "improve">("material");
+  const [mode, setMode] = useState<"chat">("chat");
   const [agents, setAgents] = useState<Agent[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   
-  // 素材模式状态
+  // 素材和文件状态
   const [materials, setMaterials] = useState("");
   const [uploadedFiles, setUploadedFiles] = useState<any[]>([]);
-  const [title, setTitle] = useState("");
-  const [requirements, setRequirements] = useState("");
   
   // 对话模式状态
   const [chatMessages, setChatMessages] = useState<Array<{role: string; content: string}>>([]);
   const [chatInput, setChatInput] = useState("");
+  const [isComposing, setIsComposing] = useState(false);
 
   useEffect(() => {
     fetchAgents();
@@ -94,12 +93,7 @@ export default function NewArticlePage() {
       return;
     }
 
-    if (mode === "material" && !materials.trim()) {
-      alert("请输入素材内容");
-      return;
-    }
-
-    if (mode === "chat" && chatMessages.length === 0) {
+    if (chatMessages.length === 0) {
       alert("请先开始对话");
       return;
     }
@@ -107,24 +101,12 @@ export default function NewArticlePage() {
     setIsLoading(true);
 
     try {
-      let response;
-      
-      if (mode === "material") {
-        response = await api.post("/api/generate/article", {
-          agentId: selectedAgent,
-          materials,
-          title,
-          requirements,
-          saveAsDraft: true,
-        });
-      } else if (mode === "chat") {
-        response = await api.post("/api/generate/chat", {
-          agentId: selectedAgent,
-          messages: chatMessages,
-          materials: materials, // 包含上传的素材
-          saveAsDraft: true,
-        });
-      }
+      const response = await api.post("/api/generate/chat", {
+        agentId: selectedAgent,
+        messages: chatMessages,
+        materials: materials, // 包含上传的素材
+        saveAsDraft: true,
+      });
 
       if (response?.data.article) {
         router.push(`/articles/${response.data.article.id}/edit`);
@@ -143,7 +125,7 @@ export default function NewArticlePage() {
   };
 
   const handleChatSend = async () => {
-    if (!chatInput.trim() || !selectedAgent) return;
+    if (!chatInput.trim() || !selectedAgent || isComposing) return;
     
     const userMessage = { role: "user", content: chatInput };
     const newMessages = [...chatMessages, userMessage];
@@ -188,134 +170,11 @@ export default function NewArticlePage() {
             <h1 className="text-2xl font-bold">创建新文章</h1>
           </div>
 
-          {/* 模式选择 */}
-          <div className="mb-8">
-            <div className="flex gap-4 p-1 bg-muted rounded-lg">
-              <button
-                onClick={() => setMode("material")}
-                className={`flex-1 py-2 px-4 rounded-md transition-colors ${
-                  mode === "material"
-                    ? "bg-background shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                📄 从素材生成
-              </button>
-              <button
-                onClick={() => setMode("chat")}
-                className={`flex-1 py-2 px-4 rounded-md transition-colors ${
-                  mode === "chat"
-                    ? "bg-background shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                💬 对话式生成
-              </button>
-              <button
-                onClick={() => setMode("improve")}
-                className={`flex-1 py-2 px-4 rounded-md transition-colors ${
-                  mode === "improve"
-                    ? "bg-background shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-                disabled
-              >
-                ✨ 增量完善
-              </button>
-            </div>
-          </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* 左侧：内容输入区 */}
             <div className="lg:col-span-2 space-y-6">
-              {mode === "material" ? (
-                <>
-                  {/* 文件上传 */}
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      上传素材文件（可选）
-                    </label>
-                    <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-primary transition-colors">
-                      <input
-                        type="file"
-                        onChange={handleFileUpload}
-                        accept=".pdf,.md,.txt,.doc,.docx"
-                        className="hidden"
-                        id="file-upload"
-                      />
-                      <label
-                        htmlFor="file-upload"
-                        className="cursor-pointer"
-                      >
-                        <div className="text-3xl mb-2">📁</div>
-                        <p className="text-sm text-muted-foreground">
-                          点击或拖拽文件到此处
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          支持 PDF、MD、TXT 等格式
-                        </p>
-                      </label>
-                    </div>
-                    {uploadedFiles.length > 0 && (
-                      <div className="mt-2 space-y-1">
-                        {uploadedFiles.map((file, index) => (
-                          <div key={index} className="flex items-center justify-between text-sm text-muted-foreground bg-muted/50 px-3 py-2 rounded">
-                            <span>✓ {file.originalName}</span>
-                            <button
-                              onClick={() => handleFileDelete(index)}
-                              className="text-red-500 hover:text-red-700 ml-2 p-1"
-                              title="删除文件"
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 素材内容 */}
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      素材内容 *
-                    </label>
-                    <textarea
-                      value={materials}
-                      onChange={(e) => setMaterials(e.target.value)}
-                      className="w-full h-64 px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-                      placeholder="粘贴或输入您的素材内容..."
-                    />
-                  </div>
-
-                  {/* 文章标题 */}
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      文章标题（可选）
-                    </label>
-                    <input
-                      type="text"
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                      placeholder="如果不填写，AI会自动生成标题"
-                    />
-                  </div>
-
-                  {/* 额外要求 */}
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      额外要求（可选）
-                    </label>
-                    <textarea
-                      value={requirements}
-                      onChange={(e) => setRequirements(e.target.value)}
-                      className="w-full h-24 px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-                      placeholder="例如：重点介绍技术实现、添加代码示例等"
-                    />
-                  </div>
-                </>
-              ) : mode === "chat" ? (
-                <div className="space-y-6">
+              <div className="space-y-6">
                   {/* 文件上传区 - 整合到对话模式 */}
                   <div>
                     <label className="block text-sm font-medium mb-2">
@@ -398,7 +257,14 @@ export default function NewArticlePage() {
                           type="text"
                           value={chatInput}
                           onChange={(e) => setChatInput(e.target.value)}
-                          onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleChatSend()}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey && !isComposing) {
+                              e.preventDefault();
+                              handleChatSend();
+                            }
+                          }}
+                          onCompositionStart={() => setIsComposing(true)}
+                          onCompositionEnd={() => setIsComposing(false)}
                           className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                           placeholder="输入您的想法... (Enter发送，Shift+Enter换行)"
                           disabled={!selectedAgent}
@@ -419,7 +285,6 @@ export default function NewArticlePage() {
                     </div>
                   </div>
                 </div>
-              ) : null}
             </div>
 
             {/* 右侧：Agent选择 */}
