@@ -6,6 +6,7 @@ node_modules/
 # Testing
 coverage/
 .nyc_output
+*.pyc
 
 # Next.js
 frontend/.next/
@@ -77,3 +78,4 @@ frontend/package-lock.json
 # Build artifacts  
 .cursor/
 
+*.pyc
