@@ -686,7 +686,17 @@ export default function EditArticlePage() {
       });
       
       if (response.data.success) {
-        const imageUrl = `http://localhost:8080${response.data.file.url}`;
+        // 自动检测环境生成图片URL
+        const getImageUrl = () => {
+          if (typeof window !== 'undefined') {
+            const hostname = window.location.hostname;
+            if (hostname === 'muses.ink' || hostname.endsWith('.muses.ink')) {
+              return `https://api.muses.ink${response.data.file.url}`;
+            }
+          }
+          return `http://localhost:8080${response.data.file.url}`;
+        };
+        const imageUrl = getImageUrl();
         const imageInfo = {
           id: response.data.file.id,
           name: file.name,

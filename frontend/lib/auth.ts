@@ -1,6 +1,17 @@
 import axios from 'axios';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+// 自动检测环境：如果是 muses.ink 域名，使用生产 API，否则使用开发环境
+const getApiUrl = () => {
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    if (hostname === 'muses.ink' || hostname.endsWith('.muses.ink')) {
+      return 'https://api.muses.ink';
+    }
+  }
+  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+};
+
+const API_URL = getApiUrl();
 
 export interface User {
   id: string;
