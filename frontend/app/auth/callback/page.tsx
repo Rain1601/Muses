@@ -32,7 +32,7 @@ function AuthCallbackContent() {
 
     if (code) {
       // 重定向到后端处理OAuth
-      window.location.href = `http://localhost:8080/api/auth/github/callback?code=${code}`;
+      window.location.href = `https://api.muses.ink/api/auth/github/callback?code=${code}`;
     } else {
       router.push('/');
     }
