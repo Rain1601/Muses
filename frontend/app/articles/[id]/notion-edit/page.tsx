@@ -52,7 +52,7 @@ export default function NotionEditPage() {
       setContent(articleData.content || '');
     } catch (error) {
       console.error('Failed to fetch article:', error);
-      router.push('/articles');
+      router.push('/dashboard');
     } finally {
       setLoading(false);
     }
@@ -115,7 +115,7 @@ export default function NotionEditPage() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold mb-4">文章未找到</h2>
-          <Button onClick={() => router.push('/articles')}>
+          <Button onClick={() => router.push('/dashboard')}>
             返回文章列表
           </Button>
         </div>
@@ -135,7 +135,7 @@ export default function NotionEditPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => router.push('/articles')}
+                onClick={() => router.push('/dashboard')}
                 className="text-muted-foreground hover:text-foreground"
               >
                 <ArrowLeft className="w-4 h-4 mr-1" />

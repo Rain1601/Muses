@@ -79,7 +79,7 @@ export default function ArticleDetailPage() {
     try {
       await api.delete(`/api/articles/${articleId}`);
       alert('文章已删除');
-      router.push('/articles');
+      router.push('/dashboard');
     } catch (error: any) {
       console.error('Delete error:', error);
       alert('删除失败：' + (error.response?.data?.detail || '未知错误'));
@@ -100,7 +100,7 @@ export default function ArticleDetailPage() {
         <div className="text-center">
           <h1 className="text-2xl font-bold text-red-600 mb-4">{error}</h1>
           <Button
-            onClick={() => router.push('/articles')}
+            onClick={() => router.push('/dashboard')}
           >
             返回文章列表
           </Button>
@@ -115,7 +115,7 @@ export default function ArticleDetailPage() {
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">文章不存在</h1>
           <Button
-            onClick={() => router.push('/articles')}
+            onClick={() => router.push('/dashboard')}
           >
             返回文章列表
           </Button>
@@ -131,7 +131,7 @@ export default function ArticleDetailPage() {
       {/* 头部操作栏 */}
       <div className="flex justify-between items-center mb-8">
         <button
-          onClick={() => router.push('/articles')}
+          onClick={() => router.push('/dashboard')}
           className="text-muted-foreground hover:text-foreground flex items-center"
         >
           ← 返回文章列表

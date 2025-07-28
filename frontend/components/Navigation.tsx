@@ -12,7 +12,6 @@ export default function Navigation() {
 
   const navItems = [
     { href: '/dashboard', label: '工作台' },
-    { href: '/articles', label: '文章管理' },
     { href: '/agents', label: 'Agent管理' },
     { href: '/settings', label: '设置' },
   ];
