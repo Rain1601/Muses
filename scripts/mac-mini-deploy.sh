@@ -117,7 +117,7 @@ check_health() {
     # 检查后端
     local backend_attempts=0
     while [ $backend_attempts -lt 6 ]; do
-        if curl -f http://localhost:8080/health >/dev/null 2>&1; then
+        if curl -f http://localhost:8080/ >/dev/null 2>&1; then
             log "✅ 后端服务健康检查通过"
             break
         fi
