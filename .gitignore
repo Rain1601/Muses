@@ -47,6 +47,8 @@ backend/prisma/migrations/
 # Uploads
 backend/uploads/
 backend/temp/
+venv/
+venv_deploy/
 
 # IDE
 .idea/

@@ -1,0 +1,327 @@
+/* Mermaid 图表样式 */
+.mermaid-block {
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  background-color: #f9fafb;
+}
+
+.mermaid-block pre {
+  margin: 0;
+  padding: 0.5rem;
+  background-color: #1f2937;
+  color: #e5e7eb;
+  border-radius: 0.25rem;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.mermaid-block code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+
+/* 代码块语法高亮 */
+.ProseMirror pre {
+  background: #1f2937;
+  color: #e5e7eb;
+  font-family: 'JetBrains Mono', 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  margin: 1rem 0;
+}
+
+.ProseMirror pre code {
+  color: inherit;
+  padding: 0;
+  background: none;
+  font-size: 0.875rem;
+}
+
+/* 增强的编辑器样式 */
+.ProseMirror {
+  outline: none;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.6;
+}
+
+.ProseMirror h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 1.5rem 0 1rem 0;
+  line-height: 1.2;
+}
+
+.ProseMirror h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 1.25rem 0 0.75rem 0;
+  line-height: 1.3;
+}
+
+.ProseMirror h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 1rem 0 0.5rem 0;
+  line-height: 1.4;
+}
+
+.ProseMirror blockquote {
+  border-left: 4px solid #e5e7eb;
+  padding-left: 1rem;
+  margin: 1rem 0;
+  font-style: italic;
+  color: #6b7280;
+}
+
+.ProseMirror ul, .ProseMirror ol {
+  padding-left: 1.5rem;
+  margin: 0.5rem 0;
+}
+
+.ProseMirror li {
+  margin: 0.25rem 0;
+}
+
+.ProseMirror p {
+  margin: 0.75rem 0;
+}
+
+/* 高亮样式 */
+.ProseMirror mark {
+  background-color: #fef3c7;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+}
+
+/* 图片样式 */
+.ProseMirror .editor-image {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  margin: 1rem 0;
+  cursor: pointer;
+  transition: transform 0.2s ease-in-out;
+}
+
+.ProseMirror .editor-image:hover {
+  transform: scale(1.02);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* 拖拽指示器样式 */
+.ProseMirror .ProseMirror-dropcursor {
+  position: relative;
+  border: none;
+  margin: 0;
+  display: block;
+  height: 1px;
+}
+
+.ProseMirror .ProseMirror-dropcursor:after {
+  content: '';
+  position: absolute;
+  left: -10px;
+  right: -10px;
+  top: -1px;
+  bottom: -1px;
+  background: #3b82f6;
+  border-radius: 1px;
+}
+
+/* 图片上传状态 */
+.ProseMirror .image-uploading {
+  opacity: 0.6;
+  position: relative;
+}
+
+.ProseMirror .image-uploading::after {
+  content: '⏳ 上传中...';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+}
+
+/* 表格样式 */
+.ProseMirror table {
+  border-collapse: collapse;
+  margin: 1rem 0;
+  overflow: hidden;
+  table-layout: fixed;
+  width: 100%;
+}
+
+.ProseMirror table td,
+.ProseMirror table th {
+  border: 1px solid #e5e7eb;
+  box-sizing: border-box;
+  min-width: 1em;
+  padding: 6px 8px;
+  position: relative;
+  vertical-align: top;
+}
+
+.ProseMirror table th {
+  background-color: #f9fafb;
+  font-weight: bold;
+}
+
+.ProseMirror table .selectedCell:after {
+  background: rgba(59, 130, 246, 0.2);
+  content: "";
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 2;
+}
+
+/* 任务列表样式 */
+.ProseMirror ul[data-type="taskList"] {
+  list-style: none;
+  padding: 0;
+}
+
+.ProseMirror ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  margin: 0.25rem 0;
+}
+
+.ProseMirror ul[data-type="taskList"] li > label {
+  flex: 0 0 auto;
+  margin-right: 0.5rem;
+  user-select: none;
+}
+
+.ProseMirror ul[data-type="taskList"] li > div {
+  flex: 1 1 auto;
+}
+
+.ProseMirror ul[data-type="taskList"] input[type="checkbox"] {
+  cursor: pointer;
+  margin: 0;
+  width: 1rem;
+  height: 1rem;
+}
+
+/* 链接样式 */
+.ProseMirror a {
+  color: #3b82f6;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.ProseMirror a:hover {
+  color: #1d4ed8;
+}
+
+/* 数学公式样式 */
+.ProseMirror .math-inline {
+  display: inline-block;
+  font-family: 'KaTeX_Main', 'Times New Roman', serif;
+  background: #f3f4f6;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  margin: 0 0.125rem;
+}
+
+.ProseMirror .math-display {
+  display: block;
+  text-align: center;
+  margin: 1rem 0;
+  padding: 1rem;
+  background: #f9fafb;
+  border-radius: 0.5rem;
+  border: 1px solid #e5e7eb;
+}
+
+/* 上标下标样式 */
+.ProseMirror sup {
+  font-size: 0.75em;
+  line-height: 0;
+  position: relative;
+  vertical-align: baseline;
+  top: -0.5em;
+}
+
+.ProseMirror sub {
+  font-size: 0.75em;
+  line-height: 0;
+  position: relative;
+  vertical-align: baseline;
+  bottom: -0.25em;
+}
+
+/* YouTube嵌入样式 */
+.ProseMirror .youtube-embed {
+  margin: 1rem 0;
+  text-align: center;
+}
+
+.ProseMirror .youtube-embed iframe {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+}
+
+/* 折叠块样式 */
+.ProseMirror .collapsible-block {
+  margin: 1rem 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.ProseMirror .collapsible-block summary {
+  background: #f9fafb;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  font-weight: 500;
+  border-bottom: 1px solid #e5e7eb;
+  user-select: none;
+}
+
+.ProseMirror .collapsible-block summary:hover {
+  background: #f3f4f6;
+}
+
+.ProseMirror .collapsible-content {
+  padding: 1rem;
+}
+
+/* 表格调整手柄 */
+.ProseMirror .tableWrapper {
+  overflow-x: auto;
+}
+
+.ProseMirror .resize-cursor {
+  cursor: col-resize;
+}
+
+/* 改进的焦点样式 */
+.ProseMirror:focus {
+  outline: none;
+}
+
+.ProseMirror .ProseMirror-focused {
+  outline: none;
+}
+
+/* 改进的选择样式 */
+.ProseMirror ::selection {
+  background: rgba(59, 130, 246, 0.2);
+}
