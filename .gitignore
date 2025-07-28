@@ -65,3 +65,13 @@ logs/
 # Cache
 .cache/
 backend/.cache/
+# Python cache files
+backend-python/**/__pycache__/
+backend-python/venv_deploy/
+
+# Node.js updates from deployment
+frontend/package-lock.json
+
+# Build artifacts  
+.cursor/
+
