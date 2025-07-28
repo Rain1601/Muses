@@ -54,6 +54,10 @@ class Article(ArticleBase):
 
 class ArticleListResponse(BaseModel):
     articles: list[Article]
+    total: Optional[int] = None
+    page: Optional[int] = None
+    page_size: Optional[int] = None
+    total_pages: Optional[int] = None
 
 
 class ArticleResponse(BaseModel):
