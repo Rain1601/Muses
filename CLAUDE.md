@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Muses** is an AI-powered blog article generation platform that converts various source materials (PDF, Markdown, text, conversations) into high-quality blog articles. It features a Next.js frontend and Express.js backend with SQLite database.
+**Muses** is an AI-powered blog article generation platform that converts various source materials (PDF, Markdown, text, conversations) into high-quality blog articles. It features a Next.js frontend and FastAPI (Python) backend with SQLite database.
 
 ## Development Commands
 
@@ -13,10 +13,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Initial setup (installs dependencies, creates database)
 ./scripts/setup.sh
 
-# Start development environment (opens both frontend/backend in separate terminals)
+# Start with Python backend (recommended)
+./start-python.sh
+
+# Traditional dev mode (if Express backend exists)
 ./scripts/dev.sh
 
-# Start production mode (single script for both services)
+# Start production mode
 ./scripts/start.sh
 ```
 
@@ -24,36 +27,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 cd frontend
 npm run dev          # Development server
+npm run dev:turbo    # Development server with Turbo
 npm run build        # Production build
 npm run start        # Production server
 npm run lint         # ESLint checks
 ```
 
-### Backend (runs on port 8080)
+### Python Backend (runs on port 8080)
 ```bash
-cd backend
-npm run dev          # Development server with nodemon
-npm run build        # TypeScript compilation
-npm run start        # Production server
-npm run db:generate  # Generate Prisma client
-npm run db:push      # Push schema to database
-npm run db:studio    # Open Prisma Studio
-```
-
-### Database Management
-```bash
-cd backend
-npm run db:generate  # Regenerate Prisma client after schema changes
-npm run db:push      # Apply schema changes to database
-npm run db:studio    # Visual database management tool
+cd backend-python
+python3 start.py     # Start FastAPI server
+# Access API docs at http://localhost:8080/docs
 ```
 
 ## Architecture Overview
 
 ### Technology Stack
-- **Frontend**: Next.js 14 (App Router), TypeScript, Tailwind CSS, Shadcn/ui, TanStack Query, Zustand
-- **Backend**: Express.js, TypeScript, Prisma ORM, JWT authentication, OpenAI integration
-- **Database**: SQLite with Prisma (production-ready, can migrate to PostgreSQL)
+- **Frontend**: Next.js 14 (App Router), TypeScript, Tailwind CSS, Shadcn/ui, TanStack Query, Zustand, TipTap Editor
+- **Backend**: FastAPI (Python), SQLAlchemy ORM, JWT authentication, OpenAI integration
+- **Database**: SQLite with SQLAlchemy (production-ready, can migrate to PostgreSQL)
 - **Authentication**: GitHub OAuth + JWT tokens
 
 ### Key Directories
@@ -68,14 +60,15 @@ npm run db:studio    # Visual database management tool
 │   ├── components/            # Reusable React components
 │   ├── lib/                   # Utility libraries
 │   └── store/                 # Zustand state management
-├── backend/                   # Express.js API server
-│   ├── src/
-│   │   ├── routes/           # API endpoints
+├── backend-python/            # FastAPI server
+│   ├── app/
+│   │   ├── api/              # API endpoints
 │   │   ├── services/         # Business logic (AI, GitHub integration)
-│   │   ├── middleware/       # Authentication middleware
+│   │   ├── models/           # SQLAlchemy models
+│   │   ├── schemas/          # Pydantic schemas
 │   │   └── utils/           # Utilities (cache, encryption)
-│   ├── prisma/              # Database schema and migrations
-│   └── uploads/             # File upload storage
+│   ├── uploads/             # File upload storage
+│   └── requirements.txt     # Python dependencies
 ```
 
 ## Core Features
@@ -112,17 +105,19 @@ All sensitive data (OpenAI API keys, GitHub tokens) is encrypted before storage.
 
 ## Development Patterns
 
-### API Routes
-- Located in `backend/src/routes/`
-- Use Zod for request validation
-- JWT authentication via middleware
+### API Routes (Python Backend)
+- Located in `backend-python/app/api/`
+- Use Pydantic for request/response validation
+- JWT authentication via FastAPI dependencies
 - Proper error handling and logging
+- FastAPI automatic OpenAPI/Swagger documentation
 
 ### Frontend Components
 - Use shadcn/ui components for consistency
 - TanStack Query for server state management
 - Zustand for client state
 - TypeScript interfaces for all props
+- TipTap for rich text editing (Notion-style editor)
 
 ### State Management
 - **Server State**: TanStack Query with proper caching
@@ -131,13 +126,14 @@ All sensitive data (OpenAI API keys, GitHub tokens) is encrypted before storage.
 
 ## Environment Configuration
 
-### Required Environment Variables (backend/.env)
+### Required Environment Variables (backend-python/.env)
 ```bash
-DATABASE_URL="file:./muses.db"
+DATABASE_URL="sqlite:///./muses.db"
 JWT_SECRET="your-jwt-secret"
 GITHUB_CLIENT_ID="your-github-oauth-app-id"
 GITHUB_CLIENT_SECRET="your-github-oauth-app-secret"
 ENCRYPTION_KEY="your-32-char-encryption-key"
+OPENAI_API_KEY="your-openai-api-key"
 ```
 
 ### GitHub OAuth Setup
@@ -148,56 +144,55 @@ ENCRYPTION_KEY="your-32-char-encryption-key"
 
 ### Running Tests
 ```bash
-# Backend tests
-cd backend && npm test
+# Python backend tests
+cd backend-python && python -m pytest
 
 # Frontend tests  
 cd frontend && npm test
 
 # Type checking
-cd frontend && npm run type-check
-cd backend && npx tsc --noEmit
+cd frontend && npx tsc --noEmit
 ```
 
 ### Code Quality
-- ESLint configuration for both frontend and backend
+- ESLint configuration for frontend
 - TypeScript strict mode enabled
-- Prettier for code formatting
-- Husky pre-commit hooks (if configured)
+- Python type hints with Pydantic
+- FastAPI automatic validation and serialization
 
 ## Security Considerations
 
 - All API routes require JWT authentication except auth endpoints
 - User data isolation - users can only access their own data
 - Sensitive data encryption (API keys, tokens)
-- Input validation using Zod schemas
-- CORS and security headers configured
+- Input validation using Pydantic models
+- CORS and security headers configured via FastAPI
 
 ## Common Development Tasks
 
-### Adding New API Endpoint
-1. Create route handler in `backend/src/routes/`
-2. Add Zod validation schema
-3. Implement authentication middleware
-4. Add error handling
-5. Register route in `backend/src/index.ts`
+### Adding New API Endpoint (Python)
+1. Create route handler in `backend-python/app/api/`
+2. Define Pydantic request/response schemas in `app/schemas/`
+3. Implement authentication dependency
+4. Add proper error handling
+5. Register route in FastAPI router
 
 ### Adding New Page
 1. Create page component in `frontend/app/`
-2. Wrap with `<ProtectedRoute>` if authentication required
-3. Add navigation to `frontend/components/navbar.tsx`
+2. Wrap with authentication check if required
+3. Add navigation to relevant components
 4. Create corresponding API hooks if needed
 
-### Database Schema Changes
-1. Modify `backend/prisma/schema.prisma`
-2. Run `npm run db:generate`
-3. Run `npm run db:push`
-4. Update TypeScript types as needed
+### Database Schema Changes (SQLAlchemy)
+1. Modify models in `backend-python/app/models/`
+2. Create Alembic migration: `alembic revision --autogenerate -m "description"`
+3. Apply migration: `alembic upgrade head`
+4. Update Pydantic schemas as needed
 
 ### Performance Optimization
 - Use React.memo() for expensive components
 - Implement proper TanStack Query caching strategies
-- Optimize database queries with proper select/include
+- Optimize database queries with proper SQLAlchemy select/joins
 - Use Next.js Image component for images
 
 ## Deployment

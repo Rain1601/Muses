@@ -1,0 +1,30 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- 定义裁剪路径 -->
+  <defs>
+    <clipPath id="roundedSquareClip">
+      <rect x="10" y="10" width="180" height="180" rx="30" ry="30"/>
+    </clipPath>
+  </defs>
+  
+  <!-- 黑色背景圆角方形 -->
+  <rect x="10" y="10" width="180" height="180" rx="30" ry="30" fill="#1a1a1a"/>
+  
+  <!-- 裁剪区域内的内容 -->
+  <g clip-path="url(#roundedSquareClip)">
+    <!-- 超大的雨滴作为背景 -->
+    <g transform="translate(140, 110)" opacity="0.1">
+      <path d="M 0,-90 C -45,-45 -60,20 -60,45 C -60,80 -30,110 0,110 C 30,110 60,80 60,45 C 60,20 45,-45 0,-90 Z" 
+            fill="#ffffff"/>
+    </g>
+    
+    <!-- 巨大的R字母 -->
+    <text x="85" y="165" font-family="Georgia, Times New Roman, serif" font-size="195" font-weight="400" text-anchor="middle" fill="#ffffff">
+      R
+    </text>
+
+    <!-- 溢出的小写a -->
+    <text x="160" y="165" font-family="Georgia, Times New Roman, serif" font-size="200" font-weight="300" text-anchor="middle" fill="#ffffff" opacity="0.7">
+      a
+    </text>
+  </g>
+</svg>

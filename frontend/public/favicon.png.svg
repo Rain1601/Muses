@@ -1,0 +1,23 @@
+<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <!-- 淡棕色背景 -->
+  <rect x="0" y="0" width="64" height="64" rx="8" fill="#e8d5c4"/>
+  
+  <!-- 羽毛背景 - 极简化 -->
+  <g transform="translate(45, 15) rotate(-20) scale(0.3)" opacity="0.25">
+    <path d="M 0,0 L 1,60 M 0,10 C -8,15 -10,25 -12,35 M 0,10 C 8,15 10,25 12,35" stroke="#8b7355" stroke-width="1.5" fill="none"/>
+  </g>
+  
+  <!-- M字母 - 极简化，适合16x16显示 -->
+  <text x="20" y="45" 
+        font-family="serif" 
+        font-size="28" 
+        font-weight="bold" 
+        fill="#2c1810">M</text>
+        
+  <!-- u字母 - 极简化 -->
+  <text x="38" y="50" 
+        font-family="serif" 
+        font-size="22" 
+        font-weight="normal" 
+        fill="#5a3e2a">u</text>
+</svg>
