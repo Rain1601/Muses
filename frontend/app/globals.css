@@ -52,9 +52,11 @@
 @layer base {
   * {
     @apply border-border;
+    font-family: "Times New Roman", "SimSun", "宋体", Times, serif;
   }
   body {
     @apply bg-background text-foreground;
+    font-family: "Times New Roman", "SimSun", "宋体", Times, serif;
   }
   
   /* Code block styles */
@@ -77,4 +79,93 @@
   .dark code {
     @apply bg-muted/20 text-foreground;
   }
+}
+
+/* Custom prose styles for better readability */
+.prose {
+  font-family: "Times New Roman", "SimSun", "宋体", Times, serif;
+  line-height: 1.75;
+}
+
+.prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+  font-family: "Times New Roman", "SimSun", "宋体", Times, serif;
+  font-weight: 700;
+  margin-top: 1.5em;
+  margin-bottom: 0.75em;
+}
+
+.prose p {
+  margin-bottom: 1.25em;
+}
+
+.prose blockquote {
+  border-left: 4px solid hsl(var(--border));
+  padding-left: 1em;
+  font-style: italic;
+  color: hsl(var(--muted-foreground));
+}
+
+.prose code {
+  background: hsl(var(--muted));
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  font-size: 0.875em;
+}
+
+.prose pre {
+  background: hsl(var(--muted));
+  padding: 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+}
+
+.prose pre code {
+  background: none;
+  padding: 0;
+}
+
+/* Dashboard layout animations */
+.dashboard-transition {
+  transition: all 200ms ease-in-out;
+}
+
+.article-preview-enter {
+  opacity: 0;
+  transform: translateY(8px);
+  animation: fadeInUp 300ms ease-out forwards;
+}
+
+@keyframes fadeInUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sidebar-content {
+  transition: opacity 200ms ease-in-out, transform 200ms ease-in-out;
+}
+
+.sidebar-content.loading {
+  opacity: 0.7;
+  transform: scale(0.98);
+}
+
+/* Smooth scrolling for better UX */
+.smooth-scroll {
+  scroll-behavior: smooth;
+}
+
+/* Enhanced hover effects for interactive elements */
+.hover-lift {
+  transition: transform 150ms ease-out, box-shadow 150ms ease-out;
+}
+
+.hover-lift:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.dark .hover-lift:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
 }

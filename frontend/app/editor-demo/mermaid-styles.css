@@ -98,20 +98,82 @@
   border-radius: 0.25rem;
 }
 
-/* 图片样式 */
+/* 图片样式 - 默认居中 */
 .ProseMirror .editor-image {
+  display: block;
   max-width: 100%;
   height: auto;
   border-radius: 0.5rem;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  margin: 1rem 0;
+  margin: 1rem auto;
   cursor: pointer;
-  transition: transform 0.2s ease-in-out;
+  transition: all 0.2s ease-in-out;
+  resize: both;
+  min-width: 100px;
+  min-height: 100px;
+  border: 2px solid transparent;
 }
 
 .ProseMirror .editor-image:hover {
   transform: scale(1.02);
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  border: 2px solid #3b82f6;
+}
+
+.ProseMirror img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  margin: 1rem auto;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  resize: both;
+  min-width: 100px;
+  min-height: 100px;
+  border: 2px solid transparent;
+}
+
+.ProseMirror img:hover {
+  transform: scale(1.02);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  border: 2px solid #3b82f6;
+}
+
+.ProseMirror img:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+.ProseMirror img:selected,
+.ProseMirror .editor-image.ProseMirror-selectednode {
+  border: 2px solid #3b82f6;
+}
+
+/* 图片容器样式，支持调整大小 */
+.ProseMirror .image-container {
+  position: relative;
+  display: inline-block;
+  margin: 1rem auto;
+  resize: both;
+  overflow: hidden;
+  min-width: 100px;
+  min-height: 100px;
+  border: 2px solid transparent;
+  border-radius: 0.5rem;
+}
+
+.ProseMirror .image-container:hover {
+  border: 2px solid #3b82f6;
+}
+
+.ProseMirror .image-container img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  margin: 0;
+  border-radius: 0.375rem;
 }
 
 /* 拖拽指示器样式 */
@@ -153,32 +215,103 @@
   font-size: 0.875rem;
 }
 
-/* 表格样式 */
+/* 表格样式 - 现代化设计 */
 .ProseMirror table {
-  border-collapse: collapse;
-  margin: 1rem 0;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: 1.5rem 0;
   overflow: hidden;
   table-layout: fixed;
   width: 100%;
+  background: #ffffff;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.dark .ProseMirror table {
+  background: #1f2937;
+  border: 1px solid #374151;
 }
 
 .ProseMirror table td,
 .ProseMirror table th {
-  border: 1px solid #e5e7eb;
+  border: none;
+  border-bottom: 1px solid #e5e7eb;
+  border-right: 1px solid #e5e7eb;
   box-sizing: border-box;
   min-width: 1em;
-  padding: 6px 8px;
+  padding: 12px 16px;
   position: relative;
   vertical-align: top;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.dark .ProseMirror table td,
+.dark .ProseMirror table th {
+  border-bottom: 1px solid #374151;
+  border-right: 1px solid #374151;
+  color: #faf9f5;
 }
 
 .ProseMirror table th {
-  background-color: #f9fafb;
-  font-weight: bold;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: #475569;
+  text-align: left;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.dark .ProseMirror table th {
+  background: linear-gradient(180deg, #374151 0%, #2d3748 100%);
+  color: #e2e8f0;
+  border-bottom: 2px solid #4b5563;
+}
+
+.ProseMirror table tbody tr:nth-child(even) {
+  background: #f8fafc;
+}
+
+.dark .ProseMirror table tbody tr:nth-child(even) {
+  background: #2d3748;
+}
+
+.ProseMirror table tbody tr:hover {
+  background: #f1f5f9;
+}
+
+.dark .ProseMirror table tbody tr:hover {
+  background: #374151;
+}
+
+.ProseMirror table tr:first-child th:first-child {
+  border-top-left-radius: 0.5rem;
+}
+
+.ProseMirror table tr:first-child th:last-child {
+  border-top-right-radius: 0.5rem;
+}
+
+.ProseMirror table tr:last-child td:first-child {
+  border-bottom-left-radius: 0.5rem;
+}
+
+.ProseMirror table tr:last-child td:last-child {
+  border-bottom-right-radius: 0.5rem;
+}
+
+.ProseMirror table td:last-child,
+.ProseMirror table th:last-child {
+  border-right: none;
+}
+
+.ProseMirror table tr:last-child td {
+  border-bottom: none;
 }
 
 .ProseMirror table .selectedCell:after {
-  background: rgba(59, 130, 246, 0.2);
+  background: rgba(59, 130, 246, 0.15);
   content: "";
   left: 0;
   right: 0;
@@ -187,6 +320,7 @@
   pointer-events: none;
   position: absolute;
   z-index: 2;
+  border-radius: 0.25rem;
 }
 
 /* 任务列表样式 */
@@ -218,15 +352,68 @@
   height: 1rem;
 }
 
-/* 链接样式 */
+/* 列表标题暗色模式修复 */
+.dark .ProseMirror h1,
+.dark .ProseMirror h2,
+.dark .ProseMirror h3,
+.dark .ProseMirror h4,
+.dark .ProseMirror h5,
+.dark .ProseMirror h6 {
+  color: #faf9f5; /* 使用foreground颜色 */
+  background-color: transparent;
+}
+
+.dark .ProseMirror ul,
+.dark .ProseMirror ol,
+.dark .ProseMirror li {
+  color: #faf9f5;
+}
+
+.dark .ProseMirror p {
+  color: #faf9f5;
+}
+
+/* 链接样式 - 标签风格 */
 .ProseMirror a {
+  display: inline-flex;
+  align-items: center;
   color: #3b82f6;
-  text-decoration: underline;
+  text-decoration: none;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 500;
   cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  margin: 0 0.125rem;
 }
 
 .ProseMirror a:hover {
-  color: #1d4ed8;
+  color: #ffffff;
+  background: #3b82f6;
+  border-color: #3b82f6;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.3);
+}
+
+.ProseMirror a:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px -1px rgba(59, 130, 246, 0.3);
+}
+
+/* 暗色模式下的链接样式 */
+.dark .ProseMirror a {
+  color: #60a5fa;
+  background: rgba(96, 165, 250, 0.15);
+  border: 1px solid rgba(96, 165, 250, 0.4);
+}
+
+.dark .ProseMirror a:hover {
+  color: #1f2937;
+  background: #60a5fa;
+  border-color: #60a5fa;
 }
 
 /* 数学公式样式 */
@@ -312,13 +499,25 @@
   cursor: col-resize;
 }
 
-/* 改进的焦点样式 */
+/* 改进的焦点样式 - 移除蓝色边框 */
 .ProseMirror:focus {
   outline: none;
+  border: none !important;
 }
 
 .ProseMirror .ProseMirror-focused {
   outline: none;
+  border: none !important;
+}
+
+/* 移除编辑器容器的焦点边框 */
+.prose .ProseMirror {
+  border: none !important;
+}
+
+.prose .ProseMirror:focus-within {
+  border: none !important;
+  box-shadow: none !important;
 }
 
 /* 改进的选择样式 */

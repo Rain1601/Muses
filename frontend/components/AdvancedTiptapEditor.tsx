@@ -761,8 +761,7 @@ export function AdvancedTiptapEditor({ initialContent, onChange }: AdvancedTipta
       {/* 主编辑器 */}
       <Card className="flex-1 p-6 relative">
         <div className="mb-4">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-lg font-semibold">🚀 全功能编辑器</h3>
+          <div className="flex items-center justify-end mb-2">
             <Button
               size="sm"
               variant="outline"
@@ -772,143 +771,12 @@ export function AdvancedTiptapEditor({ initialContent, onChange }: AdvancedTipta
               目录
             </Button>
           </div>
-          
-          {/* 工具栏 */}
-          <div className="flex flex-wrap gap-2 mb-4 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
-            {/* 基础格式 */}
-            <div className="flex gap-1 border-r pr-2 mr-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => editor.chain().focus().toggleBold().run()}
-                className={editor.isActive('bold') ? 'bg-gray-200 dark:bg-gray-700' : ''}
-              >
-                <Bold className="w-4 h-4" />
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => editor.chain().focus().toggleItalic().run()}
-                className={editor.isActive('italic') ? 'bg-gray-200 dark:bg-gray-700' : ''}
-              >
-                <Italic className="w-4 h-4" />
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => editor.chain().focus().toggleHighlight().run()}
-                className={editor.isActive('highlight') ? 'bg-gray-200 dark:bg-gray-700' : ''}
-              >
-                <Highlighter className="w-4 h-4" />
-              </Button>
-            </div>
-
-            {/* 文字颜色 */}
-            <div className="flex gap-1 border-r pr-2 mr-2">
-              <input
-                type="color"
-                value={currentColor}
-                onChange={(e) => {
-                  setCurrentColor(e.target.value);
-                  editor.chain().focus().setColor(e.target.value).run();
-                }}
-                className="w-8 h-8 rounded cursor-pointer"
-                title="文字颜色"
-              />
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => editor.chain().focus().toggleSuperscript().run()}
-                className={editor.isActive('superscript') ? 'bg-gray-200 dark:bg-gray-700' : ''}
-                title="上标"
-              >
-                <SuperIcon className="w-4 h-4" />
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => editor.chain().focus().toggleSubscript().run()}
-                className={editor.isActive('subscript') ? 'bg-gray-200 dark:bg-gray-700' : ''}
-                title="下标"
-              >
-                <SubIcon className="w-4 h-4" />
-              </Button>
-            </div>
-
-            {/* 表格和列表 */}
-            <div className="flex gap-1 border-r pr-2 mr-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
-                title="插入表格"
-              >
-                <TableIcon className="w-4 h-4" />
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => editor.chain().focus().toggleTaskList().run()}
-                className={editor.isActive('taskList') ? 'bg-gray-200 dark:bg-gray-700' : ''}
-                title="任务列表"
-              >
-                <CheckSquare className="w-4 h-4" />
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => editor.chain().focus().toggleBulletList().run()}
-                className={editor.isActive('bulletList') ? 'bg-gray-200 dark:bg-gray-700' : ''}
-                title="无序列表"
-              >
-                <List className="w-4 h-4" />
-              </Button>
-            </div>
-
-            {/* 其他功能 */}
-            <div className="flex gap-1 border-r pr-2 mr-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-                className={editor.isActive('codeBlock') ? 'bg-gray-200 dark:bg-gray-700' : ''}
-                title="代码块"
-              >
-                <Code className="w-4 h-4" />
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => editor.chain().focus().insertContent('$\\LaTeX$').run()}
-                title="数学公式"
-              >
-                <Calculator className="w-4 h-4" />
-              </Button>
-              <label className="cursor-pointer">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                />
-                <div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    title="上传图片"
-                  >
-                    <ImageIcon className="w-4 h-4" />
-                  </Button>
-                </div>
-              </label>
-            </div>
-          </div>
         </div>
 
         <div className="prose prose-sm max-w-none">
-          <EditorContent 
-            editor={editor} 
-            className="min-h-[500px] p-4 border rounded-md focus-within:border-blue-500"
+          <EditorContent
+            editor={editor}
+            className="min-h-[500px] p-4 border rounded-md"
           />
         </div>
 
@@ -1216,37 +1084,67 @@ export function AdvancedTiptapEditor({ initialContent, onChange }: AdvancedTipta
         )}
       </Card>
 
-      {/* 目录导航 */}
+      {/* 目录导航 - 左侧固定位置 */}
       {showTableOfContents && (
-        <Card className="w-64 p-4">
-          <h4 className="font-semibold mb-3 flex items-center">
-            <Menu className="w-4 h-4 mr-2" />
-            目录导航
-          </h4>
-          <div className="space-y-1 max-h-96 overflow-y-auto">
-            {tableOfContents.map((heading, index) => (
-              <button
-                key={index}
-                className={`block w-full text-left px-2 py-1 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors ${
-                  heading.level === 1 ? 'font-semibold' : 
-                  heading.level === 2 ? 'ml-4 font-medium' : 
-                  'ml-8 text-gray-600 dark:text-gray-400'
-                }`}
-                onClick={() => {
-                  const element = document.getElementById(heading.id);
-                  element?.scrollIntoView({ behavior: 'smooth' });
-                }}
+        <div className="fixed top-32 left-6 w-72 z-30">
+          <Card className="p-4 shadow-lg border bg-background/95 backdrop-blur-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="font-semibold text-sm text-foreground">
+                标题目录
+              </h4>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setShowTableOfContents(false)}
+                className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
               >
-                {heading.text}
-              </button>
-            ))}
-            {tableOfContents.length === 0 && (
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                暂无标题
-              </p>
-            )}
-          </div>
-        </Card>
+                ×
+              </Button>
+            </div>
+            <div className="space-y-1 max-h-80 overflow-y-auto">
+              {tableOfContents.map((heading, index) => {
+                const isTopLevel = heading.level === 1;
+                const isSecondLevel = heading.level === 2;
+                const isThirdLevel = heading.level === 3;
+
+                return (
+                  <button
+                    key={index}
+                    className={`group flex items-center w-full text-left py-1.5 px-2 text-sm hover:bg-accent/50 rounded transition-colors ${
+                      isTopLevel
+                        ? 'font-semibold text-red-600 dark:text-red-400'
+                        : isSecondLevel
+                        ? 'font-medium text-foreground/90 ml-4'
+                        : 'text-muted-foreground ml-8'
+                    }`}
+                    onClick={() => {
+                      const element = document.getElementById(heading.id);
+                      element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }}
+                  >
+                    {isTopLevel && (
+                      <span className="mr-2 text-red-600 dark:text-red-400">▼</span>
+                    )}
+                    {isSecondLevel && (
+                      <span className="mr-2 text-muted-foreground">▶</span>
+                    )}
+                    <span className="flex-1 truncate">{heading.text}</span>
+                  </button>
+                );
+              })}
+              {tableOfContents.length === 0 && (
+                <div className="text-center py-8">
+                  <p className="text-sm text-muted-foreground">
+                    暂无标题
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    添加标题后将在此处显示
+                  </p>
+                </div>
+              )}
+            </div>
+          </Card>
+        </div>
       )}
     </div>
   );

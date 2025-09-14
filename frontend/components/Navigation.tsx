@@ -22,8 +22,12 @@ export default function Navigation() {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-8">
             <Link href="/dashboard" className="flex items-center space-x-3 group">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-accent/30 dark:from-primary/30 dark:to-accent/40 flex items-center justify-center text-lg transition-all duration-200 group-hover:from-primary/30 group-hover:to-accent/40 dark:group-hover:from-primary/40 dark:group-hover:to-accent/50 shadow-sm">
-                🪶
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-accent/30 dark:from-primary/30 dark:to-accent/40 flex items-center justify-center transition-all duration-200 group-hover:from-primary/30 group-hover:to-accent/40 dark:group-hover:from-primary/40 dark:group-hover:to-accent/50 shadow-sm">
+                <img
+                  src="/materials/images/icons/feather-brown.svg"
+                  alt="Muses"
+                  className="w-5 h-5"
+                />
               </div>
               <span className="text-xl font-semibold text-foreground">Muses</span>
             </Link>

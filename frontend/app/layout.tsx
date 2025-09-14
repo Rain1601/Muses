@@ -7,23 +7,23 @@ import { ThemeProvider } from "@/components/theme-provider";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Muses",
+  title: "Muses: Write And Share",
   description: "智能将素材转换为个性化博客文章",
   icons: {
     icon: [
+      {
+        url: "/materials/images/icons/logov2.svg?v=4",
+        type: "image/svg+xml",
+        sizes: "any",
+      },
       {
         url: "/favicon.png?v=2",
         type: "image/png",
         sizes: "any",
       },
-      {
-        url: "/favicon.svg?v=2",
-        type: "image/svg+xml",
-        sizes: "any",
-      },
     ],
-    shortcut: "/favicon.png?v=2",
-    apple: "/favicon.png?v=2"
+    shortcut: "/materials/images/icons/logov2.svg?v=4",
+    apple: "/materials/images/icons/logov2.svg?v=4"
   },
 };
 
@@ -34,7 +34,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN" suppressHydrationWarning>
-      <body className={inter.className}>
+      <body className={`${inter.className} font-serif`} style={{ fontFamily: '"Times New Roman", Times, serif' }}>
         <ThemeProvider
           attribute="class"
           defaultTheme="light"

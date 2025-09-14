@@ -141,17 +141,10 @@ export default function ArticleManagement({
             <h2 className="text-xl font-semibold">文章管理</h2>
             <div className="flex gap-2">
               <Button
-                onClick={() => router.push("/articles/new")}
+                onClick={() => router.push("/articles/notion-new")}
                 size="sm"
               >
                 新建文章
-              </Button>
-              <Button
-                onClick={() => router.push("/articles/notion-new")}
-                size="sm"
-                variant="outline"
-              >
-                ✨ Notion编辑器
               </Button>
             </div>
           </div>
@@ -343,23 +336,11 @@ export default function ArticleManagement({
                       size="sm"
                       onClick={(e) => {
                         e.stopPropagation();
-                        router.push(`/articles/${article.id}/edit`);
+                        router.push(`/articles/${article.id}/notion-edit`);
                       }}
                       className="flex-1 text-xs whitespace-nowrap"
                     >
                       📝 编辑
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        router.push(`/articles/${article.id}/notion-edit`);
-                      }}
-                      className="flex-1 text-xs whitespace-nowrap"
-                      title="使用 Notion 风格编辑器"
-                    >
-                      ✨ Notion
                     </Button>
                     <Button
                       size="sm"
