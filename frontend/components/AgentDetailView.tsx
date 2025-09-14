@@ -38,6 +38,7 @@ interface AgentDetailViewProps {
   agent: Agent;
   onDelete: () => void;
   onRefresh: () => void;
+  onEdit: () => void;
 }
 
 const toneLabels = {
@@ -53,7 +54,7 @@ const lengthLabels = {
   long: "详细",
 };
 
-export function AgentDetailView({ agent, onDelete, onRefresh }: AgentDetailViewProps) {
+export function AgentDetailView({ agent, onDelete, onRefresh, onEdit }: AgentDetailViewProps) {
   const router = useRouter();
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSettingDefault, setIsSettingDefault] = useState(false);
@@ -166,7 +167,7 @@ export function AgentDetailView({ agent, onDelete, onRefresh }: AgentDetailViewP
 
             <Button
               size="sm"
-              onClick={() => router.push(`/agents/${agent.id}/edit`)}
+              onClick={onEdit}
               className="flex items-center gap-1"
             >
               <Edit3 className="w-4 h-4" />

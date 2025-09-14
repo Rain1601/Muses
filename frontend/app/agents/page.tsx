@@ -6,6 +6,7 @@ import { ProtectedRoute } from "@/components/protected-route";
 import Navigation from "@/components/Navigation";
 import { AgentListItem } from "@/components/AgentListItem";
 import { AgentDetailView } from "@/components/AgentDetailView";
+import { AgentEditForm } from "@/components/AgentEditForm";
 import { api } from "@/lib/api";
 import { Plus, Bot, Search, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,7 @@ export default function AgentsPage() {
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     fetchAgents();
@@ -55,11 +57,32 @@ export default function AgentsPage() {
 
   const handleAgentSelect = (agent: Agent) => {
     setSelectedAgent(agent);
+    setIsEditing(false); // 切换agent时退出编辑模式
   };
 
   const handleAgentDelete = () => {
     setSelectedAgent(null);
+    setIsEditing(false);
     fetchAgents();
+  };
+
+  const handleStartEdit = () => {
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+  };
+
+  const handleSaveAgent = (updatedAgent: Agent) => {
+    // 更新agents列表中的数据
+    setAgents(prev => prev.map(agent =>
+      agent.id === updatedAgent.id ? updatedAgent : agent
+    ));
+    // 更新选中的agent
+    setSelectedAgent(updatedAgent);
+    // 退出编辑模式
+    setIsEditing(false);
   };
 
   // 过滤agents
@@ -157,14 +180,23 @@ export default function AgentsPage() {
             </div>
           </aside>
 
-          {/* 右侧区域 - Agent详情 */}
+          {/* 右侧区域 - Agent详情或编辑 */}
           <section className="flex-1 bg-background">
             {selectedAgent ? (
-              <AgentDetailView
-                agent={selectedAgent}
-                onDelete={handleAgentDelete}
-                onRefresh={fetchAgents}
-              />
+              isEditing ? (
+                <AgentEditForm
+                  agent={selectedAgent}
+                  onCancel={handleCancelEdit}
+                  onSave={handleSaveAgent}
+                />
+              ) : (
+                <AgentDetailView
+                  agent={selectedAgent}
+                  onDelete={handleAgentDelete}
+                  onRefresh={fetchAgents}
+                  onEdit={handleStartEdit}
+                />
+              )
             ) : (
               <div className="h-full flex items-center justify-center">
                 <div className="text-center text-muted-foreground">
