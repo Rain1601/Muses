@@ -6,6 +6,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Muses** is an AI-powered blog article generation platform that converts various source materials (PDF, Markdown, text, conversations) into high-quality blog articles. It features a Next.js frontend and FastAPI (Python) backend with SQLite database.
 
+## important-instruction-reminders
+Do what has been asked; nothing more, nothing less.
+NEVER create files unless they're absolutely necessary for achieving your goal.
+ALWAYS prefer editing an existing file to creating a new one.
+NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
+
 ## Development Commands
 
 ### Quick Start
@@ -92,6 +98,7 @@ python3 start.py     # Start FastAPI server
 - One-click publishing to GitHub repositories
 - OAuth-based GitHub authentication
 - Configurable repository paths and commit messages
+- GitHub-based image hosting: images uploaded to user's repos and accessible via raw.githubusercontent.com URLs
 
 ## Database Schema
 
@@ -188,6 +195,15 @@ cd frontend && npx tsc --noEmit
 2. Create Alembic migration: `alembic revision --autogenerate -m "description"`
 3. Apply migration: `alembic upgrade head`
 4. Update Pydantic schemas as needed
+
+### Key API Endpoints
+- `/api/auth/github/callback` - GitHub OAuth callback
+- `/api/agents/` - AI agent CRUD operations
+- `/api/articles/` - Article management
+- `/api/generate/` - AI article generation
+- `/api/upload/` - File upload processing
+- `/api/image-upload/upload-image` - GitHub image hosting
+- `/api/publish/` - GitHub repository publishing
 
 ### Performance Optimization
 - Use React.memo() for expensive components
