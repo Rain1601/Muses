@@ -13,6 +13,8 @@ frontend/.next/
 frontend/out/
 frontend/build/
 
+rain.blog/
+
 # Production
 frontend/dist/
 backend/dist/
