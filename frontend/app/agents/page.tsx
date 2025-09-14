@@ -4,7 +4,11 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ProtectedRoute } from "@/components/protected-route";
 import Navigation from "@/components/Navigation";
+import { AgentListItem } from "@/components/AgentListItem";
+import { AgentDetailView } from "@/components/AgentDetailView";
 import { api } from "@/lib/api";
+import { Plus, Bot, Search, Sparkles } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface Agent {
   id: string;
@@ -14,13 +18,18 @@ interface Agent {
   language: string;
   tone: string;
   lengthPreference: string;
+  targetAudience?: string;
+  customPrompt?: string;
   isDefault: boolean;
   createdAt: string;
+  updatedAt: string;
 }
 
 export default function AgentsPage() {
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     fetchAgents();
@@ -29,7 +38,14 @@ export default function AgentsPage() {
   const fetchAgents = async () => {
     try {
       const response = await api.get("/api/agents");
-      setAgents(response.data.agents);
+      const agentList = response.data.agents || [];
+      setAgents(agentList);
+
+      // 如果没有选中的agent，选择第一个或默认的
+      if (!selectedAgent && agentList.length > 0) {
+        const defaultAgent = agentList.find((a: Agent) => a.isDefault);
+        setSelectedAgent(defaultAgent || agentList[0]);
+      }
     } catch (error) {
       console.error("Failed to fetch agents:", error);
     } finally {
@@ -37,130 +53,130 @@ export default function AgentsPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("确定要删除这个Agent吗？")) return;
-
-    try {
-      await api.delete(`/api/agents/${id}`);
-      await fetchAgents();
-    } catch (error: any) {
-      alert(error.response?.data?.error || "删除失败");
-    }
+  const handleAgentSelect = (agent: Agent) => {
+    setSelectedAgent(agent);
   };
 
-  const toneLabels = {
-    professional: "专业",
-    casual: "轻松",
-    humorous: "幽默",
-    serious: "严肃",
+  const handleAgentDelete = () => {
+    setSelectedAgent(null);
+    fetchAgents();
   };
 
-  const lengthLabels = {
-    short: "简洁",
-    medium: "适中",
-    long: "详细",
-  };
+  // 过滤agents
+  const filteredAgents = agents.filter(agent =>
+    agent.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    agent.description?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-background">
         <Navigation />
-        
-        <main className="container mx-auto px-4 py-8">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h1 className="text-2xl font-bold">Agent 管理</h1>
-              <p className="text-muted-foreground mt-1">
-                创建和管理您的AI写作助手
-              </p>
-            </div>
-            <Link
-              href="/agents/new"
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90"
-            >
-              创建新Agent
-            </Link>
-          </div>
 
-          {isLoading ? (
-            <div className="text-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-            </div>
-          ) : agents.length === 0 ? (
-            <div className="text-center py-12 border rounded-lg">
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white text-2xl font-bold mb-4 mx-auto shadow-lg">
-                ✨
-              </div>
-              <p className="text-muted-foreground mb-4">
-                还没有创建任何Agent
-              </p>
-              <Link
-                href="/agents/new"
-                className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90"
-              >
-                创建第一个Agent
-              </Link>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {agents.map((agent) => (
-                <div
-                  key={agent.id}
-                  className="border rounded-lg p-6 hover:border-primary transition-colors"
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-12 h-12 rounded-full bg-gradient-to-r from-emerald-500 to-teal-600 flex items-center justify-center text-white text-lg font-bold">
-                        {agent.avatar || "✨"}
-                      </div>
-                      <div>
-                        <h3 className="font-semibold">{agent.name}</h3>
-                        {agent.isDefault && (
-                          <span className="text-xs text-primary">默认</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {agent.description && (
-                    <p className="text-sm text-muted-foreground mb-4">
-                      {agent.description}
-                    </p>
-                  )}
-
-                  <div className="space-y-2 mb-4">
-                    <div className="flex items-center text-sm">
-                      <span className="text-muted-foreground w-20">语言：</span>
-                      <span>{agent.language === "zh-CN" ? "中文" : "英文"}</span>
-                    </div>
-                    <div className="flex items-center text-sm">
-                      <span className="text-muted-foreground w-20">语气：</span>
-                      <span>{toneLabels[agent.tone as keyof typeof toneLabels]}</span>
-                    </div>
-                    <div className="flex items-center text-sm">
-                      <span className="text-muted-foreground w-20">篇幅：</span>
-                      <span>{lengthLabels[agent.lengthPreference as keyof typeof lengthLabels]}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <Link
-                      href={`/agents/${agent.id}/edit`}
-                      className="flex-1 text-center px-3 py-1.5 border rounded hover:bg-muted text-sm"
-                    >
-                      编辑
-                    </Link>
-                    <button
-                      onClick={() => handleDelete(agent.id)}
-                      className="flex-1 px-3 py-1.5 border border-destructive text-destructive rounded hover:bg-destructive/10 text-sm"
-                    >
-                      删除
-                    </button>
-                  </div>
+        <main className="flex h-[calc(100vh-80px)]">
+          {/* 左侧栏 - Agent列表 */}
+          <aside className="w-80 bg-card border-r border-border flex-shrink-0">
+            <div className="h-full flex flex-col">
+              {/* 头部 */}
+              <div className="p-4 border-b border-border">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-lg font-semibold">AI Agents</h2>
+                  <Link href="/agents/new">
+                    <Button size="sm" className="h-8">
+                      <Plus className="w-4 h-4 mr-1" />
+                      新建
+                    </Button>
+                  </Link>
                 </div>
-              ))}
+
+                {/* 搜索框 */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <input
+                    type="text"
+                    placeholder="搜索Agent..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  />
+                </div>
+              </div>
+
+              {/* Agent列表 */}
+              <div className="flex-1 overflow-y-auto">
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  </div>
+                ) : filteredAgents.length === 0 ? (
+                  <div className="text-center py-12 px-4">
+                    {searchQuery ? (
+                      <>
+                        <Search className="w-12 h-12 text-muted-foreground/40 mx-auto mb-3" />
+                        <p className="text-sm text-muted-foreground">
+                          没有找到匹配的Agent
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-12 h-12 text-muted-foreground/40 mx-auto mb-3" />
+                        <p className="text-sm text-muted-foreground mb-3">
+                          还没有创建任何Agent
+                        </p>
+                        <Link href="/agents/new">
+                          <Button size="sm" variant="outline">
+                            <Plus className="w-4 h-4 mr-1" />
+                            创建第一个Agent
+                          </Button>
+                        </Link>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    {filteredAgents.map((agent) => (
+                      <AgentListItem
+                        key={agent.id}
+                        agent={agent}
+                        isSelected={selectedAgent?.id === agent.id}
+                        onClick={() => handleAgentSelect(agent)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 底部统计 */}
+              {!isLoading && agents.length > 0 && (
+                <div className="p-3 border-t border-border bg-muted/30">
+                  <p className="text-xs text-muted-foreground text-center">
+                    共 {agents.length} 个Agent
+                  </p>
+                </div>
+              )}
             </div>
-          )}
+          </aside>
+
+          {/* 右侧区域 - Agent详情 */}
+          <section className="flex-1 bg-background">
+            {selectedAgent ? (
+              <AgentDetailView
+                agent={selectedAgent}
+                onDelete={handleAgentDelete}
+                onRefresh={fetchAgents}
+              />
+            ) : (
+              <div className="h-full flex items-center justify-center">
+                <div className="text-center text-muted-foreground">
+                  <Bot className="w-16 h-16 mx-auto mb-4 text-muted-foreground/40" />
+                  <h3 className="text-xl font-medium mb-2">选择一个Agent</h3>
+                  <p className="text-sm">
+                    从左侧列表选择Agent查看详情，或创建新的AI助手
+                  </p>
+                </div>
+              </div>
+            )}
+          </section>
         </main>
       </div>
     </ProtectedRoute>
