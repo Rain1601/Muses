@@ -23,9 +23,10 @@
 }
 
 .notionEditor table th {
-  background-color: hsl(var(--muted));
+  background-color: hsl(var(--background));
   font-weight: 600;
   color: hsl(var(--foreground));
+  border-bottom: 2px solid hsl(var(--border));
 }
 
 .notionEditor table td {
@@ -163,7 +164,281 @@
   height: auto;
   border-radius: 8px;
   margin: 1rem 0;
+  display: block;
+  cursor: pointer;
+}
+
+/* 可缩放图片包装器 */
+.notionEditor .resizable-image-wrapper {
+  display: inline-block;
+  margin: 1rem 0;
+}
+
+.notionEditor .image-container {
+  position: relative;
+  display: inline-block;
+}
+
+.notionEditor .image-container.selected {
+  outline: 1px dashed hsl(var(--muted-foreground) / 0.5);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+
+/* 缩放手柄 */
+.notionEditor .resize-handle {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  width: 12px;
+  height: 12px;
+  background: hsl(var(--primary));
+  border: 2px solid hsl(var(--background));
+  border-radius: 50%;
+  cursor: se-resize;
+  z-index: 10;
+}
+
+.notionEditor .resize-handle:hover {
+  transform: scale(1.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* 图片缩放控制样式 */
+.notionEditor .ProseMirror-selectednode img {
+  outline: 1px dashed hsl(var(--muted-foreground) / 0.5);
+  outline-offset: 4px;
+}
+
+/* 图片缩放手柄样式 */
+.notionEditor .resize-cursor-nw-resize { cursor: nw-resize; }
+.notionEditor .resize-cursor-ne-resize { cursor: ne-resize; }
+.notionEditor .resize-cursor-sw-resize { cursor: sw-resize; }
+.notionEditor .resize-cursor-se-resize { cursor: se-resize; }
+
+/* 图片容器样式 */
+.notionEditor .image-resizer {
+  display: inline-block;
+  position: relative;
+}
+
+.notionEditor .image-resizer img {
+  margin: 0;
+}
+
+/* 缩放控制点样式 */
+.notionEditor .image-resizer .resize-handle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: hsl(var(--primary));
+  border: 1px solid hsl(var(--background));
+  border-radius: 50%;
+  z-index: 10;
+}
+
+.notionEditor .image-resizer .resize-handle.nw {
+  top: -4px;
+  left: -4px;
+  cursor: nw-resize;
+}
+
+.notionEditor .image-resizer .resize-handle.ne {
+  top: -4px;
+  right: -4px;
+  cursor: ne-resize;
+}
+
+.notionEditor .image-resizer .resize-handle.sw {
+  bottom: -4px;
+  left: -4px;
+  cursor: sw-resize;
+}
+
+.notionEditor .image-resizer .resize-handle.se {
+  bottom: -4px;
+  right: -4px;
+  cursor: se-resize;
+}
+
+/* 图片对齐工具栏样式优化 */
+.notionEditor .image-toolbar {
+  position: absolute;
+  top: -45px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(8px);
+  padding: 4px;
+  display: flex;
+  gap: 2px;
+  z-index: 20;
+}
+
+.notionEditor .image-toolbar button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+}
+
+.notionEditor .image-toolbar button:hover {
+  background: hsl(var(--accent));
+  color: hsl(var(--foreground));
+}
+
+.notionEditor .image-toolbar button.active {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+.notionEditor .image-toolbar button svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* 图片工具栏按钮图标样式 */
+.notionEditor .image-toolbar .align-left::before {
+  content: "⫷";
+}
+
+.notionEditor .image-toolbar .align-center::before {
+  content: "≡";
+}
+
+.notionEditor .image-toolbar .align-right::before {
+  content: "⫸";
+}
+
+/* 当图片被选中时显示工具栏 */
+.notionEditor .ProseMirror-selectednode .image-toolbar {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* 默认隐藏工具栏 */
+.notionEditor .image-toolbar {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+/* 覆盖所有可能的图片相关工具栏样式 - 极简设计 */
+.notionEditor [class*="toolbar"],
+.notionEditor [class*="button-group"],
+.notionEditor [class*="image-controls"],
+.notionEditor .image-resizer + div,
+.notionEditor .ProseMirror-selectednode + div[class*="button"],
+.notionEditor .ProseMirror-selectednode ~ div[class*="toolbar"] {
+  background: hsl(var(--background) / 0.95) !important;
+  border: 1px solid hsl(var(--border) / 0.5) !important;
+  border-radius: 4px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
+  backdrop-filter: blur(10px) !important;
+  padding: 1px !important;
+  display: inline-flex !important;
+  gap: 0 !important;
+}
+
+.notionEditor [class*="toolbar"] button,
+.notionEditor [class*="button-group"] button,
+.notionEditor [class*="image-controls"] button,
+.notionEditor .image-resizer + div button,
+.notionEditor .ProseMirror-selectednode + div button,
+.notionEditor .ProseMirror-selectednode ~ div button {
+  width: 18px !important;
+  height: 18px !important;
+  border: none !important;
+  background: transparent !important;
+  color: hsl(var(--muted-foreground) / 0.7) !important;
+  border-radius: 3px !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  font-size: 10px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 18px !important;
+  padding: 0 !important;
+  margin: 1px !important;
+}
+
+.notionEditor [class*="toolbar"] button:hover,
+.notionEditor [class*="button-group"] button:hover,
+.notionEditor [class*="image-controls"] button:hover,
+.notionEditor .image-resizer + div button:hover,
+.notionEditor .ProseMirror-selectednode + div button:hover,
+.notionEditor .ProseMirror-selectednode ~ div button:hover {
+  background: hsl(var(--muted) / 0.5) !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+.notionEditor [class*="toolbar"] button.active,
+.notionEditor [class*="button-group"] button.active,
+.notionEditor [class*="image-controls"] button.active,
+.notionEditor [class*="toolbar"] button[data-active="true"],
+.notionEditor [class*="button-group"] button[data-active="true"],
+.notionEditor [class*="image-controls"] button[data-active="true"],
+.notionEditor .image-resizer + div button.active,
+.notionEditor .ProseMirror-selectednode + div button.active,
+.notionEditor .ProseMirror-selectednode ~ div button.active {
+  background: hsl(var(--primary) / 0.15) !important;
+  color: hsl(var(--primary)) !important;
+}
+
+/* 图片对齐按钮的具体样式 */
+.notionEditor button[data-align="left"],
+.notionEditor button[title*="left"],
+.notionEditor button[title*="左"] {
+  position: relative;
+}
+
+.notionEditor button[data-align="center"],
+.notionEditor button[title*="center"],
+.notionEditor button[title*="居中"] {
+  position: relative;
+}
+
+.notionEditor button[data-align="right"],
+.notionEditor button[title*="right"],
+.notionEditor button[title*="右"] {
+  position: relative;
+}
+
+/* 使用简洁的图标 - SVG方式或Unicode */
+.notionEditor button[data-align="left"]::after,
+.notionEditor button[title*="left"]::after,
+.notionEditor button[title*="左"]::after {
+  content: "◧";
+  font-size: 11px;
+  line-height: 1;
+}
+
+.notionEditor button[data-align="center"]::after,
+.notionEditor button[title*="center"]::after,
+.notionEditor button[title*="居中"]::after {
+  content: "◫";
+  font-size: 11px;
+  line-height: 1;
+}
+
+.notionEditor button[data-align="right"]::after,
+.notionEditor button[title*="right"]::after,
+.notionEditor button[title*="右"]::after {
+  content: "◨";
+  font-size: 11px;
+  line-height: 1;
 }
 
 /* 分割线 */

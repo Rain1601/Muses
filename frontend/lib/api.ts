@@ -17,7 +17,7 @@ const API_URL = getApiUrl();
 // 创建axios实例
 export const api = axios.create({
   baseURL: API_URL,
-  timeout: 10000,
+  timeout: 30000, // 增加到30秒，适应图片上传
 });
 
 // 请求拦截器 - 自动添加认证头

@@ -17,11 +17,14 @@ import { TaskItem } from '@tiptap/extension-task-item';
 import { Link } from '@tiptap/extension-link';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { Color } from '@tiptap/extension-color';
+import { Node, mergeAttributes } from '@tiptap/core';
+import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react';
 import { createLowlight } from 'lowlight';
 import javascript from 'highlight.js/lib/languages/javascript';
 import typescript from 'highlight.js/lib/languages/typescript';
 import css from 'highlight.js/lib/languages/css';
 import python from 'highlight.js/lib/languages/python';
+import { api } from '@/lib/api';
 
 const lowlight = createLowlight();
 lowlight.register('javascript', javascript);
@@ -34,8 +37,181 @@ interface NotionEditorProps {
   onChange?: (content: string) => void;
 }
 
+// 可缩放图片组件
+const ResizableImageComponent = ({ node, updateAttributes, selected }: any) => {
+  const [isResizing, setIsResizing] = useState(false);
+  const [startPos, setStartPos] = useState({ x: 0, y: 0 });
+  const [startSize, setStartSize] = useState({ width: 0, height: 0 });
+  const imgRef = React.useRef<HTMLImageElement>(null);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+    setStartPos({ x: e.clientX, y: e.clientY });
+
+    if (imgRef.current) {
+      const rect = imgRef.current.getBoundingClientRect();
+      setStartSize({ width: rect.width, height: rect.height });
+    }
+  };
+
+  React.useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (imgRef.current) {
+        const deltaX = e.clientX - startPos.x;
+        const newWidth = Math.max(100, startSize.width + deltaX);
+
+        updateAttributes({
+          width: newWidth,
+          height: 'auto'
+        });
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing, startPos, startSize, updateAttributes]);
+
+  return (
+    <NodeViewWrapper className="resizable-image-wrapper">
+      <div className={`image-container ${selected ? 'selected' : ''}`} style={{ position: 'relative', display: 'inline-block' }}>
+        <img
+          ref={imgRef}
+          src={node.attrs.src}
+          alt={node.attrs.alt || ''}
+          width={node.attrs.width || 'auto'}
+          height={node.attrs.height || 'auto'}
+          className="rounded-lg max-w-full h-auto"
+          style={{
+            width: node.attrs.width ? `${node.attrs.width}px` : 'auto',
+            height: node.attrs.height ? `${node.attrs.height}px` : 'auto',
+            display: 'block'
+          }}
+        />
+        {selected && (
+          <div
+            className="resize-handle"
+            onMouseDown={handleMouseDown}
+            style={{
+              position: 'absolute',
+              bottom: '-4px',
+              right: '-4px',
+              width: '12px',
+              height: '12px',
+              background: 'hsl(var(--primary))',
+              border: '2px solid hsl(var(--background))',
+              borderRadius: '50%',
+              cursor: 'se-resize',
+              zIndex: 10
+            }}
+          />
+        )}
+      </div>
+    </NodeViewWrapper>
+  );
+};
+
+// 自定义可缩放图片扩展
+const ResizableImage = Node.create({
+  name: 'resizableImage',
+
+  group: 'block',
+
+  draggable: true,
+
+  addAttributes() {
+    return {
+      src: {
+        default: null,
+      },
+      alt: {
+        default: null,
+      },
+      title: {
+        default: null,
+      },
+      width: {
+        default: null,
+      },
+      height: {
+        default: null,
+      },
+    }
+  },
+
+  parseHTML() {
+    return [
+      {
+        tag: 'img',
+      },
+    ]
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return ['img', mergeAttributes(HTMLAttributes)]
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(ResizableImageComponent)
+  },
+});
+
 export function NotionEditor({ initialContent = '', onChange }: NotionEditorProps) {
   const [mounted, setMounted] = useState(false);
+
+  // 图片上传到GitHub仓库的函数
+  const uploadImageToGitHub = useCallback(async (file: File): Promise<string> => {
+    console.log('🖼️ Starting image upload:', file.name, file.size, file.type);
+
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = async (readerEvent) => {
+        try {
+          const dataURL = readerEvent.target?.result as string;
+          if (!dataURL) {
+            reject(new Error('Failed to read file'));
+            return;
+          }
+
+          // 提取Base64数据（去除data:image/jpeg;base64,前缀）
+          const base64Data = dataURL.split(',')[1];
+          const contentType = dataURL.match(/data:([^;]+)/)?.[1] || 'image/jpeg';
+
+          console.log('📤 Sending API request to /api/upload-image with:', {
+            filename: file.name,
+            contentType,
+            base64Length: base64Data.length
+          });
+
+          // 调用API上传图片
+          const response = await api.post('/api/upload-image', {
+            base64Data,
+            contentType,
+            filename: file.name
+          });
+
+          console.log('✅ Upload successful:', response.data);
+          resolve(response.data.url);
+        } catch (error) {
+          console.error('❌ Failed to upload image:', error);
+          reject(error);
+        }
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+    });
+  }, []);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -45,11 +221,7 @@ export function NotionEditor({ initialContent = '', onChange }: NotionEditorProp
       CodeBlockLowlight.configure({
         lowlight,
       }),
-      Image.configure({
-        HTMLAttributes: {
-          class: 'rounded-lg max-w-full h-auto',
-        },
-      }),
+      ResizableImage,
       Dropcursor,
       Table.configure({
         resizable: true,
@@ -75,6 +247,89 @@ export function NotionEditor({ initialContent = '', onChange }: NotionEditorProp
       attributes: {
         class: 'prose prose-lg max-w-none focus:outline-none dark:prose-invert min-h-[400px] px-6 py-6',
         style: 'font-family: "Times New Roman", "SimSun", "宋体", Times, serif;',
+      },
+      handlePaste: (view, event) => {
+        const items = event.clipboardData?.items;
+        if (items) {
+          for (let i = 0; i < items.length; i++) {
+            if (items[i].type.indexOf('image') === 0) {
+              event.preventDefault();
+              const file = items[i].getAsFile();
+              if (file) {
+                // 先插入占位符
+                const placeholder = view.state.schema.nodes.resizableImage.create({
+                  src: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDIwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMTAwIiBmaWxsPSIjZjNmNGY2Ii8+CjxwYXRoIGQ9Ik05MC41IDQwLjVIMTA5LjVWNTkuNUg5MC41VjQwLjVaIiBzdHJva2U9IiM5Y2EzYWYiIHN0cm9rZS13aWR0aD0iMiIvPgo8cGF0aCBkPSJNOTUgNDVIMTA1VjU1SDk1VjQ1WiIgZmlsbD0iIzljYTNhZiIvPgo8dGV4dCB4PSIxMDAiIHk9IjcwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjNmI3Mjg3IiBmb250LXNpemU9IjEyIj7kuK3kvKDkuK08L3RleHQ+Cjwvc3ZnPgo='
+                });
+                const transaction = view.state.tr.replaceSelectionWith(placeholder);
+                const insertPos = transaction.selection.from - 1;
+                view.dispatch(transaction);
+
+                // 异步上传图片
+                uploadImageToGitHub(file).then((githubUrl) => {
+                  // 上传成功后，替换占位符为真实的GitHub URL
+                  const currentState = view.state;
+                  const node = currentState.doc.nodeAt(insertPos);
+                  if (node && node.type.name === 'resizableImage') {
+                    const newTransaction = currentState.tr.setNodeMarkup(insertPos, null, {
+                      ...node.attrs,
+                      src: githubUrl
+                    });
+                    view.dispatch(newTransaction);
+                  }
+                }).catch((error) => {
+                  console.error('Image upload failed:', error);
+                  // 上传失败，可以选择保留占位符或者移除节点
+                });
+              }
+              return true;
+            }
+          }
+        }
+        return false;
+      },
+      handleDrop: (view, event, slice, moved) => {
+        if (moved || !event.dataTransfer?.files?.length) {
+          return false;
+        }
+
+        const files = Array.from(event.dataTransfer.files);
+        const imageFile = files.find(file => file.type.startsWith('image/'));
+
+        if (imageFile) {
+          event.preventDefault();
+          const { schema } = view.state;
+          const pos = view.posAtCoords({ left: event.clientX, top: event.clientY });
+
+          if (pos) {
+            // 插入占位符
+            const placeholder = schema.nodes.resizableImage.create({
+              src: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDIwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMTAwIiBmaWxsPSIjZjNmNGY2Ii8+CjxwYXRoIGQ9Ik05MC41IDQwLjVIMTA5LjVWNTkuNUg5MC41VjQwLjVaIiBzdHJva2U9IiM5Y2EzYWYiIHN0cm9rZS13aWR0aD0iMiIvPgo8cGF0aCBkPSJNOTUgNDVIMTA1VjU1SDk1VjQ1WiIgZmlsbD0iIzljYTNhZiIvPgo8dGV4dCB4PSIxMDAiIHk9IjcwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjNmI3Mjg3IiBmb250LXNpemU9IjEyIj7kuK3kvKDkuK08L3RleHQ+Cjwvc3ZnPgo='
+            });
+            const transaction = view.state.tr.insert(pos.pos, placeholder);
+            const insertPos = pos.pos;
+            view.dispatch(transaction);
+
+            // 异步上传图片
+            uploadImageToGitHub(imageFile).then((githubUrl) => {
+              // 上传成功后，替换占位符为真实的GitHub URL
+              const currentState = view.state;
+              const node = currentState.doc.nodeAt(insertPos);
+              if (node && node.type.name === 'resizableImage') {
+                const newTransaction = currentState.tr.setNodeMarkup(insertPos, null, {
+                  ...node.attrs,
+                  src: githubUrl
+                });
+                view.dispatch(newTransaction);
+              }
+            }).catch((error) => {
+              console.error('Image upload failed:', error);
+              // 上传失败，可以选择保留占位符或者移除节点
+            });
+          }
+          return true;
+        }
+
+        return false;
       },
     },
   });
