@@ -300,9 +300,22 @@ function DashboardContent() {
                 <div>
                   {(() => {
                     const content = isEditing ? editingContent : (selectedArticle?.content || '');
-                    const headings = content.split('\n').filter(line => line.match(/^#{1,4}\s+/));
 
-                    if (headings.length === 0) {
+                    // 解析HTML内容中的标题
+                    const extractHeadings = (htmlContent: string) => {
+                      const headingMatches = htmlContent.match(/<h[1-4][^>]*>(.*?)<\/h[1-4]>/gi) || [];
+                      return headingMatches.map(match => {
+                        const levelMatch = match.match(/<h([1-4])/i);
+                        const level = levelMatch ? parseInt(levelMatch[1]) : 1;
+                        const textMatch = match.match(/<h[1-4][^>]*>(.*?)<\/h[1-4]>/i);
+                        const text = textMatch ? textMatch[1].replace(/<[^>]*>/g, '').trim() : '';
+                        return { level, text };
+                      });
+                    };
+
+                    const headingObjects = extractHeadings(content);
+
+                    if (headingObjects.length === 0) {
                       return (
                         <div className="text-center py-12">
                           <div className="mb-4 flex justify-center">
@@ -317,9 +330,8 @@ function DashboardContent() {
 
                     return (
                       <div className="space-y-1">
-                        {headings.map((heading, index) => {
-                          const level = heading.match(/^(#{1,4})/)?.[1]?.length || 1;
-                          const text = heading.replace(/^#{1,4}\s+/, '').trim();
+                        {headingObjects.map((heading, index) => {
+                          const { level, text } = heading;
                           const headingId = `heading-${index}-${text.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]/g, '-')}`;
 
                           const scrollToHeading = () => {
