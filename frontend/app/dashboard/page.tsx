@@ -159,10 +159,10 @@ function DashboardContent() {
     }
   }, [isEditing, editingContent]);
 
-  // 监听Cmd+S快捷键
+  // 监听Shift+Cmd+S快捷键
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key === 's') {
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key === 'S') {
         event.preventDefault();
         manualSave();
       }
