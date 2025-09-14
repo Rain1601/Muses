@@ -9,10 +9,12 @@ import { api } from "@/lib/api";
 export default function SettingsPage() {
   const { user } = useUserStore();
   const [isLoading, setIsLoading] = useState(false);
+  const [isDataLoading, setIsDataLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("account");
-  
+
   const [formData, setFormData] = useState({
     openaiKey: "",
+    githubToken: "",
     defaultRepoUrl: "",
     language: "zh-CN",
     theme: "light",
@@ -25,22 +27,47 @@ export default function SettingsPage() {
   });
 
   useEffect(() => {
-    fetchUserData();
-    fetchStats();
+    // Wait a bit for auth to stabilize, then fetch data
+    const timer = setTimeout(() => {
+      fetchUserData();
+      fetchStats();
+    }, 500);
+
+    return () => clearTimeout(timer);
   }, []);
 
   const fetchUserData = async () => {
     try {
+      setIsDataLoading(true);
+
+      // Check if we have a token
+      const token = localStorage.getItem('token');
+      console.log("Token exists:", !!token);
+      if (!token) {
+        throw new Error("No authentication token found. Please log in again.");
+      }
+
       const response = await api.get("/api/user/profile");
-      const userData = response.data.user;
-      setFormData({
+      // The API returns the user data directly, not wrapped in a 'user' object
+      const userData = response.data;
+      console.log("Full user data from API:", userData); // Debug log
+      console.log("defaultRepoUrl from API:", userData.defaultRepoUrl); // Specific log
+
+      const newFormData = {
         openaiKey: userData.hasOpenAIKey ? "••••••••" : "",
+        githubToken: userData.hasGitHubToken ? "••••••••" : "",
         defaultRepoUrl: userData.defaultRepoUrl || "",
         language: userData.settings?.language || "zh-CN",
         theme: userData.settings?.theme || "light",
-      });
-    } catch (error) {
+      };
+      console.log("Setting form data to:", newFormData);
+      setFormData(newFormData);
+    } catch (error: any) {
       console.error("Failed to fetch user data:", error);
+      console.error("Error details:", error.response?.data || error.message);
+      alert(`Failed to load user data: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setIsDataLoading(false);
     }
   };
 
@@ -70,14 +97,26 @@ export default function SettingsPage() {
         theme: formData.theme,
       };
 
+      console.log("Saving settings with data:", updateData);
+
       // 只有当用户输入了新的API Key时才更新
       if (formData.openaiKey && formData.openaiKey !== "••••••••") {
         updateData.openaiKey = formData.openaiKey;
       }
 
-      await api.post("/api/user/settings", updateData);
+      // 只有当用户输入了新的GitHub Token时才更新
+      if (formData.githubToken && formData.githubToken !== "••••••••") {
+        updateData.githubToken = formData.githubToken;
+      }
+
+      const response = await api.post("/api/user/settings", updateData);
+      console.log("Settings saved response:", response.data);
+
+      // 重新获取用户数据以确保显示最新值
+      await fetchUserData();
+
       alert("设置保存成功");
-      
+
       // 如果更改了主题，应用新主题
       if (formData.theme === "dark") {
         document.documentElement.classList.add("dark");
@@ -96,14 +135,21 @@ export default function SettingsPage() {
       const response = await api.get("/api/user/export", {
         responseType: "blob",
       });
-      
+
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
       link.href = url;
       link.setAttribute("download", `muses-export-${Date.now()}.json`);
       document.body.appendChild(link);
       link.click();
-      link.remove();
+
+      // 安全地清理 DOM 和内存
+      setTimeout(() => {
+        if (document.body.contains(link)) {
+          document.body.removeChild(link);
+        }
+        window.URL.revokeObjectURL(url);
+      }, 100);
     } catch (error) {
       alert("导出失败");
     }
@@ -216,7 +262,72 @@ export default function SettingsPage() {
 
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  默认发布仓库
+                  GitHub Personal Access Token
+                </label>
+                <input
+                  type="password"
+                  value={formData.githubToken}
+                  onChange={(e) => setFormData({ ...formData, githubToken: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="ghp_..."
+                />
+                <div className="text-xs text-muted-foreground mt-1 space-y-2">
+                  <div>
+                    <p className="font-medium text-foreground mb-1">🎯 用途说明：</p>
+                    <p>• 编辑器中复制粘贴图片自动上传到 GitHub 仓库</p>
+                    <p>• 发布文章时自动提交到指定的 GitHub 仓库</p>
+                  </div>
+
+                  <div className="border-l-2 border-amber-400 pl-2">
+                    <p className="text-amber-600 dark:text-amber-400 font-medium">
+                      ⚠️ 必需权限配置：
+                    </p>
+                    <p className="text-amber-600 dark:text-amber-400">
+                      请选择 <strong>Classic Personal Access Token</strong>，并勾选
+                      <code className="bg-amber-50 dark:bg-amber-900/20 px-1 rounded mx-1">repo</code>
+                      权限（完整仓库访问权限）
+                    </p>
+                  </div>
+
+                  <div className="border-l-2 border-red-400 pl-2">
+                    <p className="text-red-600 dark:text-red-400 font-medium">
+                      🔒 安全提醒：
+                    </p>
+                    <p className="text-red-600 dark:text-red-400">
+                      • Token 将被 AES 加密存储在服务器中
+                    </p>
+                    <p className="text-red-600 dark:text-red-400">
+                      • 请妥善保管，不要分享给他人
+                    </p>
+                    <p className="text-red-600 dark:text-red-400">
+                      • 格式示例：ghp_xxxxxxxxxxxxxxxxxxxx
+                    </p>
+                  </div>
+
+                  <div className="bg-muted/50 p-2 rounded">
+                    <p className="font-medium text-foreground">📋 创建步骤：</p>
+                    <p>1. 点击下方链接进入 GitHub 设置</p>
+                    <p>2. 选择 "Generate new token (classic)"</p>
+                    <p>3. 勾选 "repo" 权限</p>
+                    <p>4. 设置过期时间，生成并复制 token</p>
+                  </div>
+
+                  <p>
+                    <a
+                      href="https://github.com/settings/tokens"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline font-medium"
+                    >
+                      🔗 在此创建 Personal Access Token →
+                    </a>
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  默认发布仓库 {isDataLoading && <span className="text-xs text-muted-foreground">(加载中...)</span>}
                 </label>
                 <input
                   type="text"
@@ -224,9 +335,15 @@ export default function SettingsPage() {
                   onChange={(e) => setFormData({ ...formData, defaultRepoUrl: e.target.value })}
                   className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   placeholder="https://github.com/username/blog"
+                  disabled={isDataLoading}
                 />
                 <p className="text-xs text-muted-foreground mt-1">
                   设置默认的 GitHub 仓库，发布时自动选择
+                  {formData.defaultRepoUrl && (
+                    <span className="block text-primary mt-1">
+                      当前: {formData.defaultRepoUrl}
+                    </span>
+                  )}
                 </p>
               </div>
             </div>

@@ -36,6 +36,7 @@ async def get_user_profile(
         "email": current_user_db.email,
         "avatarUrl": current_user_db.avatarUrl,
         "hasOpenAIKey": bool(current_user_db.openaiKey),
+        "hasGitHubToken": bool(current_user_db.githubToken),
         "defaultRepoUrl": current_user_db.defaultRepoUrl,
         "createdAt": current_user_db.createdAt,
         "updatedAt": current_user_db.updatedAt,
@@ -76,6 +77,15 @@ async def update_user_settings(
             else:
                 # 清除OpenAI Key
                 current_user_db.openaiKey = None
+
+        if request.githubToken is not None:
+            if request.githubToken.strip():
+                # 加密存储GitHub Token
+                encrypted_token = encrypt(request.githubToken.strip())
+                current_user_db.githubToken = encrypted_token
+            else:
+                # 清除GitHub Token
+                current_user_db.githubToken = None
         
         # 更新用户设置
         settings = db.query(UserSettings).filter(
