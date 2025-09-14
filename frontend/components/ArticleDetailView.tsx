@@ -81,6 +81,7 @@ export function ArticleDetailView({ article, onEdit }: ArticleDetailViewProps) {
     return new Date(dateString).toLocaleString('zh-CN');
   };
 
+
   const handleDelete = async () => {
     if (!confirm("确定要删除这篇文章吗？")) return;
     // 删除逻辑由父组件处理

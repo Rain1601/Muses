@@ -1,24 +1,26 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUserStore } from "@/store/user";
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { user, isLoading, checkAuth } = useUserStore();
+  const [hasCheckedAuth, setHasCheckedAuth] = useState(false);
 
   useEffect(() => {
-    if (!user && !isLoading) {
+    if (!hasCheckedAuth) {
+      setHasCheckedAuth(true);
       checkAuth();
     }
-  }, [user, isLoading, checkAuth]);
+  }, [hasCheckedAuth, checkAuth]);
 
   useEffect(() => {
-    if (!isLoading && !user) {
+    if (hasCheckedAuth && !isLoading && !user) {
       router.push("/");
     }
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, hasCheckedAuth]);
 
   if (isLoading) {
     return (

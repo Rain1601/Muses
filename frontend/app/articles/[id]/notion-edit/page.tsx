@@ -95,9 +95,11 @@ export default function NotionEditPage() {
       successDiv.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
       successDiv.textContent = '✅ 保存成功';
       document.body.appendChild(successDiv);
-      
+
       setTimeout(() => {
-        document.body.removeChild(successDiv);
+        if (document.body.contains(successDiv)) {
+          document.body.removeChild(successDiv);
+        }
       }, 2000);
       
     } catch (error) {
