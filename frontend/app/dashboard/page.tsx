@@ -10,7 +10,10 @@ import { ArticleDetailView } from "@/components/ArticleDetailView";
 import { NotionEditor } from '@/components/NotionEditor';
 import '@/app/editor-demo/mermaid-styles.css';
 import { api } from "@/lib/api";
-import { List, Info } from "lucide-react";
+import { List, Info, ChevronLeft, ChevronRight, Send, Save, Eye } from "lucide-react";
+import { useToast } from "@/components/Toast";
+import { usePublishNotification } from "@/components/PublishNotification";
+import { prepareFilesForGitHub } from "@/lib/publish-utils";
 
 interface Article {
   id: string;
@@ -20,6 +23,7 @@ interface Article {
   publishStatus: string;
   createdAt: string;
   updatedAt: string;
+  agentId?: string;
   agent?: {
     name: string;
     avatar?: string;
@@ -38,6 +42,27 @@ function DashboardContent() {
   const [rightPanelMode, setRightPanelMode] = useState<'toc' | 'info'>('toc');
   const [activeHeading, setActiveHeading] = useState<string>('');
   const [showSaveToast, setShowSaveToast] = useState(false);
+  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
+  const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [defaultAgent, setDefaultAgent] = useState<any>(null);
+  const { showToast, ToastContainer } = useToast();
+  const { showNotifications, NotificationContainer } = usePublishNotification();
+
+  // 获取默认agent
+  useEffect(() => {
+    const fetchDefaultAgent = async () => {
+      try {
+        const response = await api.get('/api/agents');
+        const agents = response.data.agents || [];
+        const defaultAgentFound = agents.find((a: any) => a.isDefault) || agents[0];
+        setDefaultAgent(defaultAgentFound);
+      } catch (error) {
+        console.error('Failed to fetch default agent:', error);
+      }
+    };
+    fetchDefaultAgent();
+  }, []);
 
   useEffect(() => {
     // 处理OAuth回调
@@ -66,18 +91,24 @@ function DashboardContent() {
         });
       } else {
         // 创建新文章
+        if (!defaultAgent?.id) {
+          console.error('没有找到默认agent');
+          showToast('请先创建一个Agent', 'warning');
+          return;
+        }
         const response = await api.post('/api/articles', {
           title: editingTitle || '无标题',
           content: editingContent,
-          publishStatus: 'draft'
+          publishStatus: 'draft',
+          agentId: defaultAgent.id
         });
-        setSelectedArticle(response.data);
+        setSelectedArticle(response.data.article || response.data);
       }
       setLastSaved(new Date());
     } catch (error) {
       console.error('自动保存失败:', error);
     }
-  }, [editingTitle, editingContent, selectedArticle]);
+  }, [editingTitle, editingContent, selectedArticle, defaultAgent, showToast]);
 
   // 手动保存功能（Cmd+S）
   const manualSave = useCallback(async () => {
@@ -93,12 +124,18 @@ function DashboardContent() {
         });
       } else {
         // 创建新文章
+        if (!defaultAgent?.id) {
+          console.error('没有找到默认agent');
+          showToast('请先创建一个Agent', 'warning');
+          return;
+        }
         const response = await api.post('/api/articles', {
           title: editingTitle || '无标题',
           content: editingContent,
-          publishStatus: 'draft'
+          publishStatus: 'draft',
+          agentId: defaultAgent.id
         });
-        setSelectedArticle(response.data);
+        setSelectedArticle(response.data.article || response.data);
       }
       setLastSaved(new Date());
 
@@ -110,7 +147,180 @@ function DashboardContent() {
     } catch (error) {
       console.error('手动保存失败:', error);
     }
-  }, [editingTitle, editingContent, selectedArticle]);
+  }, [editingTitle, editingContent, selectedArticle, defaultAgent, showToast]);
+
+  // 发布文章功能
+  const handlePublish = useCallback(async () => {
+    if (!editingContent.trim() && !editingTitle.trim()) {
+      showToast('请先添加内容再发布', 'warning');
+      return;
+    }
+
+    setIsPublishing(true);
+    try {
+      // 先保存文章
+      let articleToPublish;
+
+      if (selectedArticle?.id) {
+        // 更新现有文章并设为已发布
+        const response = await api.put(`/api/articles/${selectedArticle.id}`, {
+          title: editingTitle || '无标题',
+          content: editingContent,
+          publishStatus: 'published'
+        });
+        articleToPublish = response.data.article || response.data;
+        setSelectedArticle(articleToPublish);
+      } else {
+        // 创建新文章并直接发布
+        if (!selectedArticle?.agentId && !defaultAgent?.id) {
+          console.error('没有找到默认agent');
+          showToast('请先创建一个Agent', 'warning');
+          return;
+        }
+        const response = await api.post('/api/articles', {
+          title: editingTitle || '无标题',
+          content: editingContent,
+          publishStatus: 'published',
+          agentId: selectedArticle?.agentId || defaultAgent.id
+        });
+        articleToPublish = response.data.article || response.data;
+        setSelectedArticle(articleToPublish);
+      }
+
+      // 确保我们有文章ID
+      if (!articleToPublish?.id) {
+        showToast('文章保存成功，但无法获取文章ID', 'warning');
+        return;
+      }
+
+      // 发布到 GitHub
+      let githubPublishSuccess = false;
+      // 使用新的发布通知系统
+      const notifications = [
+        { message: '正在保存文章...', type: 'info' as const },
+        { message: '正在发布到 GitHub...', type: 'info' as const }
+      ];
+      showNotifications(notifications);
+
+      try {
+        // 生成文件路径：使用年/月/文章文件夹/index.md结构
+        const date = new Date();
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+
+        // 生成文件夹名：日期-标题
+        const titleSlug = (editingTitle || '无标题')
+          .toLowerCase()
+          .replace(/[^a-z0-9\u4e00-\u9fa5]+/gi, '-')
+          .replace(/^-|-$/g, '');
+        const folderName = `${year}-${month}-${day}-${titleSlug}`;
+
+        // 文件路径：posts/年/月/文章文件夹/index.md
+        const articleFolder = `posts/${year}/${month}/${folderName}`;
+        const filePath = `${articleFolder}/index.md`;
+
+        // 生成带有Frontmatter的内容
+        const frontmatter = `---
+title: "${editingTitle || '无标题'}"
+date: "${year}-${month}-${day}"
+tags: []
+categories: []
+author: "Muses"
+summary: ""
+---
+
+`;
+
+        // 由于图片现在自动上传到GitHub并获得稳定链接，不需要处理图片文件
+        // 直接使用编辑内容，图片链接已经是GitHub的raw链接
+        const fullContent = frontmatter + editingContent;
+
+        console.log('Publishing article to:', filePath);
+
+        // 只需要上传主文章文件
+        await api.post('/api/publish/github/batch', {
+          articleId: articleToPublish.id,
+          repoUrl: 'https://github.com/Rain1601/rain.blog.repo',
+          commitMessage: `发布文章: ${editingTitle || '无标题'}`,
+          files: [{
+            path: filePath,
+            content: fullContent,
+            encoding: "utf-8"
+          }]
+        });
+
+        githubPublishSuccess = true;
+        // 更新通知序列以显示成功状态
+        const successNotifications = [
+          { message: '文章保存成功', type: 'success' as const },
+          { message: '发布成功！', type: 'success' as const, isRepositoryLink: true, repositoryUrl: 'https://github.com/Rain1601/rain.blog.repo' }
+        ];
+        showNotifications(successNotifications);
+      } catch (githubError: any) {
+        console.error('GitHub 发布失败:', githubError);
+        let errorMsg = 'GitHub 发布失败';
+
+        // Handle different error formats
+        if (githubError.response?.data?.detail) {
+          // If detail is an object, extract the message
+          if (typeof githubError.response.data.detail === 'object') {
+            errorMsg = githubError.response.data.detail.msg ||
+                      githubError.response.data.detail.message ||
+                      'GitHub 发布失败，请检查配置';
+          } else {
+            errorMsg = String(githubError.response.data.detail);
+          }
+        } else if (githubError.message) {
+          errorMsg = githubError.message;
+        }
+
+        // Ensure errorMsg is always a string
+        errorMsg = String(errorMsg);
+
+        // GitHub 发布失败不影响文章状态，仅提示
+        // GitHub 发布失败的通知序列
+        const failureNotifications = [
+          { message: '文章已保存', type: 'success' as const },
+          { message: `GitHub 发布失败: ${errorMsg}`, type: 'error' as const }
+        ];
+        showNotifications(failureNotifications);
+      }
+
+      setLastSaved(new Date());
+
+      // 发布成功后不刷新页面，保持在当前文章
+      if (githubPublishSuccess) {
+        // 可以添加一些视觉反馈，比如显示发布成功的标记
+        console.log('文章已成功发布到 GitHub');
+      }
+    } catch (error: any) {
+      console.error('发布失败:', error);
+      let errorMessage = '发布失败，请重试';
+
+      // Handle different error formats
+      if (error.response?.data?.detail) {
+        // If detail is an object, extract the message string
+        if (typeof error.response.data.detail === 'object') {
+          errorMessage = error.response.data.detail.msg ||
+                        error.response.data.detail.message ||
+                        '发布失败，请查看控制台了解详情';
+        } else {
+          errorMessage = String(error.response.data.detail);
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      // 发布失败通知
+      const errorNotifications = [
+        { message: errorMessage, type: 'error' as const }
+      ];
+      showNotifications(errorNotifications);
+    } finally {
+      setIsPublishing(false);
+    }
+  }, [editingTitle, editingContent, selectedArticle, showToast]);
 
   // 每10秒自动保存
   useEffect(() => {
@@ -203,11 +413,15 @@ function DashboardContent() {
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
+      <ToastContainer />
+      <NotificationContainer />
 
       {/* 主内容区 - 三栏布局 */}
       <main className="flex h-[calc(100vh-80px)]">
         {/* 左侧栏 - 文章列表 */}
-        <aside className="w-80 bg-card border-r border-border flex-shrink-0">
+        <aside className={`bg-card border-r border-border flex-shrink-0 transition-all duration-300 ${
+          leftPanelCollapsed ? 'w-0 opacity-0 overflow-hidden' : 'w-80 opacity-100'
+        }`}>
           <ArticleCompactList
             onArticleSelect={handleArticleSelect}
             selectedArticleId={selectedArticle?.id}
@@ -215,21 +429,75 @@ function DashboardContent() {
         </aside>
 
         {/* 中间区域 - 编辑器 */}
-        <section className="flex-1 bg-background">
+        <section className="flex-1 bg-background relative">
+          {/* 左侧栏收缩展开按钮 */}
+          <button
+            onClick={() => setLeftPanelCollapsed(!leftPanelCollapsed)}
+            className="absolute top-1/2 left-0 transform -translate-y-1/2 -translate-x-1/2 z-10 w-6 h-12 bg-card border border-border rounded-r-lg shadow-sm hover:shadow-md transition-all duration-200 flex items-center justify-center text-muted-foreground hover:text-foreground"
+            title={leftPanelCollapsed ? "展开文章列表" : "收缩文章列表"}
+          >
+            {leftPanelCollapsed ? (
+              <ChevronRight className="w-3 h-3" />
+            ) : (
+              <ChevronLeft className="w-3 h-3" />
+            )}
+          </button>
+
+          {/* 右侧栏收缩展开按钮 */}
+          <button
+            onClick={() => setRightPanelCollapsed(!rightPanelCollapsed)}
+            className="absolute top-1/2 right-0 transform -translate-y-1/2 translate-x-1/2 z-10 w-6 h-12 bg-card border border-border rounded-l-lg shadow-sm hover:shadow-md transition-all duration-200 flex items-center justify-center text-muted-foreground hover:text-foreground"
+            title={rightPanelCollapsed ? "展开侧栏" : "收缩侧栏"}
+          >
+            {rightPanelCollapsed ? (
+              <ChevronLeft className="w-3 h-3" />
+            ) : (
+              <ChevronRight className="w-3 h-3" />
+            )}
+          </button>
+
           {isEditing && (editingTitle || editingContent || selectedArticle) ? (
             <div className="h-full flex flex-col">
               {/* 编辑器标题栏 */}
               <div className="border-b border-border p-4 bg-card/50">
-                <input
-                  type="text"
-                  value={editingTitle}
-                  onChange={(e) => setEditingTitle(e.target.value)}
-                  placeholder="文章标题..."
-                  className="w-full text-2xl font-bold bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground"
-                />
-                <div className="flex items-center mt-2">
-                  <div className="text-sm text-muted-foreground">
-                    {lastSaved && `上次保存: ${lastSaved.toLocaleTimeString()}`}
+                <div className="flex items-start justify-between">
+                  <div className="flex-1 mr-4">
+                    <input
+                      type="text"
+                      value={editingTitle}
+                      onChange={(e) => setEditingTitle(e.target.value)}
+                      placeholder="文章标题..."
+                      className="w-full text-2xl font-bold bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground"
+                    />
+                    <div className="flex items-center mt-2">
+                      <div className="text-sm text-muted-foreground">
+                        {lastSaved && `上次保存: ${lastSaved.toLocaleTimeString()}`}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 操作按钮组 */}
+                  <div className="flex items-center gap-2 mt-1">
+                    {/* 手动保存按钮 */}
+                    <button
+                      onClick={manualSave}
+                      className="flex items-center gap-1 px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground border border-border rounded-lg hover:bg-accent/50 transition-colors"
+                      title="手动保存 (Shift+Cmd+S)"
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      <span>保存</span>
+                    </button>
+
+                    {/* 发布按钮 */}
+                    <button
+                      onClick={handlePublish}
+                      disabled={isPublishing || (!editingTitle.trim() && !editingContent.trim())}
+                      className="flex items-center gap-1 px-4 py-1.5 text-sm bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                      title="发布文章"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>{isPublishing ? '发布中...' : '发布'}</span>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -259,7 +527,9 @@ function DashboardContent() {
         </section>
 
         {/* 右侧栏 - 信息面板 */}
-        <aside className="w-72 bg-muted/30 border-l border-border flex-shrink-0 hidden lg:block">
+        <aside className={`bg-muted/30 border-l border-border flex-shrink-0 hidden lg:block transition-all duration-300 ${
+          rightPanelCollapsed ? 'w-0 opacity-0 overflow-hidden' : 'w-72 opacity-100'
+        }`}>
           <div className="h-full flex flex-col">
             {/* 切换标签 */}
             <div className="border-b border-border bg-card">

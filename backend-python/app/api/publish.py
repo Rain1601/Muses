@@ -61,28 +61,146 @@ async def get_repos(
         raise HTTPValidationError(f"Failed to get repositories: {str(e)}")
 
 
+@router.post("/github/batch")
+async def publish_batch_to_github(
+    request: dict,
+    current_user = Depends(get_current_user_db),
+    db: Session = Depends(get_db)
+):
+    """批量发布文章和图片到GitHub"""
+
+    article_id = request.get("articleId")
+    repo_url = request.get("repoUrl")
+    files = request.get("files", [])  # [{"path": "...", "content": "...", "encoding": "utf-8|base64"}]
+    commit_message = request.get("commitMessage", "Add new article")
+
+    if not all([article_id, repo_url, files]):
+        raise HTTPValidationError("Missing required parameters")
+
+    # 获取文章
+    article = db.query(Article).filter(
+        Article.id == article_id,
+        Article.userId == current_user.id
+    ).first()
+
+    if not article:
+        raise HTTPNotFoundError("Article not found")
+
+    if not current_user.githubToken:
+        raise HTTPValidationError("GitHub token not found")
+
+    try:
+        # 解密GitHub token
+        github_token = decrypt(current_user.githubToken)
+
+        # 解析仓库信息
+        repo_parts = repo_url.rstrip('/').split('/')
+        owner = repo_parts[-2]
+        repo = repo_parts[-1]
+
+        async with httpx.AsyncClient() as client:
+            success_files = []
+            failed_files = []
+
+            # 按顺序上传每个文件
+            for file_info in files:
+                file_path = file_info.get("path")
+                file_content = file_info.get("content")
+                encoding = file_info.get("encoding", "utf-8")
+
+                try:
+                    # 如果是base64编码，直接使用；否则先编码
+                    if encoding == "base64":
+                        content_encoded = file_content
+                    else:
+                        content_encoded = base64.b64encode(file_content.encode('utf-8')).decode('utf-8')
+
+                    # 检查文件是否已存在
+                    check_response = await client.get(
+                        f"https://api.github.com/repos/{owner}/{repo}/contents/{file_path}",
+                        headers={"Authorization": f"token {github_token}"}
+                    )
+
+                    # 准备提交数据
+                    commit_data = {
+                        "message": commit_message,
+                        "content": content_encoded,
+                        "branch": "main"
+                    }
+
+                    # 如果文件已存在，需要提供sha
+                    if check_response.status_code == 200:
+                        existing_file = check_response.json()
+                        commit_data["sha"] = existing_file["sha"]
+
+                    # 提交文件
+                    commit_response = await client.put(
+                        f"https://api.github.com/repos/{owner}/{repo}/contents/{file_path}",
+                        headers={"Authorization": f"token {github_token}"},
+                        json=commit_data
+                    )
+
+                    if commit_response.status_code in [200, 201]:
+                        success_files.append(file_path)
+                    else:
+                        failed_files.append({
+                            "path": file_path,
+                            "error": f"HTTP {commit_response.status_code}: {commit_response.text}"
+                        })
+
+                except Exception as e:
+                    failed_files.append({
+                        "path": file_path,
+                        "error": str(e)
+                    })
+
+            # 如果主文件（index.md）上传成功，更新文章状态
+            main_file_uploaded = any("index.md" in path for path in success_files)
+            if main_file_uploaded:
+                main_file_path = next(path for path in success_files if "index.md" in path)
+                github_url = f"{repo_url}/blob/main/{main_file_path}"
+                article.publishStatus = "published"
+                article.publishedAt = datetime.utcnow()
+                article.githubUrl = github_url
+                article.repoPath = main_file_path
+                db.commit()
+
+            return {
+                "success": len(failed_files) == 0,
+                "message": f"上传完成：{len(success_files)} 个文件成功，{len(failed_files)} 个文件失败",
+                "success_files": success_files,
+                "failed_files": failed_files,
+                "github_url": f"{repo_url}/blob/main/{success_files[0]}" if success_files else None
+            }
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPValidationError(f"Failed to publish to GitHub: {str(e)}")
+
+
 @router.post("/github")
 async def publish_to_github(
     request: dict,
     current_user = Depends(get_current_user_db),
     db: Session = Depends(get_db)
 ):
-    """发布文章到GitHub"""
+    """发布文章到GitHub（保持向后兼容）"""
     
     article_id = request.get("articleId")
-    repo_url = request.get("repoUrl") 
+    repo_url = request.get("repoUrl")
     file_path = request.get("filePath")
     commit_message = request.get("commitMessage", "Add new article")
-    
+    custom_content = request.get("content")  # 可选：直接传递的内容
+
     if not all([article_id, repo_url, file_path]):
         raise HTTPValidationError("Missing required parameters")
-    
+
     # 获取文章
     article = db.query(Article).filter(
         Article.id == article_id,
         Article.userId == current_user.id
     ).first()
-    
+
     if not article:
         raise HTTPNotFoundError("Article not found")
     
@@ -100,8 +218,11 @@ async def publish_to_github(
         repo = repo_parts[-1]
         
         # 准备文件内容
+        # 如果提供了自定义内容，使用自定义内容
+        if custom_content:
+            file_content = custom_content
         # 如果文件路径以.html结尾，直接使用HTML内容
-        if file_path.endswith('.html'):
+        elif file_path.endswith('.html'):
             file_content = f"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
