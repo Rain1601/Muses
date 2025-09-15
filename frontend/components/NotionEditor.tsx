@@ -150,6 +150,9 @@ const ResizableImage = Node.create({
       isUploading: {
         default: false,
       },
+      uploadId: {
+        default: null,
+      },
     }
   },
 
@@ -255,70 +258,80 @@ export function NotionEditor({ initialContent = '', onChange }: NotionEditorProp
       handlePaste: (view, event) => {
         const items = event.clipboardData?.items;
         if (items) {
+          // 收集所有图片文件
+          const imageFiles = [];
           for (let i = 0; i < items.length; i++) {
             if (items[i].type.indexOf('image') === 0) {
-              event.preventDefault();
               const file = items[i].getAsFile();
               if (file) {
-                // 先插入带有转圈loading效果的占位符
-                const placeholder = view.state.schema.nodes.resizableImage.create({
-                  src: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDIwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMTAwIiBmaWxsPSIjZjlmYWZiIiBzdHJva2U9IiNlNWU3ZWIiIHN0cm9rZS13aWR0aD0iMiIgcng9IjgiLz4KPGNpcmNsZSBjeD0iMTAwIiBjeT0iNTAiIHI9IjEyIiBzdHJva2U9IiM5Y2EzYWYiIHN0cm9rZS13aWR0aD0iMiIgZmlsbD0ibm9uZSIgc3Ryb2tlLWRhc2hhcnJheT0iMTggNiIgb3BhY2l0eT0iMC44Ij4KPGFuaW1hdGVUcmFuc2Zvcm0gYXR0cmlidXRlTmFtZT0idHJhbnNmb3JtIiB0eXBlPSJyb3RhdGUiIHZhbHVlcz0iMCAxMDAgNTA7MzYwIDEwMCA1MCIgZHVyPSIxcyIgcmVwZWF0Q291bnQ9ImluZGVmaW5pdGUiLz4KPC9jaXJjbGU+Cjx0ZXh0IHg9IjEwMCIgeT0iNzUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiM2Yjc0ODciIGZvbnQtc2l6ZT0iMTEiIGZvbnQtZmFtaWx5PSJzeXN0ZW0tdWkiPuS4iuS8oOS4rS4uLjwvdGV4dD4KPC9zdmc+',
-                  isUploading: true
-                });
-                const transaction = view.state.tr.replaceSelectionWith(placeholder);
-                const insertPos = transaction.selection.from - 1;
-                view.dispatch(transaction);
+                imageFiles.push(file);
+              }
+            }
+          }
 
+          if (imageFiles.length > 0) {
+            event.preventDefault();
+            console.log(`📸 Found ${imageFiles.length} image(s) to upload`);
+
+            // 为每个图片创建唯一ID和占位符
+            imageFiles.forEach((file, index) => {
+              const uploadId = `upload_${Date.now()}_${index}`;
+              console.log(`🆔 Creating upload ID: ${uploadId} for file: ${file.name}`);
+
+              const placeholder = view.state.schema.nodes.resizableImage.create({
+                src: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDIwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMTAwIiBmaWxsPSIjZjlmYWZiIiBzdHJva2U9IiNlNWU3ZWIiIHN0cm9rZS13aWR0aD0iMiIgcng9IjgiLz4KPGNpcmNsZSBjeD0iMTAwIiBjeT0iNTAiIHI9IjEyIiBzdHJva2U9IiM5Y2EzYWYiIHN0cm9rZS13aWR0aD0iMiIgZmlsbD0ibm9uZSIgc3Ryb2tlLWRhc2hhcnJheT0iMTggNiIgb3BhY2l0eT0iMC44Ij4KPGFuaW1hdGVUcmFuc2Zvcm0gYXR0cmlidXRlTmFtZT0idHJhbnNmb3JtIiB0eXBlPSJyb3RhdGUiIHZhbHVlcz0iMCAxMDAgNTA7MzYwIDEwMCA1MCIgZHVyPSIxcyIgcmVwZWF0Q291bnQ9ImluZGVmaW5pdGUiLz4KPC9jaXJjbGU+Cjx0ZXh0IHg9IjEwMCIgeT0iNzUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiM2Yjc0ODciIGZvbnQtc2l6ZT0iMTEiIGZvbnQtZmFtaWx5PSJzeXN0ZW0tdWkiPuS4iuS8oOS4rS4uLjwvdGV4dD4KPC9zdmc+',
+                isUploading: true,
+                uploadId: uploadId
+              });
+
+              const transaction = view.state.tr.replaceSelectionWith(placeholder);
+              view.dispatch(transaction);
+
+              // 添加小延迟避免所有请求同时发出
+              setTimeout(() => {
                 // 异步上传图片
                 uploadImageToGitHub(file).then((githubUrl) => {
-                  console.log('🔄 Promise resolved with URL:', githubUrl);
-                  console.log('📍 Insert position:', insertPos);
+                  console.log(`🔄 Promise resolved for ${uploadId} with URL:`, githubUrl);
                   // 上传成功后，替换占位符为真实的GitHub URL
                   const currentState = view.state;
 
-                  // 尝试多种方式找到上传中的图片节点
+                  // 使用uploadId精确找到对应的节点
                   let foundNode = null;
                   let foundPos = -1;
 
-                  // 方法1: 检查原始位置
-                  const originalNode = currentState.doc.nodeAt(insertPos);
-                  if (originalNode?.type.name === 'resizableImage' && originalNode.attrs.isUploading) {
-                    foundNode = originalNode;
-                    foundPos = insertPos;
-                  }
+                  currentState.doc.descendants((node, pos) => {
+                    if (node.type.name === 'resizableImage' &&
+                        node.attrs.isUploading &&
+                        node.attrs.uploadId === uploadId) {
+                      foundNode = node;
+                      foundPos = pos;
+                      return false; // 停止遍历
+                    }
+                  });
 
-                  // 方法2: 如果原始位置没找到，遍历整个文档寻找上传中的图片
-                  if (!foundNode) {
-                    currentState.doc.descendants((node, pos) => {
-                      if (node.type.name === 'resizableImage' && node.attrs.isUploading) {
-                        foundNode = node;
-                        foundPos = pos;
-                        return false; // 停止遍历
-                      }
-                    });
-                  }
-
-                  console.log('🔍 Found node:', foundNode?.type.name, foundNode?.attrs.src, 'at position:', foundPos);
+                  console.log(`🔍 Found node for ${uploadId}:`, foundNode?.type.name, 'at position:', foundPos);
 
                   if (foundNode && foundPos >= 0) {
-                    console.log('✅ Updating node with new src:', githubUrl);
+                    console.log(`✅ Updating node ${uploadId} with new src:`, githubUrl);
                     const newTransaction = currentState.tr.setNodeMarkup(foundPos, null, {
                       ...foundNode.attrs,
                       src: githubUrl,
-                      isUploading: false
+                      isUploading: false,
+                      uploadId: null
                     });
                     view.dispatch(newTransaction);
-                    console.log('🎯 Transaction dispatched');
+                    console.log(`🎯 Transaction dispatched for ${uploadId}`);
                   } else {
-                    console.warn('⚠️ Node not found or wrong type for replacement');
+                    console.warn(`⚠️ Node not found for upload ID: ${uploadId}`);
                   }
                 }).catch((error) => {
-                  console.error('❌ Promise rejected - Image upload failed:', error);
+                  console.error(`❌ Promise rejected for ${uploadId} - Image upload failed:`, error);
                   // 上传失败，可以选择保留占位符或者移除节点
                 });
-              }
-              return true;
-            }
+              }, index * 200); // 每个图片延迟200ms
+            });
+
+            return true;
           }
         }
         return false;
@@ -329,69 +342,72 @@ export function NotionEditor({ initialContent = '', onChange }: NotionEditorProp
         }
 
         const files = Array.from(event.dataTransfer.files);
-        const imageFile = files.find(file => file.type.startsWith('image/'));
+        const imageFiles = files.filter(file => file.type.startsWith('image/'));
 
-        if (imageFile) {
+        if (imageFiles.length > 0) {
           event.preventDefault();
+          console.log(`📸 Found ${imageFiles.length} image(s) to drop`);
+
           const { schema } = view.state;
           const pos = view.posAtCoords({ left: event.clientX, top: event.clientY });
 
           if (pos) {
-            // 插入带有转圈loading效果的占位符
-            const placeholder = schema.nodes.resizableImage.create({
-              src: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDIwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMTAwIiBmaWxsPSIjZjlmYWZiIiBzdHJva2U9IiNlNWU3ZWIiIHN0cm9rZS13aWR0aD0iMiIgcng9IjgiLz4KPGNpcmNsZSBjeD0iMTAwIiBjeT0iNTAiIHI9IjEyIiBzdHJva2U9IiM5Y2EzYWYiIHN0cm9rZS13aWR0aD0iMiIgZmlsbD0ibm9uZSIgc3Ryb2tlLWRhc2hhcnJheT0iMTggNiIgb3BhY2l0eT0iMC44Ij4KPGFuaW1hdGVUcmFuc2Zvcm0gYXR0cmlidXRlTmFtZT0idHJhbnNmb3JtIiB0eXBlPSJyb3RhdGUiIHZhbHVlcz0iMCAxMDAgNTA7MzYwIDEwMCA1MCIgZHVyPSIxcyIgcmVwZWF0Q291bnQ9ImluZGVmaW5pdGUiLz4KPC9jaXJjbGU+Cjx0ZXh0IHg9IjEwMCIgeT0iNzUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiM2Yjc0ODciIGZvbnQtc2l6ZT0iMTEiIGZvbnQtZmFtaWx5PSJzeXN0ZW0tdWkiPuS4iuS8oOS4rS4uLjwvdGV4dD4KPC9zdmc+',
-              isUploading: true
-            });
-            const transaction = view.state.tr.insert(pos.pos, placeholder);
-            const insertPos = pos.pos;
-            view.dispatch(transaction);
+            // 为每个图片创建占位符
+            imageFiles.forEach((imageFile, index) => {
+              const uploadId = `drop_${Date.now()}_${index}`;
+              console.log(`🆔 Creating drop upload ID: ${uploadId} for file: ${imageFile.name}`);
 
-            // 异步上传图片
-            uploadImageToGitHub(imageFile).then((githubUrl) => {
-              console.log('🔄 Drag Promise resolved with URL:', githubUrl);
-              console.log('📍 Drag Insert position:', insertPos);
-              // 上传成功后，替换占位符为真实的GitHub URL
-              const currentState = view.state;
+              const placeholder = schema.nodes.resizableImage.create({
+                src: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDIwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMTAwIiBmaWxsPSIjZjlmYWZiIiBzdHJva2U9IiNlNWU3ZWIiIHN0cm9rZS13aWR0aD0iMiIgcng9IjgiLz4KPGNpcmNsZSBjeD0iMTAwIiBjeT0iNTAiIHI9IjEyIiBzdHJva2U9IiM5Y2EzYWYiIHN0cm9rZS13aWR0aD0iMiIgZmlsbD0ibm9uZSIgc3Ryb2tlLWRhc2hhcnJheT0iMTggNiIgb3BhY2l0eT0iMC44Ij4KPGFuaW1hdGVUcmFuc2Zvcm0gYXR0cmlidXRlTmFtZT0idHJhbnNmb3JtIiB0eXBlPSJyb3RhdGUiIHZhbHVlcz0iMCAxMDAgNTA7MzYwIDEwMCA1MCIgZHVyPSIxcyIgcmVwZWF0Q291bnQ9ImluZGVmaW5pdGUiLz4KPC9jaXJjbGU+Cjx0ZXh0IHg9IjEwMCIgeT0iNzUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiM2Yjc0ODciIGZvbnQtc2l6ZT0iMTEiIGZvbnQtZmFtaWx5PSJzeXN0ZW0tdWkiPuS4iuS8oOS4rS4uLjwvdGV4dD4KPC9zdmc+',
+                isUploading: true,
+                uploadId: uploadId
+              });
 
-              // 尝试多种方式找到上传中的图片节点
-              let foundNode = null;
-              let foundPos = -1;
+              const transaction = view.state.tr.insert(pos.pos, placeholder);
+              view.dispatch(transaction);
 
-              // 方法1: 检查原始位置
-              const originalNode = currentState.doc.nodeAt(insertPos);
-              if (originalNode?.type.name === 'resizableImage' && originalNode.attrs.isUploading) {
-                foundNode = originalNode;
-                foundPos = insertPos;
-              }
+              // 添加小延迟避免所有请求同时发出
+              setTimeout(() => {
+                // 异步上传图片
+                uploadImageToGitHub(imageFile).then((githubUrl) => {
+                  console.log(`🔄 Drag Promise resolved for ${uploadId} with URL:`, githubUrl);
+                  // 上传成功后，替换占位符为真实的GitHub URL
+                  const currentState = view.state;
 
-              // 方法2: 如果原始位置没找到，遍历整个文档寻找上传中的图片
-              if (!foundNode) {
-                currentState.doc.descendants((node, pos) => {
-                  if (node.type.name === 'resizableImage' && node.attrs.isUploading) {
-                    foundNode = node;
-                    foundPos = pos;
-                    return false; // 停止遍历
+                  // 使用uploadId精确找到对应的节点
+                  let foundNode = null;
+                  let foundPos = -1;
+
+                  currentState.doc.descendants((node, pos) => {
+                    if (node.type.name === 'resizableImage' &&
+                        node.attrs.isUploading &&
+                        node.attrs.uploadId === uploadId) {
+                      foundNode = node;
+                      foundPos = pos;
+                      return false; // 停止遍历
+                    }
+                  });
+
+                  console.log(`🔍 Drag Found node for ${uploadId}:`, foundNode?.type.name, 'at position:', foundPos);
+
+                  if (foundNode && foundPos >= 0) {
+                    console.log(`✅ Drag Updating node ${uploadId} with new src:`, githubUrl);
+                    const newTransaction = currentState.tr.setNodeMarkup(foundPos, null, {
+                      ...foundNode.attrs,
+                      src: githubUrl,
+                      isUploading: false,
+                      uploadId: null
+                    });
+                    view.dispatch(newTransaction);
+                    console.log(`🎯 Drag Transaction dispatched for ${uploadId}`);
+                  } else {
+                    console.warn(`⚠️ Drag Node not found for upload ID: ${uploadId}`);
                   }
+                }).catch((error) => {
+                  console.error(`❌ Drag Promise rejected for ${uploadId} - Image upload failed:`, error);
+                  // 上传失败，可以选择保留占位符或者移除节点
                 });
-              }
-
-              console.log('🔍 Drag Found node:', foundNode?.type.name, foundNode?.attrs.src, 'at position:', foundPos);
-
-              if (foundNode && foundPos >= 0) {
-                console.log('✅ Drag Updating node with new src:', githubUrl);
-                const newTransaction = currentState.tr.setNodeMarkup(foundPos, null, {
-                  ...foundNode.attrs,
-                  src: githubUrl,
-                  isUploading: false
-                });
-                view.dispatch(newTransaction);
-                console.log('🎯 Drag Transaction dispatched');
-              } else {
-                console.warn('⚠️ Drag Node not found or wrong type for replacement');
-              }
-            }).catch((error) => {
-              console.error('❌ Drag Promise rejected - Image upload failed:', error);
-              // 上传失败，可以选择保留占位符或者移除节点
+              }, index * 200); // 每个图片延迟200ms
             });
           }
           return true;
