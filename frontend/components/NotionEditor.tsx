@@ -147,6 +147,9 @@ const ResizableImage = Node.create({
       height: {
         default: null,
       },
+      isUploading: {
+        default: false,
+      },
     }
   },
 
@@ -202,6 +205,7 @@ export function NotionEditor({ initialContent = '', onChange }: NotionEditorProp
           });
 
           console.log('✅ Upload successful:', response.data);
+          console.log('🔗 Resolving with URL:', response.data.url);
           resolve(response.data.url);
         } catch (error) {
           console.error('❌ Failed to upload image:', error);
@@ -256,9 +260,10 @@ export function NotionEditor({ initialContent = '', onChange }: NotionEditorProp
               event.preventDefault();
               const file = items[i].getAsFile();
               if (file) {
-                // 先插入占位符
+                // 先插入带有转圈loading效果的占位符
                 const placeholder = view.state.schema.nodes.resizableImage.create({
-                  src: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDIwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMTAwIiBmaWxsPSIjZjNmNGY2Ii8+CjxwYXRoIGQ9Ik05MC41IDQwLjVIMTA5LjVWNTkuNUg5MC41VjQwLjVaIiBzdHJva2U9IiM5Y2EzYWYiIHN0cm9rZS13aWR0aD0iMiIvPgo8cGF0aCBkPSJNOTUgNDVIMTA1VjU1SDk1VjQ1WiIgZmlsbD0iIzljYTNhZiIvPgo8dGV4dCB4PSIxMDAiIHk9IjcwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjNmI3Mjg3IiBmb250LXNpemU9IjEyIj7kuK3kvKDkuK08L3RleHQ+Cjwvc3ZnPgo='
+                  src: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDIwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMTAwIiBmaWxsPSIjZjlmYWZiIiBzdHJva2U9IiNlNWU3ZWIiIHN0cm9rZS13aWR0aD0iMiIgcng9IjgiLz4KPGNpcmNsZSBjeD0iMTAwIiBjeT0iNTAiIHI9IjEyIiBzdHJva2U9IiM5Y2EzYWYiIHN0cm9rZS13aWR0aD0iMiIgZmlsbD0ibm9uZSIgc3Ryb2tlLWRhc2hhcnJheT0iMTggNiIgb3BhY2l0eT0iMC44Ij4KPGFuaW1hdGVUcmFuc2Zvcm0gYXR0cmlidXRlTmFtZT0idHJhbnNmb3JtIiB0eXBlPSJyb3RhdGUiIHZhbHVlcz0iMCAxMDAgNTA7MzYwIDEwMCA1MCIgZHVyPSIxcyIgcmVwZWF0Q291bnQ9ImluZGVmaW5pdGUiLz4KPC9jaXJjbGU+Cjx0ZXh0IHg9IjEwMCIgeT0iNzUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiM2Yjc0ODciIGZvbnQtc2l6ZT0iMTEiIGZvbnQtZmFtaWx5PSJzeXN0ZW0tdWkiPuS4iuS8oOS4rS4uLjwvdGV4dD4KPC9zdmc+',
+                  isUploading: true
                 });
                 const transaction = view.state.tr.replaceSelectionWith(placeholder);
                 const insertPos = transaction.selection.from - 1;
@@ -266,18 +271,49 @@ export function NotionEditor({ initialContent = '', onChange }: NotionEditorProp
 
                 // 异步上传图片
                 uploadImageToGitHub(file).then((githubUrl) => {
+                  console.log('🔄 Promise resolved with URL:', githubUrl);
+                  console.log('📍 Insert position:', insertPos);
                   // 上传成功后，替换占位符为真实的GitHub URL
                   const currentState = view.state;
-                  const node = currentState.doc.nodeAt(insertPos);
-                  if (node && node.type.name === 'resizableImage') {
-                    const newTransaction = currentState.tr.setNodeMarkup(insertPos, null, {
-                      ...node.attrs,
-                      src: githubUrl
+
+                  // 尝试多种方式找到上传中的图片节点
+                  let foundNode = null;
+                  let foundPos = -1;
+
+                  // 方法1: 检查原始位置
+                  const originalNode = currentState.doc.nodeAt(insertPos);
+                  if (originalNode?.type.name === 'resizableImage' && originalNode.attrs.isUploading) {
+                    foundNode = originalNode;
+                    foundPos = insertPos;
+                  }
+
+                  // 方法2: 如果原始位置没找到，遍历整个文档寻找上传中的图片
+                  if (!foundNode) {
+                    currentState.doc.descendants((node, pos) => {
+                      if (node.type.name === 'resizableImage' && node.attrs.isUploading) {
+                        foundNode = node;
+                        foundPos = pos;
+                        return false; // 停止遍历
+                      }
+                    });
+                  }
+
+                  console.log('🔍 Found node:', foundNode?.type.name, foundNode?.attrs.src, 'at position:', foundPos);
+
+                  if (foundNode && foundPos >= 0) {
+                    console.log('✅ Updating node with new src:', githubUrl);
+                    const newTransaction = currentState.tr.setNodeMarkup(foundPos, null, {
+                      ...foundNode.attrs,
+                      src: githubUrl,
+                      isUploading: false
                     });
                     view.dispatch(newTransaction);
+                    console.log('🎯 Transaction dispatched');
+                  } else {
+                    console.warn('⚠️ Node not found or wrong type for replacement');
                   }
                 }).catch((error) => {
-                  console.error('Image upload failed:', error);
+                  console.error('❌ Promise rejected - Image upload failed:', error);
                   // 上传失败，可以选择保留占位符或者移除节点
                 });
               }
@@ -301,9 +337,10 @@ export function NotionEditor({ initialContent = '', onChange }: NotionEditorProp
           const pos = view.posAtCoords({ left: event.clientX, top: event.clientY });
 
           if (pos) {
-            // 插入占位符
+            // 插入带有转圈loading效果的占位符
             const placeholder = schema.nodes.resizableImage.create({
-              src: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDIwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMTAwIiBmaWxsPSIjZjNmNGY2Ii8+CjxwYXRoIGQ9Ik05MC41IDQwLjVIMTA5LjVWNTkuNUg5MC41VjQwLjVaIiBzdHJva2U9IiM5Y2EzYWYiIHN0cm9rZS13aWR0aD0iMiIvPgo8cGF0aCBkPSJNOTUgNDVIMTA1VjU1SDk1VjQ1WiIgZmlsbD0iIzljYTNhZiIvPgo8dGV4dCB4PSIxMDAiIHk9IjcwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjNmI3Mjg3IiBmb250LXNpemU9IjEyIj7kuK3kvKDkuK08L3RleHQ+Cjwvc3ZnPgo='
+              src: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDIwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMTAwIiBmaWxsPSIjZjlmYWZiIiBzdHJva2U9IiNlNWU3ZWIiIHN0cm9rZS13aWR0aD0iMiIgcng9IjgiLz4KPGNpcmNsZSBjeD0iMTAwIiBjeT0iNTAiIHI9IjEyIiBzdHJva2U9IiM5Y2EzYWYiIHN0cm9rZS13aWR0aD0iMiIgZmlsbD0ibm9uZSIgc3Ryb2tlLWRhc2hhcnJheT0iMTggNiIgb3BhY2l0eT0iMC44Ij4KPGFuaW1hdGVUcmFuc2Zvcm0gYXR0cmlidXRlTmFtZT0idHJhbnNmb3JtIiB0eXBlPSJyb3RhdGUiIHZhbHVlcz0iMCAxMDAgNTA7MzYwIDEwMCA1MCIgZHVyPSIxcyIgcmVwZWF0Q291bnQ9ImluZGVmaW5pdGUiLz4KPC9jaXJjbGU+Cjx0ZXh0IHg9IjEwMCIgeT0iNzUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiM2Yjc0ODciIGZvbnQtc2l6ZT0iMTEiIGZvbnQtZmFtaWx5PSJzeXN0ZW0tdWkiPuS4iuS8oOS4rS4uLjwvdGV4dD4KPC9zdmc+',
+              isUploading: true
             });
             const transaction = view.state.tr.insert(pos.pos, placeholder);
             const insertPos = pos.pos;
@@ -311,18 +348,49 @@ export function NotionEditor({ initialContent = '', onChange }: NotionEditorProp
 
             // 异步上传图片
             uploadImageToGitHub(imageFile).then((githubUrl) => {
+              console.log('🔄 Drag Promise resolved with URL:', githubUrl);
+              console.log('📍 Drag Insert position:', insertPos);
               // 上传成功后，替换占位符为真实的GitHub URL
               const currentState = view.state;
-              const node = currentState.doc.nodeAt(insertPos);
-              if (node && node.type.name === 'resizableImage') {
-                const newTransaction = currentState.tr.setNodeMarkup(insertPos, null, {
-                  ...node.attrs,
-                  src: githubUrl
+
+              // 尝试多种方式找到上传中的图片节点
+              let foundNode = null;
+              let foundPos = -1;
+
+              // 方法1: 检查原始位置
+              const originalNode = currentState.doc.nodeAt(insertPos);
+              if (originalNode?.type.name === 'resizableImage' && originalNode.attrs.isUploading) {
+                foundNode = originalNode;
+                foundPos = insertPos;
+              }
+
+              // 方法2: 如果原始位置没找到，遍历整个文档寻找上传中的图片
+              if (!foundNode) {
+                currentState.doc.descendants((node, pos) => {
+                  if (node.type.name === 'resizableImage' && node.attrs.isUploading) {
+                    foundNode = node;
+                    foundPos = pos;
+                    return false; // 停止遍历
+                  }
+                });
+              }
+
+              console.log('🔍 Drag Found node:', foundNode?.type.name, foundNode?.attrs.src, 'at position:', foundPos);
+
+              if (foundNode && foundPos >= 0) {
+                console.log('✅ Drag Updating node with new src:', githubUrl);
+                const newTransaction = currentState.tr.setNodeMarkup(foundPos, null, {
+                  ...foundNode.attrs,
+                  src: githubUrl,
+                  isUploading: false
                 });
                 view.dispatch(newTransaction);
+                console.log('🎯 Drag Transaction dispatched');
+              } else {
+                console.warn('⚠️ Drag Node not found or wrong type for replacement');
               }
             }).catch((error) => {
-              console.error('Image upload failed:', error);
+              console.error('❌ Drag Promise rejected - Image upload failed:', error);
               // 上传失败，可以选择保留占位符或者移除节点
             });
           }
