@@ -8,9 +8,10 @@ import Navigation from "@/components/Navigation";
 import { ArticleCompactList } from "@/components/ArticleCompactList";
 import { ArticleDetailView } from "@/components/ArticleDetailView";
 import { NotionEditor } from '@/components/NotionEditor';
+import { SyncPanel } from '@/components/SyncPanel';
 import '@/app/editor-demo/mermaid-styles.css';
 import { api } from "@/lib/api";
-import { List, Info, ChevronLeft, ChevronRight, Send, Save, Eye } from "lucide-react";
+import { List, Info, GitBranch, ChevronLeft, ChevronRight, Send, Save, Eye } from "lucide-react";
 import { useToast } from "@/components/Toast";
 import { usePublishNotification } from "@/components/PublishNotification";
 import { prepareFilesForGitHub } from "@/lib/publish-utils";
@@ -39,7 +40,7 @@ function DashboardContent() {
   const [editingTitle, setEditingTitle] = useState("");
   const [editingContent, setEditingContent] = useState("");
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const [rightPanelMode, setRightPanelMode] = useState<'toc' | 'info'>('toc');
+  const [rightPanelMode, setRightPanelMode] = useState<'toc' | 'info' | 'sync'>('toc');
   const [activeHeading, setActiveHeading] = useState<string>('');
   const [showSaveToast, setShowSaveToast] = useState(false);
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
@@ -535,29 +536,43 @@ summary: ""
             <div className="border-b border-border bg-card">
               <div className="flex">
                 <button
-                  className={`flex-1 px-4 py-3 text-sm font-medium border-b-2 transition-all duration-200 ${
+                  className={`flex-1 px-3 py-3 text-sm font-medium border-b-2 transition-all duration-200 ${
                     rightPanelMode === 'toc'
                       ? 'border-primary text-primary bg-primary/10 font-semibold'
                       : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/30 hover:border-muted-foreground/30'
                   }`}
                   onClick={() => setRightPanelMode('toc')}
                 >
-                  <div className="flex items-center gap-2">
-                    <List className="w-4 h-4" />
+                  <div className="flex items-center gap-1.5">
+                    <List className="w-3.5 h-3.5" />
                     <span>目录</span>
                   </div>
                 </button>
                 <button
-                  className={`flex-1 px-4 py-3 text-sm font-medium border-b-2 transition-all duration-200 ${
+                  className={`flex-1 px-3 py-3 text-sm font-medium border-b-2 transition-all duration-200 ${
                     rightPanelMode === 'info'
                       ? 'border-primary text-primary bg-primary/10 font-semibold'
                       : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/30 hover:border-muted-foreground/30'
                   }`}
                   onClick={() => setRightPanelMode('info')}
                 >
-                  <div className="flex items-center gap-2">
-                    <Info className="w-4 h-4" />
-                    <span>文章信息</span>
+                  <div className="flex items-center gap-1.5">
+                    <Info className="w-3.5 h-3.5" />
+                    <span>信息</span>
+                  </div>
+                </button>
+                <button
+                  className={`flex-1 px-3 py-3 text-sm font-medium border-b-2 transition-all duration-200 ${
+                    rightPanelMode === 'sync'
+                      ? 'border-primary text-primary bg-primary/10 font-semibold'
+                      : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/30 hover:border-muted-foreground/30'
+                  }`}
+                  onClick={() => setRightPanelMode('sync')}
+                  disabled={!selectedArticle}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <GitBranch className="w-3.5 h-3.5" />
+                    <span>同步</span>
                   </div>
                 </button>
               </div>
@@ -648,6 +663,21 @@ summary: ""
                     );
                   })()}
                 </div>
+              ) : rightPanelMode === 'sync' ? (
+                /* 同步面板 */
+                selectedArticle ? (
+                  <SyncPanel
+                    articleId={selectedArticle.id}
+                    onSyncComplete={() => {
+                      console.log('同步完成');
+                    }}
+                  />
+                ) : (
+                  <div className="text-center py-12">
+                    <GitBranch className="w-12 h-12 mx-auto mb-4 text-muted-foreground/40" />
+                    <div className="text-sm text-muted-foreground">选中文章后可以进行同步操作</div>
+                  </div>
+                )
               ) : selectedArticle ? (
                 /* 文章信息 */
                 <div className="space-y-4 sidebar-content">
@@ -706,7 +736,9 @@ summary: ""
                     )}
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    {rightPanelMode === 'toc' ? '开始写作后这里会显示目录' : '选中文章后显示详细信息'}
+                    {rightPanelMode === 'toc' ? '开始写作后这里会显示目录' :
+                     rightPanelMode === 'sync' ? '选中文章后可以进行同步操作' :
+                     '选中文章后显示详细信息'}
                   </div>
                 </div>
               )}
