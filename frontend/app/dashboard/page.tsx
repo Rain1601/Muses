@@ -9,6 +9,7 @@ import { ArticleCompactList } from "@/components/ArticleCompactList";
 import { ArticleDetailView } from "@/components/ArticleDetailView";
 import { NotionEditor } from '@/components/NotionEditor';
 import { SyncPanel } from '@/components/SyncPanel';
+import { FileImport } from '@/components/FileImport';
 import '@/app/editor-demo/mermaid-styles.css';
 import { api } from "@/lib/api";
 import { List, Info, GitBranch, ChevronLeft, ChevronRight, Send, Save, Eye } from "lucide-react";
@@ -47,6 +48,7 @@ function DashboardContent() {
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [defaultAgent, setDefaultAgent] = useState<any>(null);
+  const [showImportDialog, setShowImportDialog] = useState(false);
   const { showToast, ToastContainer } = useToast();
   const { showNotifications, NotificationContainer } = usePublishNotification();
 
@@ -149,6 +151,21 @@ function DashboardContent() {
       console.error('手动保存失败:', error);
     }
   }, [editingTitle, editingContent, selectedArticle, defaultAgent, showToast]);
+
+  // 处理文件导入完成
+  const handleImportComplete = (result: any) => {
+    console.log('Import completed:', result);
+    setShowImportDialog(false);
+
+    showToast({
+      title: '导入成功',
+      description: `成功导入 ${result.imported_count} 篇文章`,
+      type: 'success'
+    });
+
+    // 刷新文章列表（通过重新挂载 ArticleCompactList 组件）
+    window.location.reload();
+  };
 
   // 发布文章功能
   const handlePublish = useCallback(async () => {
@@ -426,6 +443,7 @@ summary: ""
           <ArticleCompactList
             onArticleSelect={handleArticleSelect}
             selectedArticleId={selectedArticle?.id}
+            onImportClick={() => setShowImportDialog(true)}
           />
         </aside>
 
@@ -746,6 +764,16 @@ summary: ""
           </div>
         </aside>
       </main>
+
+      {/* 文件导入对话框 */}
+      {showImportDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <FileImport
+            onImportComplete={handleImportComplete}
+            onClose={() => setShowImportDialog(false)}
+          />
+        </div>
+      )}
 
       {/* 保存成功Toast提示 */}
       {showSaveToast && (
