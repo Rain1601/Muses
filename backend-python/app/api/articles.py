@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc, func, or_
 from typing import Optional
 from datetime import datetime
+import logging
 
 from ..database import get_db
 from ..models import Article, Agent
@@ -14,6 +15,7 @@ from ..schemas.auth import SuccessResponse
 from ..dependencies import get_current_user_db
 from ..utils.exceptions import HTTPNotFoundError, HTTPValidationError
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
