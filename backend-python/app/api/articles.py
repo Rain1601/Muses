@@ -240,21 +240,104 @@ async def delete_article(
     current_user = Depends(get_current_user_db),
     db: Session = Depends(get_db)
 ):
-    """删除文章"""
-    
+    """删除文章（包括从GitHub删除已同步的文章）"""
+
     article = db.query(Article).filter(
         Article.id == article_id,
         Article.userId == current_user.id
     ).first()
-    
+
     if not article:
         raise HTTPNotFoundError("Article not found")
-    
+
     try:
+        # 如果文章已同步到GitHub，先从GitHub删除
+        if article.syncStatus == "synced" and article.githubUrl and article.repoPath:
+            await delete_article_from_github(article, current_user)
+            logger.info(f"✅ Deleted article from GitHub: {article.repoPath}")
+
+        # 从数据库删除文章
         db.delete(article)
         db.commit()
+
+        logger.info(f"✅ Deleted article: {article.id}")
         return SuccessResponse()
-        
+
     except Exception as e:
         db.rollback()
+        logger.error(f"❌ Failed to delete article: {str(e)}")
         raise HTTPValidationError(f"Failed to delete article: {str(e)}")
+
+
+async def delete_article_from_github(article: Article, current_user):
+    """从GitHub删除已同步的文章"""
+    import httpx
+
+    # 检查用户的 GitHub 配置
+    if not current_user.githubToken or not current_user.defaultRepoUrl:
+        logger.warning("⚠️ GitHub configuration incomplete, skipping GitHub deletion")
+        return
+
+    # 解密 GitHub Token
+    from ..utils.security import decrypt
+    github_token = decrypt(current_user.githubToken)
+
+    # 解析仓库信息
+    repo_url = current_user.defaultRepoUrl
+    if not repo_url.startswith('https://github.com/'):
+        logger.warning("⚠️ Invalid GitHub repository URL, skipping GitHub deletion")
+        return
+
+    parts = repo_url.replace('https://github.com/', '').split('/')
+    if len(parts) != 2:
+        logger.warning("⚠️ Invalid GitHub repository URL format, skipping GitHub deletion")
+        return
+
+    username, repo_name = parts
+
+    # GitHub API URL for deleting file
+    api_url = f"https://api.github.com/repos/{username}/{repo_name}/contents/{article.repoPath}"
+
+    headers = {
+        "Authorization": f"token {github_token}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+
+    try:
+        # 首先获取文件的当前SHA值（删除时需要）
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            # 获取文件信息
+            response = await client.get(api_url, headers=headers)
+
+            if response.status_code == 404:
+                logger.warning(f"⚠️ File not found on GitHub: {article.repoPath}")
+                return
+
+            if response.status_code != 200:
+                logger.error(f"❌ Failed to get file info from GitHub: {response.status_code}")
+                return
+
+            file_data = response.json()
+            file_sha = file_data.get('sha')
+
+            if not file_sha:
+                logger.error("❌ Could not get file SHA from GitHub")
+                return
+
+            # 删除文件
+            delete_data = {
+                "message": f"Delete article: {article.title}",
+                "sha": file_sha,
+                "branch": "main"
+            }
+
+            delete_response = await client.delete(api_url, json=delete_data, headers=headers)
+
+            if delete_response.status_code in [200, 204]:
+                logger.info(f"✅ Successfully deleted file from GitHub: {article.repoPath}")
+            else:
+                logger.error(f"❌ Failed to delete file from GitHub: {delete_response.status_code} - {delete_response.text}")
+
+    except Exception as e:
+        logger.error(f"❌ Error deleting file from GitHub: {str(e)}")
+        # 不抛出异常，因为本地删除仍然应该继续

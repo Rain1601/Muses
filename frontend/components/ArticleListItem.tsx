@@ -1,7 +1,13 @@
 "use client";
 
 import { Badge } from "./ui/badge";
-import { FileText } from "lucide-react";
+import { FileText, Trash2, MoreHorizontal } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 
 interface Article {
   id: string;
@@ -29,7 +35,8 @@ interface ArticleListItemProps {
 export function ArticleListItem({
   article,
   isSelected = false,
-  onClick
+  onClick,
+  onDelete
 }: ArticleListItemProps) {
 
   const getStatusColor = (status: string) => {
@@ -80,12 +87,39 @@ export function ArticleListItem({
               </h3>
             </div>
 
-            <Badge
-              variant="secondary"
-              className={`text-xs px-1.5 py-0.5 flex-shrink-0 ml-2 ${getStatusColor(article.publishStatus)}`}
-            >
-              {getStatusText(article.publishStatus)}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge
+                variant="secondary"
+                className={`text-xs px-1.5 py-0.5 flex-shrink-0 ${getStatusColor(article.publishStatus)}`}
+              >
+                {getStatusText(article.publishStatus)}
+              </Badge>
+
+              {onDelete && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded-sm"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete();
+                      }}
+                      className="text-red-600 focus:text-red-600"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      删除
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
           </div>
         </div>
 
