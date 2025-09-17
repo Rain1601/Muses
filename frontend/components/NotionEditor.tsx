@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import styles from './NotionEditor.module.css';
 import StarterKit from '@tiptap/starter-kit';
@@ -175,6 +175,148 @@ const ResizableImage = Node.create({
 
 export function NotionEditor({ initialContent = '', onChange }: NotionEditorProps) {
   const [mounted, setMounted] = useState(false);
+  const [showSlashMenu, setShowSlashMenu] = useState(false);
+  const [slashMenuPosition, setSlashMenuPosition] = useState({ x: 0, y: 0 });
+  const [slashQuery, setSlashQuery] = useState('');
+  const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
+
+  // 定义斜杠命令列表
+  const slashCommands = [
+    {
+      id: 'image',
+      name: '图片',
+      description: '上传图片到文档',
+      icon: '📷',
+      keywords: ['img', 'image', 'tp', '图片', '上传'],
+      action: (editor: any) => handleFileUpload(editor),
+    },
+    {
+      id: 'ai',
+      name: 'AI 生成',
+      description: '使用 AI 生成内容',
+      icon: '✨',
+      keywords: ['ai', 'generate', '生成', '智能'],
+      action: () => {}, // 暂时禁用
+      disabled: true,
+    },
+  ];
+
+  // 根据查询过滤命令
+  const filteredCommands = slashCommands.filter(command =>
+    command.keywords.some(keyword =>
+      keyword.toLowerCase().includes(slashQuery.toLowerCase())
+    ) || slashQuery === ''
+  );
+
+  // 使用 ref 来存储最新的状态，避免闭包问题
+  const slashMenuState = useRef({
+    showSlashMenu: false,
+    slashQuery: '',
+    selectedCommandIndex: 0,
+    filteredCommands: [] as any[]
+  });
+
+  // 更新 ref 状态
+  useEffect(() => {
+    slashMenuState.current = {
+      showSlashMenu,
+      slashQuery,
+      selectedCommandIndex,
+      filteredCommands
+    };
+  });
+
+  // 键盘处理函数
+  const handleKeyDown = useCallback((view: any, event: KeyboardEvent) => {
+    const { state } = view;
+    const { selection } = state;
+    const { $from } = selection;
+
+    // 检测斜杠输入 - 只在行首显示菜单
+    if (event.key === '/') {
+      const currentLine = state.doc.textBetween($from.start(), $from.pos);
+      if (currentLine === '') {
+        setTimeout(() => {
+          const coords = view.coordsAtPos($from.pos + 1);
+          const editorContent = view.dom.closest('.notion-editor-content') as HTMLElement;
+          const editorContentRect = editorContent?.getBoundingClientRect();
+
+          if (editorContentRect) {
+            const relativeX = coords.left - editorContentRect.left;
+            const relativeY = coords.bottom - editorContentRect.top;
+            setSlashMenuPosition({ x: relativeX, y: relativeY });
+          } else {
+            setSlashMenuPosition({ x: 100, y: 50 });
+          }
+
+          setSlashQuery('');
+          setSelectedCommandIndex(0);
+          setShowSlashMenu(true);
+        }, 100);
+      }
+    }
+
+    // 斜杠菜单激活时的键盘处理
+    if (slashMenuState.current.showSlashMenu) {
+      const currentLine = state.doc.textBetween($from.start(), $from.pos);
+
+      // 更新查询字符串
+      if (currentLine.startsWith('/')) {
+        const query = currentLine.substring(1);
+        setTimeout(() => setSlashQuery(query), 0);
+      }
+
+      // 上下箭头选择命令
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        const maxIndex = Math.max(0, slashMenuState.current.filteredCommands.length - 1);
+        setSelectedCommandIndex(prev => prev < maxIndex ? prev + 1 : 0);
+        return true;
+      }
+
+      if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        const maxIndex = Math.max(0, slashMenuState.current.filteredCommands.length - 1);
+        setSelectedCommandIndex(prev => prev > 0 ? prev - 1 : maxIndex);
+        return true;
+      }
+
+      // ESC 或空格关闭菜单
+      if (event.key === 'Escape' || event.key === ' ') {
+        setShowSlashMenu(false);
+        setSlashQuery('');
+        return true;
+      }
+
+      // Enter 执行选中的命令
+      if (event.key === 'Enter') {
+        event.preventDefault();
+
+        const filteredCmds = slashMenuState.current.filteredCommands;
+        const selectedIndex = slashMenuState.current.selectedCommandIndex;
+        const selectedCommand = filteredCmds[selectedIndex];
+
+        if (selectedCommand && !selectedCommand.disabled) {
+          // 删除斜杠命令文本
+          const tr = state.tr.delete($from.start(), $from.pos);
+          view.dispatch(tr);
+
+          // 隐藏菜单
+          setShowSlashMenu(false);
+          setSlashQuery('');
+
+          // 执行命令
+          setTimeout(() => {
+            selectedCommand.action(view);
+          }, 10);
+        }
+
+        return true;
+      }
+    }
+
+    return false;
+  }, []);
 
   // 图片上传到GitHub仓库的函数
   const uploadImageToGitHub = useCallback(async (file: File): Promise<string> => {
@@ -194,8 +336,14 @@ export function NotionEditor({ initialContent = '', onChange }: NotionEditorProp
           const base64Data = dataURL.split(',')[1];
           const contentType = dataURL.match(/data:([^;]+)/)?.[1] || 'image/jpeg';
 
+          // 生成唯一文件名（不依赖file.name，避免重复）
+          const timestamp = new Date().toISOString().replace(/[:-]/g, '').split('.')[0];
+          const randomId = Math.random().toString(36).substring(2, 8);
+          const ext = contentType.split('/')[1] || 'png';
+          const uniqueFilename = `image_${timestamp}_${randomId}.${ext}`;
+
           console.log('📤 Sending API request to /api/upload-image with:', {
-            filename: file.name,
+            filename: uniqueFilename,
             contentType,
             base64Length: base64Data.length
           });
@@ -204,7 +352,7 @@ export function NotionEditor({ initialContent = '', onChange }: NotionEditorProp
           const response = await api.post('/api/upload-image', {
             base64Data,
             contentType,
-            filename: file.name
+            filename: uniqueFilename
           });
 
           console.log('✅ Upload successful:', response.data);
@@ -220,10 +368,88 @@ export function NotionEditor({ initialContent = '', onChange }: NotionEditorProp
     });
   }, []);
 
+  // 文件上传处理函数
+  const handleFileUpload = useCallback((editorInstance: any) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.multiple = true;
+
+    input.onchange = (e) => {
+      const files = (e.target as HTMLInputElement).files;
+      if (files && files.length > 0) {
+        Array.from(files).forEach((file, index) => {
+          const uploadId = `manual_upload_${Date.now()}_${index}`;
+          console.log(`📁 Manual file upload: ${file.name} with ID: ${uploadId}`);
+
+          // 创建占位符
+          const placeholder = editorInstance?.state.schema.nodes.resizableImage.create({
+            src: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDIwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMTAwIiBmaWxsPSIjZjlmYWZiIiBzdHJva2U9IiNlNWU3ZWIiIHN0cm9rZS13aWR0aD0iMiIgcng9IjgiLz4KPGNpcmNsZSBjeD0iMTAwIiBjeT0iNTAiIHI9IjEyIiBzdHJva2U9IiM5Y2EzYWYiIHN0cm9rZS13aWR0aD0iMiIgZmlsbD0ibm9uZSIgc3Ryb2tlLWRhc2hhcnJheT0iMTggNiIgb3BhY2l0eT0iMC44Ij4KPGFuaW1hdGVUcmFuc2Zvcm0gYXR0cmlidXRlTmFtZT0idHJhbnNmb3JtIiB0eXBlPSJyb3RhdGUiIHZhbHVlcz0iMCAxMDAgNTA7MzYwIDEwMCA1MCIgZHVyPSIxcyIgcmVwZWF0Q291bnQ9ImluZGVmaW5pdGUiLz4KPC9jaXJjbGU+Cjx0ZXh0IHg9IjEwMCIgeT0iNzUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiM2Yjc0ODciIGZvbnQtc2l6ZT0iMTEiIGZvbnQtZmFtaWx5PSJzeXN0ZW0tdWkiPuS4iuS8oOS4rS4uLjwvdGV4dD4KPC9zdmc+',
+            isUploading: true,
+            uploadId: uploadId
+          });
+
+          if (editorInstance) {
+            const transaction = editorInstance.state.tr.replaceSelectionWith(placeholder);
+            editorInstance.view.dispatch(transaction);
+
+            // 异步上传
+            setTimeout(() => {
+              uploadImageToGitHub(file).then((githubUrl) => {
+                console.log(`✅ Manual upload completed for ${uploadId} with URL:`, githubUrl);
+
+                // 替换占位符为真实URL
+                const currentState = editorInstance.state;
+                let foundNode = null;
+                let foundPos = -1;
+
+                currentState.doc.descendants((node, pos) => {
+                  if (node.type.name === 'resizableImage' &&
+                      node.attrs.isUploading &&
+                      node.attrs.uploadId === uploadId) {
+                    foundNode = node;
+                    foundPos = pos;
+                    return false;
+                  }
+                });
+
+                if (foundNode && foundPos >= 0) {
+                  const newTransaction = currentState.tr.setNodeMarkup(foundPos, null, {
+                    ...foundNode.attrs,
+                    src: githubUrl,
+                    isUploading: false,
+                    uploadId: null
+                  });
+                  editorInstance.view.dispatch(newTransaction);
+                }
+              }).catch((error) => {
+                console.error(`❌ Manual upload failed for ${uploadId}:`, error);
+              });
+            }, index * 200);
+          }
+        });
+      }
+    };
+
+    input.click();
+  }, [uploadImageToGitHub]);
+
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        // 配置斜杠命令
+        commands: {
+          addCommands() {
+            return {
+              insertImageCommand: () => ({ commands, editor }) => {
+                handleFileUpload(editor);
+                return true;
+              },
+            };
+          },
+        },
+      }),
       Highlight,
       CodeBlockLowlight.configure({
         lowlight,
@@ -255,6 +481,7 @@ export function NotionEditor({ initialContent = '', onChange }: NotionEditorProp
         class: 'prose prose-lg max-w-none focus:outline-none dark:prose-invert min-h-[400px] px-6 py-6',
         style: 'font-family: "Times New Roman", "SimSun", "宋体", Times, serif;',
       },
+      handleKeyDown,
       handlePaste: (view, event) => {
         const items = event.clipboardData?.items;
         if (items) {
@@ -416,7 +643,7 @@ export function NotionEditor({ initialContent = '', onChange }: NotionEditorProp
         return false;
       },
     },
-  });
+  }, [handleFileUpload, uploadImageToGitHub]);
 
   useEffect(() => {
     setMounted(true);
@@ -427,6 +654,31 @@ export function NotionEditor({ initialContent = '', onChange }: NotionEditorProp
       editor.commands.setContent(initialContent || '');
     }
   }, [editor, initialContent]);
+
+  // 点击外部关闭斜杠菜单
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showSlashMenu) {
+        const target = event.target as HTMLElement;
+        if (!target.closest('.slash-menu')) {
+          setShowSlashMenu(false);
+          setSlashQuery('');
+        }
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, [showSlashMenu]);
+
+  // 当过滤结果改变时重置选中索引
+  useEffect(() => {
+    if (filteredCommands.length > 0 && selectedCommandIndex >= filteredCommands.length) {
+      setSelectedCommandIndex(0);
+    }
+  }, [filteredCommands.length, selectedCommandIndex]);
 
   if (!mounted || !editor) {
     return (
@@ -442,11 +694,88 @@ export function NotionEditor({ initialContent = '', onChange }: NotionEditorProp
   }
 
   return (
-    <div className={`w-full ${styles.notionEditor}`}>
+    <div className={`w-full ${styles.notionEditor} relative`}>
       <EditorContent
         editor={editor}
         className="notion-editor-content"
       />
+
+      {/* 斜杠命令菜单 */}
+      {showSlashMenu && filteredCommands.length > 0 && (
+        <div
+          className="slash-menu absolute z-50 bg-popover border border-border rounded-md shadow-md p-1 min-w-[200px] max-w-[300px]"
+          style={{
+            left: `${slashMenuPosition.x}px`,
+            top: `${slashMenuPosition.y}px`,
+          }}
+        >
+          {filteredCommands.map((command, index) => {
+            const isSelected = index === selectedCommandIndex;
+            const matchedKeyword = command.keywords.find(keyword =>
+              keyword.toLowerCase().includes(slashQuery.toLowerCase())
+            );
+
+            return (
+              <button
+                key={command.id}
+                className={`w-full text-left px-3 py-2 rounded-sm flex items-center gap-2 transition-colors ${
+                  isSelected
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'hover:bg-accent hover:text-accent-foreground'
+                } ${command.disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                onClick={() => {
+                  if (!command.disabled) {
+                    const view = editor?.view;
+                    if (view) {
+                      // 删除斜杠命令文本
+                      const { state } = view;
+                      const { selection } = state;
+                      const { $from } = selection;
+                      const tr = state.tr.delete($from.start(), $from.pos);
+                      view.dispatch(tr);
+
+                      // 隐藏菜单
+                      setShowSlashMenu(false);
+                      setSlashQuery('');
+
+                      // 执行命令
+                      command.action(editor);
+                    }
+                  }
+                }}
+                disabled={command.disabled}
+              >
+                <span className="text-lg">{command.icon}</span>
+                <div className="flex-1">
+                  <div className="font-medium flex items-center gap-1">
+                    {command.name}
+                    {matchedKeyword && slashQuery && (
+                      <span className="text-xs px-1 py-0.5 bg-muted rounded text-muted-foreground">
+                        {matchedKeyword}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {command.description}
+                  </div>
+                </div>
+                {isSelected && (
+                  <span className="text-xs text-muted-foreground">Enter</span>
+                )}
+              </button>
+            );
+          })}
+
+          {/* 底部提示 */}
+          <div className="px-3 py-1 text-xs text-muted-foreground border-t border-border mt-1">
+            <div className="flex items-center justify-between">
+              <span>↑↓ 选择</span>
+              <span>Enter 确认</span>
+              <span>Esc 取消</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
