@@ -254,7 +254,8 @@ async def delete_article(
 
     try:
         # 如果文章已同步到GitHub，先从GitHub删除
-        if article.syncStatus == "synced" and article.githubUrl and article.repoPath:
+        # 检查是否有GitHub URL和路径（不只依赖syncStatus，因为旧版发布的文章可能状态是local）
+        if article.githubUrl and article.repoPath:
             await delete_article_from_github(article, current_user)
             logger.info(f"✅ Deleted article from GitHub: {article.repoPath}")
 
