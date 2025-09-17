@@ -151,3 +151,137 @@ async def upload_image_to_github(request: ImageUploadRequest, current_user: User
         import traceback
         logger.error(f"Full traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"上传失败: {type(e).__name__} - {str(e)}")
+
+
+class ImageUrlRequest(BaseModel):
+    imageUrl: str
+
+
+@router.post("/convert-image-url")
+async def convert_image_url_to_github(request: ImageUrlRequest, current_user: User = Depends(get_current_user_db)):
+    """将外部图片URL转换为GitHub图床链接"""
+    try:
+        logger.info(f"🌐 Converting image URL for user: {current_user.username}")
+        logger.info(f"📡 Image URL: {request.imageUrl}")
+
+        # 设置用户代理和referer头来绕过防盗链，尝试多种策略
+        base_url = request.imageUrl.split('?')[0]
+        domain = '/'.join(request.imageUrl.split('/')[0:3])
+
+        headers_list = [
+            # 策略1：使用沃斯托自己的referer
+            {
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Referer": f"{domain}/",
+                "Accept": "image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+                "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+                "Accept-Encoding": "gzip, deflate, br",
+                "Cache-Control": "no-cache",
+                "Pragma": "no-cache",
+                "Sec-Fetch-Dest": "image",
+                "Sec-Fetch-Mode": "no-cors",
+                "Sec-Fetch-Site": "cross-site",
+            },
+            # 策略2：完全模拟浏览器请求
+            {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Referer": "https://www.wostatic.cn/",
+                "Accept": "*/*",
+                "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+                "Accept-Encoding": "gzip, deflate, br",
+                "Connection": "keep-alive",
+                "Sec-Ch-Ua": '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+                "Sec-Ch-Ua-Mobile": "?0",
+                "Sec-Ch-Ua-Platform": '"Windows"',
+                "Sec-Fetch-Dest": "image",
+                "Sec-Fetch-Mode": "no-cors",
+                "Sec-Fetch-Site": "cross-site",
+            },
+            # 策略3：无referer
+            {
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+                "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+                "Cache-Control": "no-cache",
+            }
+        ]
+
+        # 尝试多种策略下载图片
+        response = None
+        for i, headers in enumerate(headers_list):
+            try:
+                logger.info(f"📥 尝试策略 {i+1}: 下载图片 {request.imageUrl}")
+                logger.info(f"🔑 使用请求头: {headers}")
+
+                async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+                    response = await client.get(request.imageUrl, headers=headers)
+
+                if response.status_code == 200:
+                    logger.info(f"✅ 策略 {i+1} 成功! Status: {response.status_code}")
+                    break
+                else:
+                    logger.warning(f"⚠️ 策略 {i+1} 失败: Status {response.status_code}")
+
+            except Exception as e:
+                logger.warning(f"⚠️ 策略 {i+1} 异常: {str(e)}")
+                continue
+
+        if not response or response.status_code != 200:
+            logger.error(f"❌ 所有策略都失败了 - 最终状态: {response.status_code if response else 'No response'}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"无法下载图片: 所有下载策略都失败了 (HTTP {response.status_code if response else 'No response'})"
+            )
+
+        # 检查内容类型
+        content_type = response.headers.get("content-type", "").lower()
+        if not content_type.startswith("image/"):
+            logger.error(f"❌ Invalid content type: {content_type}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"URL不是有效的图片: {content_type}"
+            )
+
+        logger.info(f"✅ Image downloaded successfully - Size: {len(response.content)} bytes, Type: {content_type}")
+
+        # 转换为base64
+        image_base64 = base64.b64encode(response.content).decode('utf-8')
+
+        # 生成文件名
+        url_parts = request.imageUrl.split('/')
+        original_filename = url_parts[-1].split('?')[0] if url_parts else 'image'
+
+        # 确保文件名有扩展名
+        if '.' not in original_filename:
+            ext = content_type.split('/')[-1]
+            if ext not in ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg']:
+                ext = 'jpg'
+            original_filename = f"{original_filename}.{ext}"
+
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        unique_id = str(uuid.uuid4())[:8]
+        filename = f"url_{timestamp}_{unique_id}_{original_filename}"
+
+        logger.info(f"📝 Generated filename: {filename}")
+
+        # 调用现有的上传逻辑
+        upload_request = ImageUploadRequest(
+            base64Data=image_base64,
+            filename=filename,
+            contentType=content_type
+        )
+
+        # 重用现有的上传函数逻辑
+        return await upload_image_to_github(upload_request, current_user)
+
+    except httpx.TimeoutException as e:
+        logger.error(f"Download timeout: {str(e)}")
+        raise HTTPException(status_code=408, detail=f"下载图片超时: {str(e)}")
+    except httpx.HTTPStatusError as e:
+        logger.error(f"HTTP error downloading image: {e}")
+        raise HTTPException(status_code=400, detail=f"下载图片失败: HTTP {e.response.status_code}")
+    except Exception as e:
+        logger.error(f"Unexpected error converting image URL: {str(e)}")
+        import traceback
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"转换失败: {str(e)}")
