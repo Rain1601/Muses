@@ -328,13 +328,19 @@ async def delete_article_from_github(article: Article, current_user):
                 return
 
             # 删除文件
+            import json as json_module
             delete_data = {
                 "message": f"Delete article: {article.title}",
                 "sha": file_sha,
                 "branch": "main"
             }
 
-            delete_response = await client.delete(api_url, json=delete_data, headers=headers)
+            # httpx DELETE method doesn't support json parameter, use content instead
+            delete_response = await client.delete(
+                api_url,
+                content=json_module.dumps(delete_data),
+                headers={**headers, "Content-Type": "application/json"}
+            )
 
             if delete_response.status_code in [200, 204]:
                 logger.info(f"✅ Successfully deleted file from GitHub: {article.repoPath}")
