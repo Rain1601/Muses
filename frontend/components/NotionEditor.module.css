@@ -472,3 +472,43 @@
   pointer-events: none;
   height: 0;
 }
+
+/* TipTap Placeholder 扩展样式 */
+.notionEditor .ProseMirror .is-empty::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #9ca3af;
+  pointer-events: none;
+  height: 0;
+  font-style: normal;
+}
+
+/* 更通用的占位符样式 */
+.notionEditor .ProseMirror p.is-empty::before,
+.notionEditor .ProseMirror h1.is-empty::before,
+.notionEditor .ProseMirror h2.is-empty::before,
+.notionEditor .ProseMirror h3.is-empty::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #9ca3af;
+  pointer-events: none;
+  height: 0;
+}
+
+/* 编辑器为空时的占位符 */
+.notionEditor .ProseMirror.is-editor-empty p:first-child::before {
+  content: "输入 "/" 查看命令，或开始输入内容...";
+  float: left;
+  color: #9ca3af;
+  pointer-events: none;
+  height: 0;
+}
+
+/* 确保 TipTap 默认的占位符样式 */
+.ProseMirror .is-empty::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #9ca3af;
+  pointer-events: none;
+  height: 0;
+}

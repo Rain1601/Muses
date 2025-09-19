@@ -3,7 +3,9 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import styles from './NotionEditor.module.css';
+import '../styles/tiptap-placeholder.css';
 import StarterKit from '@tiptap/starter-kit';
+import Placeholder from '@tiptap/extension-placeholder';
 import Highlight from '@tiptap/extension-highlight';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import Image from '@tiptap/extension-image';
@@ -437,6 +439,19 @@ export function NotionEditor({ initialContent = '', onChange }: NotionEditorProp
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
+      Placeholder.configure({
+        placeholder: ({ node }) => {
+          // 为不同的节点类型设置不同的占位符
+          if (node.type.name === 'heading') {
+            return '标题'
+          }
+          return '输入 "/" 查看命令，或开始输入内容...'
+        },
+        includeChildren: true, // 也在子节点显示占位符
+        showOnlyCurrent: true, // 只在当前节点显示
+        emptyEditorClass: 'is-editor-empty',
+        emptyNodeClass: 'is-empty',
+      }),
       StarterKit.configure({
         // 配置斜杠命令
         commands: {
@@ -471,9 +486,56 @@ export function NotionEditor({ initialContent = '', onChange }: NotionEditorProp
       Color,
     ],
     content: initialContent || '',
-    onUpdate: ({ editor }) => {
+    onUpdate: ({ editor, transaction }) => {
       if (onChange) {
         onChange(editor.getHTML());
+      }
+
+      // 检测斜杠的输入和删除
+      const { state } = editor;
+      const { selection } = state;
+      const { $from } = selection;
+      const currentLine = state.doc.textBetween($from.start(), $from.pos);
+
+      // 检查当前行是否以斜杠开头
+      if (currentLine.startsWith('/')) {
+        // 如果只是斜杠，显示菜单
+        if (currentLine === '/') {
+          // 计算菜单位置
+          const coords = editor.view.coordsAtPos($from.pos);
+          const editorRect = editor.view.dom.getBoundingClientRect();
+
+          setSlashMenuPosition({
+            x: coords.left - editorRect.left,
+            y: coords.top - editorRect.top + 25
+          });
+
+          setSlashQuery('');
+          setSelectedCommandIndex(0);
+          setShowSlashMenu(true);
+        }
+        // 如果斜杠后面有内容，更新查询
+        else {
+          setSlashQuery(currentLine.substring(1));
+          // 确保菜单仍然显示
+          if (!showSlashMenu) {
+            const coords = editor.view.coordsAtPos($from.pos);
+            const editorRect = editor.view.dom.getBoundingClientRect();
+
+            setSlashMenuPosition({
+              x: coords.left - editorRect.left,
+              y: coords.top - editorRect.top + 25
+            });
+            setShowSlashMenu(true);
+          }
+        }
+      }
+      // 如果当前行不以斜杠开头，隐藏菜单
+      else {
+        if (showSlashMenu) {
+          setShowSlashMenu(false);
+          setSlashQuery('');
+        }
       }
     },
     editorProps: {

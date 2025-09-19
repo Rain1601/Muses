@@ -31,6 +31,7 @@
     "@tiptap/extension-list-item": "^3.0.7",
     "@tiptap/extension-mathematics": "^3.0.7",
     "@tiptap/extension-ordered-list": "^3.0.7",
+    "@tiptap/extension-placeholder": "^3.4.4",
     "@tiptap/extension-subscript": "^3.0.7",
     "@tiptap/extension-superscript": "^3.0.7",
     "@tiptap/extension-table": "^3.0.7",
