@@ -7,6 +7,7 @@ import { Button } from "./ui/button";
 import { ArticleListItem } from "./ArticleListItem";
 import { api } from "@/lib/api";
 import { Plus, Search, Upload } from "lucide-react";
+import { useToast } from "./Toast";
 import {
   Dialog,
   DialogContent,
@@ -46,6 +47,7 @@ export function ArticleCompactList({ onArticleSelect, selectedArticleId, onImpor
   const [articleToDelete, setArticleToDelete] = useState<Article | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const { showToast } = useToast();
 
   useEffect(() => {
     fetchArticles();
@@ -135,7 +137,37 @@ export function ArticleCompactList({ onArticleSelect, selectedArticleId, onImpor
             )}
             <Button
               size="sm"
-              onClick={() => router.push("/articles/notion-new")}
+              onClick={async () => {
+                try {
+                  // 获取默认agent
+                  const agentResponse = await api.get('/api/agents');
+                  const agents = agentResponse.data.agents || [];
+                  const defaultAgent = agents.find((a: any) => a.isDefault) || agents[0];
+
+                  if (!defaultAgent?.id) {
+                    showToast('请先创建一个Agent', 'warning');
+                    return;
+                  }
+
+                  // 创建新的草稿文章
+                  const response = await api.post('/api/articles', {
+                    title: '无标题',
+                    content: '',
+                    publishStatus: 'draft',
+                    agentId: defaultAgent.id
+                  });
+                  const newArticle = response.data.article || response.data;
+
+                  // 添加到文章列表并选中
+                  setArticles([newArticle, ...articles]);
+                  onArticleSelect?.(newArticle);
+
+                  showToast('新文章已创建', 'success');
+                } catch (error) {
+                  console.error('创建文章失败:', error);
+                  showToast('创建文章失败', 'error');
+                }
+              }}
               className="flex items-center gap-1"
             >
               <Plus className="w-4 h-4" />

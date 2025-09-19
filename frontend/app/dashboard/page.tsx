@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, Suspense } from "react";
+import { useEffect, useState, useCallback, Suspense, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useUserStore } from "@/store/user";
 import { auth } from "@/lib/auth";
@@ -12,7 +12,7 @@ import { SyncPanel } from '@/components/SyncPanel';
 import { FileImport } from '@/components/FileImport';
 import '@/app/editor-demo/mermaid-styles.css';
 import { api } from "@/lib/api";
-import { List, Info, GitBranch, ChevronLeft, ChevronRight, Send, Save, Eye } from "lucide-react";
+import { List, Info, GitBranch, ChevronLeft, ChevronRight, Send, Save, Eye, Clock, PenTool } from "lucide-react";
 import { useToast } from "@/components/Toast";
 import { usePublishNotification } from "@/components/PublishNotification";
 import { prepareFilesForGitHub } from "@/lib/publish-utils";
@@ -49,23 +49,33 @@ function DashboardContent() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [defaultAgent, setDefaultAgent] = useState<any>(null);
   const [showImportDialog, setShowImportDialog] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0); // 添加刷新key，用于强制刷新文章列表
+  const [recentArticles, setRecentArticles] = useState<Article[]>([]); // 存储最近的文章列表
+  const titleInputRef = useRef<HTMLInputElement>(null); // 标题输入框引用
   const { showToast, ToastContainer } = useToast();
   const { showNotifications, NotificationContainer } = usePublishNotification();
 
-  // 获取默认agent
+  // 获取默认agent和最近文章
   useEffect(() => {
-    const fetchDefaultAgent = async () => {
+    const fetchInitialData = async () => {
       try {
-        const response = await api.get('/api/agents');
-        const agents = response.data.agents || [];
+        // 获取默认agent
+        const agentResponse = await api.get('/api/agents');
+        const agents = agentResponse.data.agents || [];
         const defaultAgentFound = agents.find((a: any) => a.isDefault) || agents[0];
         setDefaultAgent(defaultAgentFound);
+
+        // 获取最近的文章列表
+        const articlesResponse = await api.get('/api/articles', {
+          params: { page: 1, page_size: 10, sort_by: 'updatedAt', sort_order: 'desc' }
+        });
+        setRecentArticles(articlesResponse.data.articles || []);
       } catch (error) {
-        console.error('Failed to fetch default agent:', error);
+        console.error('Failed to fetch initial data:', error);
       }
     };
-    fetchDefaultAgent();
-  }, []);
+    fetchInitialData();
+  }, [refreshKey]); // 当refreshKey变化时重新获取
 
   useEffect(() => {
     // 处理OAuth回调
@@ -188,6 +198,8 @@ function DashboardContent() {
         });
         articleToPublish = response.data.article || response.data;
         setSelectedArticle(articleToPublish);
+        // 更新成功后立即刷新列表
+        setRefreshKey(prev => prev + 1);
       } else {
         // 创建新文章并直接发布
         if (!selectedArticle?.agentId && !defaultAgent?.id) {
@@ -203,6 +215,8 @@ function DashboardContent() {
         });
         articleToPublish = response.data.article || response.data;
         setSelectedArticle(articleToPublish);
+        // 创建新文章后也刷新列表
+        setRefreshKey(prev => prev + 1);
       }
 
       // 确保我们有文章ID
@@ -307,10 +321,11 @@ summary: ""
 
       setLastSaved(new Date());
 
-      // 发布成功后不刷新页面，保持在当前文章
+      // 发布成功后保持在当前文章
       if (githubPublishSuccess) {
         // 可以添加一些视觉反馈，比如显示发布成功的标记
         console.log('文章已成功发布到 GitHub');
+        // 文章列表已经在上面setSelectedArticle时刷新了，这里不需要再次刷新
       }
     } catch (error: any) {
       console.error('发布失败:', error);
@@ -408,7 +423,34 @@ summary: ""
     setIsEditing(true);
     setEditingTitle(article.title);
     setEditingContent(article.content);
+    // 更新页面标题
+    document.title = article.title || '无标题 - Muses';
   };
+
+  // 自动聚焦标题输入框
+  useEffect(() => {
+    if (isEditing && titleInputRef.current) {
+      // 使用setTimeout确保DOM更新完成
+      setTimeout(() => {
+        if (titleInputRef.current) {
+          titleInputRef.current.focus();
+          // 如果是"无标题"，选中全部文本
+          if (editingTitle === '无标题') {
+            titleInputRef.current.select();
+          }
+        }
+      }, 100);
+    }
+  }, [isEditing, selectedArticle]);
+
+  // 页面标题管理
+  useEffect(() => {
+    if (!isEditing || !selectedArticle) {
+      document.title = 'Dashboard - Muses';
+    } else {
+      document.title = editingTitle || '无标题 - Muses';
+    }
+  }, [isEditing, selectedArticle, editingTitle]);
 
   // 切换到编辑模式
   const handleStartEditing = () => {
@@ -441,6 +483,7 @@ summary: ""
           leftPanelCollapsed ? 'w-0 opacity-0 overflow-hidden' : 'w-80 opacity-100'
         }`}>
           <ArticleCompactList
+            key={refreshKey}
             onArticleSelect={handleArticleSelect}
             selectedArticleId={selectedArticle?.id}
             onImportClick={() => setShowImportDialog(true)}
@@ -482,9 +525,38 @@ summary: ""
                 <div className="flex items-start justify-between">
                   <div className="flex-1 mr-4">
                     <input
+                      ref={titleInputRef}
                       type="text"
                       value={editingTitle}
-                      onChange={(e) => setEditingTitle(e.target.value)}
+                      onChange={(e) => {
+                        setEditingTitle(e.target.value);
+                        // 动态更新页面标题
+                        document.title = e.target.value || '无标题 - Muses';
+                      }}
+                      onBlur={async () => {
+                        // 标题失去焦点时，如果标题有变化，保存并刷新列表
+                        if (selectedArticle && editingTitle !== selectedArticle.title) {
+                          try {
+                            await api.put(`/api/articles/${selectedArticle.id}`, {
+                              title: editingTitle || '无标题',
+                              content: editingContent,
+                              publishStatus: selectedArticle.publishStatus
+                            });
+
+                            // 更新当前选中的文章对象
+                            setSelectedArticle({
+                              ...selectedArticle,
+                              title: editingTitle || '无标题'
+                            });
+
+                            // 刷新文章列表以显示新标题
+                            setRefreshKey(prev => prev + 1);
+                            setLastSaved(new Date());
+                          } catch (error) {
+                            console.error('更新标题失败:', error);
+                          }
+                        }
+                      }}
                       placeholder="文章标题..."
                       className="w-full text-2xl font-bold bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground"
                     />
@@ -536,10 +608,78 @@ summary: ""
             </div>
           ) : (
             <div className="h-full flex items-center justify-center">
-              <div className="text-center text-muted-foreground">
-                <div className="text-6xl mb-4">📝</div>
-                <h3 className="text-xl font-medium mb-2">开始写作</h3>
-                <p className="text-sm">选择左侧文章开始编辑，或点击新建创作新文章</p>
+              <div className="text-center">
+                <div className="text-6xl mb-6">📝</div>
+                <h3 className="text-2xl font-semibold mb-3 text-foreground">开始写作</h3>
+                <p className="text-sm text-muted-foreground mb-8">选择一篇文章继续编辑，或创建新的文章</p>
+
+                <div className="flex gap-4 justify-center">
+                  {/* 返回最近文章按钮 */}
+                  {recentArticles.length > 0 && (
+                    <button
+                      onClick={() => {
+                        const mostRecent = recentArticles[0];
+                        handleArticleSelect(mostRecent);
+                      }}
+                      className="group flex items-center gap-3 px-6 py-3 bg-card border border-border rounded-lg hover:border-primary/50 hover:shadow-md transition-all duration-200"
+                    >
+                      <Clock className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                      <div className="text-left">
+                        <div className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
+                          继续最近的文章
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-0.5 max-w-[200px] truncate">
+                          {recentArticles[0].title || '无标题'}
+                        </div>
+                      </div>
+                    </button>
+                  )}
+
+                  {/* 新建文章按钮 */}
+                  <button
+                    onClick={async () => {
+                      try {
+                        if (!defaultAgent?.id) {
+                          showToast('请先创建一个Agent', 'warning');
+                          return;
+                        }
+                        // 创建新的草稿文章
+                        const response = await api.post('/api/articles', {
+                          title: '无标题',
+                          content: '',
+                          publishStatus: 'draft',
+                          agentId: defaultAgent.id
+                        });
+                        const newArticle = response.data.article || response.data;
+
+                        // 选中新创建的文章并进入编辑模式
+                        setSelectedArticle(newArticle);
+                        setEditingTitle(newArticle.title);
+                        setEditingContent(newArticle.content);
+                        setIsEditing(true);
+
+                        // 刷新文章列表
+                        setRefreshKey(prev => prev + 1);
+
+                        showToast('新文章已创建', 'success');
+                      } catch (error) {
+                        console.error('创建文章失败:', error);
+                        showToast('创建文章失败', 'error');
+                      }
+                    }}
+                    className="group flex items-center gap-3 px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 hover:shadow-md transition-all duration-200"
+                  >
+                    <PenTool className="w-5 h-5" />
+                    <div className="text-left">
+                      <div className="text-sm font-medium">
+                        创建新文章
+                      </div>
+                      <div className="text-xs opacity-90 mt-0.5">
+                        开始撰写新的内容
+                      </div>
+                    </div>
+                  </button>
+                </div>
               </div>
             </div>
           )}
