@@ -4,6 +4,7 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import styles from './NotionEditor.module.css';
 import '../styles/tiptap-placeholder.css';
+import '../styles/text-selection.css';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import Highlight from '@tiptap/extension-highlight';
@@ -27,6 +28,16 @@ import typescript from 'highlight.js/lib/languages/typescript';
 import css from 'highlight.js/lib/languages/css';
 import python from 'highlight.js/lib/languages/python';
 import { api } from '@/lib/api';
+import { useImageViewer } from './ImageViewer';
+import TextActionToolbar, { TextActionType } from './TextActionToolbar';
+import AIDisabledTooltip from './AIDisabledTooltip';
+import { useTextActions } from '@/lib/hooks/useTextActions';
+import { useAIAssistantStore } from '@/store/aiAssistant';
+
+// 创建上下文来传递图片查看器函数
+const ImageViewerContext = React.createContext<{
+  openViewer: (src: string, alt?: string) => void;
+} | null>(null);
 
 const lowlight = createLowlight();
 lowlight.register('javascript', javascript);
@@ -37,6 +48,7 @@ lowlight.register('python', python);
 interface NotionEditorProps {
   initialContent?: string;
   onChange?: (content: string) => void;
+  agentId?: string; // 当前使用的Agent ID
 }
 
 // 可缩放图片组件
@@ -45,6 +57,7 @@ const ResizableImageComponent = ({ node, updateAttributes, selected }: any) => {
   const [startPos, setStartPos] = useState({ x: 0, y: 0 });
   const [startSize, setStartSize] = useState({ width: 0, height: 0 });
   const imgRef = React.useRef<HTMLImageElement>(null);
+  const imageViewerContext = React.useContext(ImageViewerContext);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -94,11 +107,20 @@ const ResizableImageComponent = ({ node, updateAttributes, selected }: any) => {
           alt={node.attrs.alt || ''}
           width={node.attrs.width || 'auto'}
           height={node.attrs.height || 'auto'}
-          className="rounded-lg max-w-full h-auto"
+          className="rounded-lg max-w-full h-auto cursor-pointer transition-opacity hover:opacity-90"
           style={{
             width: node.attrs.width ? `${node.attrs.width}px` : 'auto',
             height: node.attrs.height ? `${node.attrs.height}px` : 'auto',
             display: 'block'
+          }}
+          onClick={(e) => {
+            // 如果正在拖拽resize handle，不要打开图片查看器
+            if (!isResizing && imageViewerContext) {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log('Image clicked:', node.attrs.src);
+              imageViewerContext.openViewer(node.attrs.src, node.attrs.alt || '图片');
+            }
           }}
         />
         {selected && (
@@ -175,12 +197,54 @@ const ResizableImage = Node.create({
   },
 });
 
-export function NotionEditor({ initialContent = '', onChange }: NotionEditorProps) {
+export function NotionEditor({ initialContent = '', onChange, agentId }: NotionEditorProps) {
+  // Component initialized with agentId
+  const { isEnabled: aiAssistantEnabled } = useAIAssistantStore();
+
   const [mounted, setMounted] = useState(false);
   const [showSlashMenu, setShowSlashMenu] = useState(false);
   const [slashMenuPosition, setSlashMenuPosition] = useState({ x: 0, y: 0 });
   const [slashQuery, setSlashQuery] = useState('');
   const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
+
+  // 文本操作工具栏状态
+  const [showTextActionToolbar, setShowTextActionToolbar] = useState(false);
+  const [selectedText, setSelectedText] = useState('');
+  const [textActionPosition, setTextActionPosition] = useState({ x: 0, y: 0 });
+  const [selectionRange, setSelectionRange] = useState<Range | null>(null);
+
+  // AI 禁用提示工具提示状态
+  const [showAIDisabledTooltip, setShowAIDisabledTooltip] = useState(false);
+
+  const { viewerState, openViewer, closeViewer, ImageViewerComponent } = useImageViewer();
+  const { executeAction } = useTextActions();
+
+  // 文本选择处理已移至全局 selectionchange 监听器
+
+  // 处理文本操作
+  const handleTextAction = useCallback(async (actionType: TextActionType, text: string) => {
+    if (!agentId) {
+      console.error('No agent ID provided');
+      return;
+    }
+
+    try {
+      const result = await executeAction(agentId, text, actionType);
+
+      // 如果操作成功，可以选择是否替换选中的文本
+      if (result && onChange) {
+        // 这里可以实现文本替换逻辑
+        // 暂时只是显示结果
+        console.log('Text action result:', result);
+      }
+
+      setShowTextActionToolbar(false);
+      setSelectedText('');
+      setSelectionRange(null);
+    } catch (error) {
+      console.error('Text action failed:', error);
+    }
+  }, [agentId, executeAction, onChange]);
 
   // 定义斜杠命令列表
   const slashCommands = [
@@ -499,6 +563,8 @@ export function NotionEditor({ initialContent = '', onChange }: NotionEditorProp
         onChange(editor.getHTML());
       }
 
+      // 移除重复的文本选择检测，已使用全局 selectionchange 监听器
+
       // 检测斜杠的输入和删除
       const { state } = editor;
       const { selection } = state;
@@ -719,6 +785,79 @@ export function NotionEditor({ initialContent = '', onChange }: NotionEditorProp
     setMounted(true);
   }, []);
 
+  // 使用更稳定的文本选择检测
+  useEffect(() => {
+    if (!agentId) return;
+
+    let selectionTimeout: NodeJS.Timeout;
+
+    const checkSelection = () => {
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0) {
+        if (showTextActionToolbar) {
+          setShowTextActionToolbar(false);
+          setSelectedText('');
+          setSelectionRange(null);
+        }
+        return;
+      }
+
+      const selectedText = selection.toString().trim();
+      if (selectedText.length >= 3 && aiAssistantEnabled && agentId) {
+        const range = selection.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+
+        if (rect.width > 0 && rect.height > 0) {
+          setSelectedText(selectedText);
+          setSelectionRange(range.cloneRange());
+          setTextActionPosition({
+            x: rect.right + 10,
+            y: rect.bottom + 20
+          });
+          setShowTextActionToolbar(true);
+          setShowAIDisabledTooltip(false); // 隐藏 AI 禁用提示
+        }
+      } else if (selectedText.length >= 3 && !aiAssistantEnabled) {
+        // 显示 AI 禁用提示
+        setShowAIDisabledTooltip(true);
+        setShowTextActionToolbar(false);
+      } else {
+        // 清理所有状态
+        if (showTextActionToolbar) {
+          setShowTextActionToolbar(false);
+          setSelectedText('');
+          setSelectionRange(null);
+        }
+        if (showAIDisabledTooltip) {
+          setShowAIDisabledTooltip(false);
+        }
+      }
+    };
+
+    const handleMouseUp = (event: MouseEvent) => {
+      // 延迟检查选择，给浏览器时间更新选择
+      clearTimeout(selectionTimeout);
+      selectionTimeout = setTimeout(checkSelection, 100);
+    };
+
+    const handleKeyUp = (event: KeyboardEvent) => {
+      // 对于键盘选择（Shift + 方向键）
+      if (event.shiftKey) {
+        clearTimeout(selectionTimeout);
+        selectionTimeout = setTimeout(checkSelection, 100);
+      }
+    };
+
+    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('keyup', handleKeyUp);
+
+    return () => {
+      clearTimeout(selectionTimeout);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [agentId, aiAssistantEnabled]);
+
   useEffect(() => {
     if (editor && initialContent !== editor.getHTML()) {
       editor.commands.setContent(initialContent || '');
@@ -764,11 +903,16 @@ export function NotionEditor({ initialContent = '', onChange }: NotionEditorProp
   }
 
   return (
-    <div className={`w-full ${styles.notionEditor} relative`}>
-      <EditorContent
-        editor={editor}
-        className="notion-editor-content"
-      />
+    <div className={`w-full ${styles.notionEditor} relative ${showTextActionToolbar ? 'keep-selection-highlight' : ''}`}>
+      <ImageViewerContext.Provider value={{ openViewer }}>
+        <EditorContent
+          editor={editor}
+          className="notion-editor-content"
+        />
+      </ImageViewerContext.Provider>
+
+      {/* 图片查看器 */}
+      <ImageViewerComponent />
 
       {/* 斜杠命令菜单 */}
       {showSlashMenu && filteredCommands.length > 0 && (
@@ -846,6 +990,26 @@ export function NotionEditor({ initialContent = '', onChange }: NotionEditorProp
           </div>
         </div>
       )}
+
+      {/* 文本操作工具栏 */}
+      <TextActionToolbar
+        selectedText={selectedText}
+        position={textActionPosition}
+        onAction={handleTextAction}
+        onClose={() => {
+          setShowTextActionToolbar(false);
+          setSelectedText('');
+          setSelectionRange(null);
+        }}
+        agentId={agentId || ''}
+        isVisible={showTextActionToolbar && !!agentId && aiAssistantEnabled}
+      />
+
+      {/* AI 禁用提示工具提示 */}
+      <AIDisabledTooltip
+        isVisible={showAIDisabledTooltip}
+        onClose={() => setShowAIDisabledTooltip(false)}
+      />
     </div>
   );
 }

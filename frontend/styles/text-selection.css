@@ -1,0 +1,28 @@
+/* 保持文本选择高亮的样式 */
+.keep-selection-highlight ::selection {
+  background-color: rgba(59, 130, 246, 0.3); /* 蓝色高亮 */
+}
+
+.keep-selection-highlight ::-moz-selection {
+  background-color: rgba(59, 130, 246, 0.3);
+}
+
+/* 主题适配的高亮颜色 */
+.dark .keep-selection-highlight ::selection {
+  background-color: rgba(96, 165, 250, 0.4);
+}
+
+.dark .keep-selection-highlight ::-moz-selection {
+  background-color: rgba(96, 165, 250, 0.4);
+}
+
+/* 保持选择状态的特殊类 */
+.persistent-selection {
+  background-color: rgba(59, 130, 246, 0.2);
+  border-radius: 2px;
+  transition: background-color 0.2s ease;
+}
+
+.dark .persistent-selection {
+  background-color: rgba(96, 165, 250, 0.3);
+}

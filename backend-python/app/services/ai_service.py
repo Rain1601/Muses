@@ -520,3 +520,70 @@ class AIService:
             task_type=task_type,
             original_content=original_content
         )
+
+    @classmethod
+    async def perform_text_action(
+        cls,
+        user: User,
+        agent: Agent,
+        text: str,
+        action_type: str,
+        context: Optional[str] = None,
+        language: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """执行文本操作（改进、解释、扩展等）"""
+
+        client = cls._get_openai_client(user)
+        system_prompt = cls._build_system_prompt(agent)
+
+        # 根据操作类型构建不同的提示词
+        action_prompts = {
+            "improve": "请改进以下文本，使其更加清晰、准确和有说服力，保持原意不变：",
+            "explain": "请详细解释以下文本的含义、背景和重要概念：",
+            "expand": "请扩展以下文本，添加更多细节、例子和相关信息：",
+            "summarize": "请总结以下文本的关键要点和主要内容：",
+            "translate": f"请将以下文本翻译成{language or '英文'}：",
+            "rewrite": "请用不同的表达方式重写以下文本，保持核心意思不变："
+        }
+
+        action_prompt = action_prompts.get(action_type, "请处理以下文本：")
+
+        # 构建用户提示词
+        user_prompt = f"{action_prompt}\n\n文本内容：\n{text}"
+
+        if context:
+            user_prompt += f"\n\n上下文信息：\n{context}"
+
+        if action_type in ["improve", "rewrite"]:
+            user_prompt += "\n\n请提供简要的修改说明。"
+
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4-turbo-preview",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.7,
+                max_tokens=2000
+            )
+
+            processed_text = response.choices[0].message.content or ""
+
+            # 对于改进和重写操作，尝试分离结果和说明
+            explanation = None
+            if action_type in ["improve", "rewrite"] and "修改说明" in processed_text:
+                parts = processed_text.split("修改说明")
+                if len(parts) == 2:
+                    processed_text = parts[0].strip()
+                    explanation = parts[1].strip()
+
+            return {
+                "actionType": action_type,
+                "originalText": text,
+                "processedText": processed_text,
+                "explanation": explanation
+            }
+
+        except Exception as e:
+            raise ValidationError(f"Text action failed: {str(e)}")

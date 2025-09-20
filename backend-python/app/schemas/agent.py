@@ -92,3 +92,27 @@ class StyleAnalysisResponse(BaseModel):
     detectedType: str = Field(..., description="Detected content type: conversation or article")
     styleDescription: str = Field(..., description="Generated style description for custom prompt")
     characteristics: dict = Field(..., description="Detailed style characteristics")
+
+
+class TextActionTypeEnum(str, Enum):
+    improve = "improve"
+    explain = "explain"
+    expand = "expand"
+    summarize = "summarize"
+    translate = "translate"
+    rewrite = "rewrite"
+
+
+class TextActionRequest(BaseModel):
+    agentId: str = Field(..., description="ID of the agent to use for processing")
+    text: str = Field(..., description="Text content to process")
+    actionType: TextActionTypeEnum = Field(..., description="Type of action to perform")
+    context: Optional[str] = Field(None, description="Additional context or instructions")
+    language: Optional[str] = Field(None, description="Target language for translation (if applicable)")
+
+
+class TextActionResponse(BaseModel):
+    actionType: str = Field(..., description="Type of action performed")
+    originalText: str = Field(..., description="Original text that was processed")
+    processedText: str = Field(..., description="AI-generated result text")
+    explanation: Optional[str] = Field(None, description="Explanation of changes made (for improve/rewrite actions)")

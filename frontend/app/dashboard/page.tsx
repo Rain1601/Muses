@@ -604,8 +604,10 @@ summary: ""
                   {/* Notion 编辑器 */}
                   <div className="mb-8">
                     <NotionEditor
+                      key={`${selectedArticle?.id || 'new'}-${selectedArticle?.agentId || defaultAgent?.id}`}
                       initialContent={editingContent}
                       onChange={setEditingContent}
+                      agentId={selectedArticle?.agentId || defaultAgent?.id}
                     />
                   </div>
                 </div>

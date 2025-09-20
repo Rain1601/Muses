@@ -17,6 +17,7 @@ interface Article {
   summary?: string;
   publishStatus: string;
   createdAt: string;
+  updatedAt: string;
   agent?: {
     name: string;
     avatar?: string;
@@ -322,9 +323,28 @@ export default function ArticleManagement({
                           ? '定时发布'
                           : '草稿'}
                       </Badge>
-                      <span className="text-muted-foreground mt-1 text-xs">
-                        {new Date(article.createdAt).toLocaleDateString()}
-                      </span>
+                      <div className="mt-1 text-xs text-muted-foreground space-y-0.5">
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] text-muted-foreground/80">创建:</span>
+                          <span>{new Date(article.createdAt).toLocaleString('zh-CN', {
+                            month: '2-digit',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}</span>
+                        </div>
+                        {article.updatedAt !== article.createdAt && (
+                          <div className="flex items-center gap-1">
+                            <span className="text-[10px] text-muted-foreground/80">更新:</span>
+                            <span>{new Date(article.updatedAt).toLocaleString('zh-CN', {
+                              month: '2-digit',
+                              day: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </CardContent>

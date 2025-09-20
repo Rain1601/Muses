@@ -1,12 +1,29 @@
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useUserStore } from '@/store/user';
+import { useAIAssistantStore } from '@/store/aiAssistant';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { Sparkles } from 'lucide-react';
+import { useEffect } from 'react';
 
 export default function Navigation() {
   const router = useRouter();
   const pathname = usePathname();
   const { user, logout } = useUserStore();
+  const { isEnabled: aiAssistantEnabled, toggleEnabled: toggleAIAssistant } = useAIAssistantStore();
+
+  // 添加 Cmd+O 快捷键支持
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === 'o') {
+        event.preventDefault();
+        toggleAIAssistant();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [toggleAIAssistant]);
 
   if (!user) return null;
 
@@ -49,6 +66,21 @@ export default function Navigation() {
           </div>
           
           <div className="flex items-center space-x-4">
+            <button
+              onClick={toggleAIAssistant}
+              className={`flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-300 ${
+                aiAssistantEnabled
+                  ? 'bg-primary text-primary-foreground shadow-md hover:shadow-lg hover:bg-primary/90 border border-primary'
+                  : 'bg-muted/50 hover:bg-muted border border-border text-muted-foreground hover:text-foreground hover:border-primary/50'
+              }`}
+              title={aiAssistantEnabled ? 'AI辅助：开启 (Cmd+O 切换)' : 'AI辅助：关闭 (Cmd+O 开启)'}
+            >
+              <Sparkles className={`w-4 h-4 transition-all duration-300 ${
+                aiAssistantEnabled
+                  ? ''
+                  : 'hover:scale-110'
+              }`} />
+            </button>
             <ThemeToggle />
             <span className="text-sm text-muted-foreground">
               {user.username}

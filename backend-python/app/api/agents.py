@@ -7,9 +7,9 @@ import json
 from ..database import get_db
 from ..models import Agent, Article
 from ..schemas.agent import (
-    Agent as AgentSchema, AgentCreate, AgentUpdate, 
+    Agent as AgentSchema, AgentCreate, AgentUpdate,
     AgentListResponse, AgentResponse, AgentTemplatesResponse, AgentTemplate,
-    StyleAnalysisRequest, StyleAnalysisResponse
+    StyleAnalysisRequest, StyleAnalysisResponse, TextActionRequest, TextActionResponse
 )
 from ..schemas.auth import SuccessResponse
 from ..dependencies import get_current_user_db
@@ -303,3 +303,37 @@ async def analyze_writing_style_from_file(
         raise HTTPValidationError("File encoding error. Please ensure the file is UTF-8 encoded")
     except Exception as e:
         raise HTTPValidationError(f"Failed to analyze writing style: {str(e)}")
+
+
+@router.post("/text-action", response_model=TextActionResponse)
+async def perform_text_action(
+    request: TextActionRequest,
+    current_user = Depends(get_current_user_db),
+    db: Session = Depends(get_db)
+):
+    """执行文本操作（改进、解释、扩展等）"""
+
+    # 获取Agent
+    agent = db.query(Agent).filter(
+        Agent.id == request.agentId,
+        Agent.userId == current_user.id
+    ).first()
+
+    if not agent:
+        raise HTTPNotFoundError("Agent not found")
+
+    try:
+        # 调用AI服务执行文本操作
+        result = await AIService.perform_text_action(
+            user=current_user,
+            agent=agent,
+            text=request.text,
+            action_type=request.actionType,
+            context=request.context,
+            language=request.language
+        )
+
+        return TextActionResponse(**result)
+
+    except Exception as e:
+        raise HTTPValidationError(f"Failed to perform text action: {str(e)}")
