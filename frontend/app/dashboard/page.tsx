@@ -142,6 +142,7 @@ function DashboardContent() {
         if (!defaultAgent?.id) {
           console.error('没有找到默认agent');
           showToast('请先创建一个Agent', 'warning');
+          setIsSaving(false);
           return;
         }
         const response = await api.post('/api/articles', {
@@ -154,14 +155,16 @@ function DashboardContent() {
       }
       setLastSaved(new Date());
 
-      // 显示保存成功提示
-      setShowSaveToast(true);
+      // 延迟显示保存成功提示，避免闪烁
       setTimeout(() => {
-        setShowSaveToast(false);
-      }, 1000);
+        setIsSaving(false);
+        setShowSaveToast(true);
+        setTimeout(() => {
+          setShowSaveToast(false);
+        }, 1500);
+      }, 100);
     } catch (error) {
       console.error('手动保存失败:', error);
-    } finally {
       setIsSaving(false);
     }
   }, [editingTitle, editingContent, selectedArticle, defaultAgent, showToast]);
@@ -202,7 +205,7 @@ function DashboardContent() {
         });
         articleToPublish = response.data.article || response.data;
         setSelectedArticle(articleToPublish);
-        // 更新成功后立即刷新列表
+        // 更新文章列表
         setRefreshKey(prev => prev + 1);
       } else {
         // 创建新文章并直接发布
@@ -219,7 +222,7 @@ function DashboardContent() {
         });
         articleToPublish = response.data.article || response.data;
         setSelectedArticle(articleToPublish);
-        // 创建新文章后也刷新列表
+        // 创建新文章后也更新文章列表
         setRefreshKey(prev => prev + 1);
       }
 
@@ -369,42 +372,90 @@ summary: ""
 
   // 监听编辑器滚动，更新当前活跃的标题
   useEffect(() => {
-    if (!isEditing) return;
+    if (!selectedArticle) return;
 
     const handleScroll = () => {
       const editorElement = document.querySelector('.notion-editor-content .ProseMirror');
       if (!editorElement) return;
 
       const headings = editorElement.querySelectorAll('h1, h2, h3, h4');
-      const scrollTop = editorElement.scrollTop;
-      const containerRect = editorElement.getBoundingClientRect();
+      const scrollContainer = document.getElementById('editor-scroll-container');
+      if (!scrollContainer) return;
+      const containerRect = scrollContainer.getBoundingClientRect();
+      const scrollThreshold = 120; // 距离顶部的阈值
 
-      let currentHeading = '';
+      let activeHeading = '';
+      let closestDistance = Infinity;
 
-      // 找到当前视区内最接近顶部的标题
+      // 找到最接近视区顶部的标题
       Array.from(headings).forEach((heading) => {
         const rect = heading.getBoundingClientRect();
         const relativeTop = rect.top - containerRect.top;
 
-        if (relativeTop <= 100 && relativeTop >= -100) {
-          currentHeading = heading.textContent?.trim() || '';
+        // 标题在视区内或刚刚离开顶部
+        if (relativeTop <= scrollThreshold && relativeTop >= -rect.height) {
+          const distance = Math.abs(relativeTop);
+          if (distance < closestDistance) {
+            closestDistance = distance;
+            activeHeading = heading.textContent?.trim() || '';
+          }
         }
       });
 
-      setActiveHeading(currentHeading);
+      // 如果没有找到活跃标题，选择最接近顶部的标题
+      if (!activeHeading && headings.length > 0) {
+        let minDistance = Infinity;
+        Array.from(headings).forEach((heading) => {
+          const rect = heading.getBoundingClientRect();
+          const relativeTop = rect.top - containerRect.top;
+          const distance = Math.abs(relativeTop);
+
+          if (distance < minDistance) {
+            minDistance = distance;
+            activeHeading = heading.textContent?.trim() || '';
+          }
+        });
+      }
+
+      console.log('Active heading:', activeHeading); // Debug log
+      setActiveHeading(activeHeading);
     };
 
-    const editorElement = document.querySelector('.notion-editor-content .ProseMirror');
-    if (editorElement) {
-      editorElement.addEventListener('scroll', handleScroll);
+    // 节流处理，避免滚动事件过于频繁
+    let scrollTimeout: NodeJS.Timeout;
+    const throttledHandleScroll = () => {
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(handleScroll, 50); // 50ms 延迟
+    };
+
+    // 绑定到实际的滚动容器
+    const scrollContainer = document.getElementById('editor-scroll-container');
+    if (scrollContainer) {
+      scrollContainer.addEventListener('scroll', throttledHandleScroll);
       // 初始检查
       handleScroll();
 
       return () => {
-        editorElement.removeEventListener('scroll', handleScroll);
+        scrollContainer.removeEventListener('scroll', throttledHandleScroll);
+        clearTimeout(scrollTimeout);
       };
     }
-  }, [isEditing, editingContent]);
+  }, [selectedArticle, isEditing, editingContent]);
+
+  // 自动滚动目录到活跃标题位置
+  useEffect(() => {
+    if (activeHeading && rightPanelMode === 'toc') {
+      const tocContainer = document.querySelector('.toc-container');
+      const activeElement = document.querySelector('.toc-item-active');
+      if (tocContainer && activeElement) {
+        activeElement.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+          inline: 'nearest'
+        });
+      }
+    }
+  }, [activeHeading, rightPanelMode]);
 
   // 监听Shift+Cmd+S快捷键
   useEffect(() => {
@@ -487,10 +538,10 @@ summary: ""
           leftPanelCollapsed ? 'w-0 opacity-0 overflow-hidden' : 'w-80 opacity-100'
         }`}>
           <ArticleCompactList
-            key={refreshKey}
             onArticleSelect={handleArticleSelect}
             selectedArticleId={selectedArticle?.id}
             onImportClick={() => setShowImportDialog(true)}
+            refreshTrigger={refreshKey}
           />
         </aside>
 
@@ -553,7 +604,7 @@ summary: ""
                               title: editingTitle || '无标题'
                             });
 
-                            // 刷新文章列表以显示新标题
+                            // 更新文章列表以显示新标题
                             setRefreshKey(prev => prev + 1);
                             setLastSaved(new Date());
                           } catch (error) {
@@ -577,11 +628,11 @@ summary: ""
                     <button
                       onClick={manualSave}
                       disabled={isSaving || (!editingTitle.trim() && !editingContent.trim())}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground bg-muted/20 hover:bg-muted/40 border-0 rounded-md hover:shadow-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground bg-muted/20 hover:bg-muted/40 border-0 rounded-md hover:shadow-sm transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed min-w-[70px]"
                       title="手动保存 (Shift+Cmd+S)"
                     >
-                      <Save className="w-3.5 h-3.5" />
-                      <span>{isSaving ? '保存中...' : '保存'}</span>
+                      <Save className={`w-3.5 h-3.5 transition-transform duration-150 ${isSaving ? 'animate-pulse' : ''}`} />
+                      <span className="transition-opacity duration-150">{isSaving ? '保存中...' : '保存'}</span>
                     </button>
 
                     {/* 发布按钮 */}
@@ -599,7 +650,7 @@ summary: ""
               </div>
 
               {/* Notion风格编辑器 */}
-              <div className="flex-1 overflow-auto">
+              <div id="editor-scroll-container" className="flex-1 overflow-auto">
                 <div className="container mx-auto py-8 max-w-4xl px-8">
                   {/* Notion 编辑器 */}
                   <div className="mb-8">
@@ -665,7 +716,7 @@ summary: ""
                         setEditingContent(newArticle.content);
                         setIsEditing(true);
 
-                        // 刷新文章列表
+                        // 更新文章列表
                         setRefreshKey(prev => prev + 1);
 
                         showToast('新文章已创建', 'success');
@@ -779,7 +830,7 @@ summary: ""
                     }
 
                     return (
-                      <div className="space-y-1">
+                      <div className="space-y-1 toc-container">
                         {headingObjects.map((heading, index) => {
                           const { level, text } = heading;
                           const headingId = `heading-${index}-${text.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]/g, '-')}`;
@@ -811,10 +862,10 @@ summary: ""
                           return (
                             <div
                               key={index}
-                              className={`text-sm cursor-pointer transition-all duration-200 rounded px-3 py-2 -mx-1 ${
+                              className={`text-sm cursor-pointer transition-all duration-300 rounded-md px-3 py-2.5 -mx-1 relative ${
                                 isActive
-                                  ? 'bg-primary/10 text-primary border-l-2 border-primary font-medium'
-                                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/30 active:bg-muted/50'
+                                  ? 'bg-primary/15 text-primary border-l-3 border-primary font-semibold shadow-sm toc-item-active'
+                                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/40 active:bg-muted/60'
                               }`}
                               style={{ paddingLeft: `${(level - 1) * 12 + 12}px` }}
                               onClick={scrollToHeading}
@@ -924,10 +975,10 @@ summary: ""
 
       {/* 保存成功Toast提示 */}
       {showSaveToast && (
-        <div className="fixed top-4 right-4 z-50 animate-in fade-in duration-200">
-          <div className="bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2">
+        <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-top-2 fade-in duration-300">
+          <div className="bg-green-500/90 backdrop-blur-sm text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 border border-green-400/20">
             <svg
-              className="w-4 h-4"
+              className="w-4 h-4 flex-shrink-0"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -939,7 +990,7 @@ summary: ""
                 d="M5 13l4 4L19 7"
               />
             </svg>
-            <span className="text-sm font-medium">保存成功</span>
+            <span className="text-sm font-medium whitespace-nowrap">保存成功</span>
           </div>
         </div>
       )}

@@ -35,9 +35,10 @@ interface ArticleCompactListProps {
   onArticleSelect?: (article: Article) => void;
   selectedArticleId?: string;
   onImportClick?: () => void;
+  refreshTrigger?: number; // 用于触发列表刷新的标志
 }
 
-export function ArticleCompactList({ onArticleSelect, selectedArticleId, onImportClick }: ArticleCompactListProps) {
+export function ArticleCompactList({ onArticleSelect, selectedArticleId, onImportClick, refreshTrigger }: ArticleCompactListProps) {
   const router = useRouter();
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,6 +53,13 @@ export function ArticleCompactList({ onArticleSelect, selectedArticleId, onImpor
   useEffect(() => {
     fetchArticles();
   }, []);
+
+  // 当 refreshTrigger 改变时重新获取文章列表
+  useEffect(() => {
+    if (refreshTrigger !== undefined) {
+      fetchArticles();
+    }
+  }, [refreshTrigger]);
 
   useEffect(() => {
     if (searchTerm.trim()) {
