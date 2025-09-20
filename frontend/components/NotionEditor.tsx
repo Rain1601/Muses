@@ -29,7 +29,7 @@ import css from 'highlight.js/lib/languages/css';
 import python from 'highlight.js/lib/languages/python';
 import { api } from '@/lib/api';
 import { useImageViewer } from './ImageViewer';
-import TextActionToolbar, { TextActionType } from './TextActionToolbar';
+import TextActionToolbar, { TextActionType, ModelType } from './TextActionToolbar';
 import AIDisabledTooltip from './AIDisabledTooltip';
 import { useTextActions } from '@/lib/hooks/useTextActions';
 import { useAIAssistantStore } from '@/store/aiAssistant';
@@ -206,6 +206,8 @@ export function NotionEditor({ initialContent = '', onChange, agentId }: NotionE
   const [slashMenuPosition, setSlashMenuPosition] = useState({ x: 0, y: 0 });
   const [slashQuery, setSlashQuery] = useState('');
   const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
+  const [showModelSubmenu, setShowModelSubmenu] = useState(false);
+  const [selectedModelIndex, setSelectedModelIndex] = useState(0);
 
   // 文本操作工具栏状态
   const [showTextActionToolbar, setShowTextActionToolbar] = useState(false);
@@ -222,13 +224,18 @@ export function NotionEditor({ initialContent = '', onChange, agentId }: NotionE
   // 文本选择处理已移至全局 selectionchange 监听器
 
   // 处理文本操作
-  const handleTextAction = useCallback(async (actionType: TextActionType, text: string) => {
+  const handleTextAction = useCallback(async (actionType: TextActionType, text: string, modelType?: ModelType) => {
     if (!agentId) {
       console.error('No agent ID provided');
       return;
     }
 
     try {
+      // Log the selected model type for debugging
+      if (modelType) {
+        console.log('Selected model type:', modelType);
+      }
+
       const result = await executeAction(agentId, text, actionType);
 
       // 如果操作成功，可以选择是否替换选中的文本
@@ -246,6 +253,38 @@ export function NotionEditor({ initialContent = '', onChange, agentId }: NotionE
     }
   }, [agentId, executeAction, onChange]);
 
+  // 定义模型选项列表（与TextActionToolbar保持一致）
+  const modelOptions = [
+    {
+      id: 'research',
+      name: '开启搜索',
+      description: '通用AI研究能力',
+      icon: '🔍',
+      command: '/research'
+    },
+    {
+      id: 'openai',
+      name: 'OpenAI',
+      description: 'GPT系列模型',
+      icon: '🤖',
+      command: '/openai'
+    },
+    {
+      id: 'claude',
+      name: 'Claude',
+      description: 'Anthropic Claude模型',
+      icon: '🧠',
+      command: '/claude'
+    },
+    {
+      id: 'gemini',
+      name: 'Gemini',
+      description: 'Google Gemini模型',
+      icon: '✨',
+      command: '/gemini'
+    }
+  ];
+
   // 定义斜杠命令列表
   const slashCommands = [
     {
@@ -255,6 +294,17 @@ export function NotionEditor({ initialContent = '', onChange, agentId }: NotionE
       icon: '📷',
       keywords: ['img', 'image', 'tp', '图片', '上传'],
       action: (editor: any) => handleFileUpload(editor),
+    },
+    {
+      id: 'model',
+      name: '模型',
+      description: '选择AI模型',
+      icon: '🤖',
+      keywords: ['model', 'mx', '模型', 'ai'],
+      action: () => {
+        setShowModelSubmenu(true);
+        setSelectedModelIndex(0);
+      },
     },
     {
       id: 'ai',
@@ -279,7 +329,9 @@ export function NotionEditor({ initialContent = '', onChange, agentId }: NotionE
     showSlashMenu: false,
     slashQuery: '',
     selectedCommandIndex: 0,
-    filteredCommands: [] as any[]
+    filteredCommands: [] as any[],
+    showModelSubmenu: false,
+    selectedModelIndex: 0
   });
 
   // 更新 ref 状态
@@ -288,7 +340,9 @@ export function NotionEditor({ initialContent = '', onChange, agentId }: NotionE
       showSlashMenu,
       slashQuery,
       selectedCommandIndex,
-      filteredCommands
+      filteredCommands,
+      showModelSubmenu,
+      selectedModelIndex
     };
   });
 
@@ -318,16 +372,61 @@ export function NotionEditor({ initialContent = '', onChange, agentId }: NotionE
           setSlashQuery('');
           setSelectedCommandIndex(0);
           setShowSlashMenu(true);
+          setShowModelSubmenu(false);
+          setSelectedModelIndex(0);
         }, 100);
       }
     }
 
     // 斜杠菜单激活时的键盘处理
     if (slashMenuState.current.showSlashMenu) {
+      // 如果在模型子菜单中
+      if (slashMenuState.current.showModelSubmenu) {
+        if (event.key === 'ArrowDown') {
+          event.preventDefault();
+          setSelectedModelIndex(prev => (prev + 1) % modelOptions.length);
+          return true;
+        }
+
+        if (event.key === 'ArrowUp') {
+          event.preventDefault();
+          setSelectedModelIndex(prev => (prev - 1 + modelOptions.length) % modelOptions.length);
+          return true;
+        }
+
+        if (event.key === 'ArrowLeft' || event.key === 'Escape') {
+          event.preventDefault();
+          setShowModelSubmenu(false);
+          setSelectedModelIndex(0);
+          return true;
+        }
+
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          const selectedModel = modelOptions[slashMenuState.current.selectedModelIndex];
+
+          // 删除斜杠命令文本
+          const tr = state.tr.delete($from.start(), $from.pos);
+          view.dispatch(tr);
+
+          // 隐藏所有菜单
+          setShowSlashMenu(false);
+          setShowModelSubmenu(false);
+          setSlashQuery('');
+
+          // 这里可以添加模型选择的逻辑
+          console.log('Selected model:', selectedModel.id);
+
+          return true;
+        }
+
+        return true;
+      }
+
       const currentLine = state.doc.textBetween($from.start(), $from.pos);
 
-      // 更新查询字符串
-      if (currentLine.startsWith('/')) {
+      // 更新查询字符串（仅在主菜单时）
+      if (currentLine.startsWith('/') && !slashMenuState.current.showModelSubmenu) {
         const query = currentLine.substring(1);
         setTimeout(() => setSlashQuery(query), 0);
       }
@@ -347,10 +446,25 @@ export function NotionEditor({ initialContent = '', onChange, agentId }: NotionE
         return true;
       }
 
+      // 右箭头进入模型子菜单
+      if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        const filteredCmds = slashMenuState.current.filteredCommands;
+        const selectedIndex = slashMenuState.current.selectedCommandIndex;
+        const selectedCommand = filteredCmds[selectedIndex];
+
+        if (selectedCommand && selectedCommand.id === 'model') {
+          setShowModelSubmenu(true);
+          setSelectedModelIndex(0);
+        }
+        return true;
+      }
+
       // ESC 或空格关闭菜单
       if (event.key === 'Escape' || event.key === ' ') {
         setShowSlashMenu(false);
         setSlashQuery('');
+        setShowModelSubmenu(false);
         return true;
       }
 
@@ -363,18 +477,24 @@ export function NotionEditor({ initialContent = '', onChange, agentId }: NotionE
         const selectedCommand = filteredCmds[selectedIndex];
 
         if (selectedCommand && !selectedCommand.disabled) {
-          // 删除斜杠命令文本
-          const tr = state.tr.delete($from.start(), $from.pos);
-          view.dispatch(tr);
+          if (selectedCommand.id === 'model') {
+            // 进入模型子菜单
+            setShowModelSubmenu(true);
+            setSelectedModelIndex(0);
+          } else {
+            // 删除斜杠命令文本
+            const tr = state.tr.delete($from.start(), $from.pos);
+            view.dispatch(tr);
 
-          // 隐藏菜单
-          setShowSlashMenu(false);
-          setSlashQuery('');
+            // 隐藏菜单
+            setShowSlashMenu(false);
+            setSlashQuery('');
 
-          // 执行命令
-          setTimeout(() => {
-            selectedCommand.action(view);
-          }, 10);
+            // 执行命令
+            setTimeout(() => {
+              selectedCommand.action(view);
+            }, 10);
+          }
         }
 
         return true;
@@ -382,7 +502,7 @@ export function NotionEditor({ initialContent = '', onChange, agentId }: NotionE
     }
 
     return false;
-  }, []);
+  }, [modelOptions]);
 
   // 图片上传到GitHub仓库的函数
   const uploadImageToGitHub = useCallback(async (file: File): Promise<string> => {
@@ -923,71 +1043,143 @@ export function NotionEditor({ initialContent = '', onChange, agentId }: NotionE
             top: `${slashMenuPosition.y}px`,
           }}
         >
-          {filteredCommands.map((command, index) => {
-            const isSelected = index === selectedCommandIndex;
-            const matchedKeyword = command.keywords.find(keyword =>
-              keyword.toLowerCase().includes(slashQuery.toLowerCase())
-            );
+          {showModelSubmenu ? (
+            // 模型子菜单
+            <>
+              <div className="px-3 py-2 border-b border-border bg-muted/30 flex items-center gap-2 text-sm font-medium">
+                <span className="text-lg">🤖</span>
+                <span>选择模型</span>
+              </div>
+              {modelOptions.map((model, index) => {
+                const isSelected = index === selectedModelIndex;
+                return (
+                  <button
+                    key={model.id}
+                    className={`w-full text-left px-3 py-2 rounded-sm flex items-center gap-2 transition-colors ${
+                      isSelected
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'hover:bg-accent hover:text-accent-foreground'
+                    }`}
+                    onClick={() => {
+                      const view = editor?.view;
+                      if (view) {
+                        // 删除斜杠命令文本
+                        const { state } = view;
+                        const { selection } = state;
+                        const { $from } = selection;
+                        const tr = state.tr.delete($from.start(), $from.pos);
+                        view.dispatch(tr);
 
-            return (
-              <button
-                key={command.id}
-                className={`w-full text-left px-3 py-2 rounded-sm flex items-center gap-2 transition-colors ${
-                  isSelected
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'hover:bg-accent hover:text-accent-foreground'
-                } ${command.disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                onClick={() => {
-                  if (!command.disabled) {
-                    const view = editor?.view;
-                    if (view) {
-                      // 删除斜杠命令文本
-                      const { state } = view;
-                      const { selection } = state;
-                      const { $from } = selection;
-                      const tr = state.tr.delete($from.start(), $from.pos);
-                      view.dispatch(tr);
+                        // 隐藏所有菜单
+                        setShowSlashMenu(false);
+                        setShowModelSubmenu(false);
+                        setSlashQuery('');
 
-                      // 隐藏菜单
-                      setShowSlashMenu(false);
-                      setSlashQuery('');
-
-                      // 执行命令
-                      command.action(editor);
-                    }
-                  }
-                }}
-                disabled={command.disabled}
-              >
-                <span className="text-lg">{command.icon}</span>
-                <div className="flex-1">
-                  <div className="font-medium flex items-center gap-1">
-                    {command.name}
-                    {matchedKeyword && slashQuery && (
-                      <span className="text-xs px-1 py-0.5 bg-muted rounded text-muted-foreground">
-                        {matchedKeyword}
-                      </span>
+                        // 这里可以添加模型选择的逻辑
+                        console.log('Selected model:', model.id);
+                      }
+                    }}
+                  >
+                    <span className="text-lg">{model.icon}</span>
+                    <div className="flex-1">
+                      <div className="font-medium">{model.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {model.description}
+                      </div>
+                    </div>
+                    {isSelected && (
+                      <span className="text-xs text-muted-foreground">Enter</span>
                     )}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {command.description}
-                  </div>
+                  </button>
+                );
+              })}
+              <div className="px-3 py-1 text-xs text-muted-foreground border-t border-border mt-1">
+                <div className="flex items-center justify-between">
+                  <span>↑↓ 选择</span>
+                  <span>← 返回</span>
+                  <span>Enter 确认</span>
                 </div>
-                {isSelected && (
-                  <span className="text-xs text-muted-foreground">Enter</span>
-                )}
-              </button>
-            );
-          })}
+              </div>
+            </>
+          ) : (
+            // 主菜单
+            <>
+              {filteredCommands.map((command, index) => {
+                const isSelected = index === selectedCommandIndex;
+                const matchedKeyword = command.keywords.find(keyword =>
+                  keyword.toLowerCase().includes(slashQuery.toLowerCase())
+                );
 
-          {/* 底部提示 */}
-          <div className="px-3 py-1 text-xs text-muted-foreground border-t border-border mt-1">
-            <div className="flex items-center justify-between">
-              <span>↑↓ 选择</span>
-              <span>Enter 确认</span>
-              <span>Esc 取消</span>
-            </div>
-          </div>
+                return (
+                  <button
+                    key={command.id}
+                    className={`w-full text-left px-3 py-2 rounded-sm flex items-center gap-2 transition-colors ${
+                      isSelected
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'hover:bg-accent hover:text-accent-foreground'
+                    } ${command.disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    onClick={() => {
+                      if (!command.disabled) {
+                        if (command.id === 'model') {
+                          setShowModelSubmenu(true);
+                          setSelectedModelIndex(0);
+                        } else {
+                          const view = editor?.view;
+                          if (view) {
+                            // 删除斜杠命令文本
+                            const { state } = view;
+                            const { selection } = state;
+                            const { $from } = selection;
+                            const tr = state.tr.delete($from.start(), $from.pos);
+                            view.dispatch(tr);
+
+                            // 隐藏菜单
+                            setShowSlashMenu(false);
+                            setSlashQuery('');
+
+                            // 执行命令
+                            command.action(editor);
+                          }
+                        }
+                      }
+                    }}
+                    disabled={command.disabled}
+                  >
+                    <span className="text-lg">{command.icon}</span>
+                    <div className="flex-1">
+                      <div className="font-medium flex items-center gap-1">
+                        {command.name}
+                        {matchedKeyword && slashQuery && (
+                          <span className="text-xs px-1 py-0.5 bg-muted rounded text-muted-foreground">
+                            {matchedKeyword}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {command.description}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {isSelected && (
+                        <span className="text-xs text-muted-foreground">
+                          {command.id === 'model' ? '→' : 'Enter'}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+
+              {/* 底部提示 */}
+              <div className="px-3 py-1 text-xs text-muted-foreground border-t border-border mt-1">
+                <div className="flex items-center justify-between">
+                  <span>↑↓ 选择</span>
+                  <span>→ 展开</span>
+                  <span>Enter 确认</span>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       )}
 

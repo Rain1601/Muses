@@ -1,14 +1,15 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Wand2, MessageSquare, PlusCircle, FileText, Languages, RotateCw, Loader2 } from 'lucide-react';
+import { Wand2, MessageSquare, PlusCircle, FileText, Languages, RotateCw, Loader2, Cpu, ChevronRight, ArrowLeft } from 'lucide-react';
 
 export type TextActionType = 'improve' | 'explain' | 'expand' | 'summarize' | 'translate' | 'rewrite';
+export type ModelType = 'research' | 'openai' | 'claude' | 'gemini';
 
 interface TextActionToolbarProps {
   selectedText: string;
   position: { x: number; y: number };
-  onAction: (actionType: TextActionType, selectedText: string) => Promise<void>;
+  onAction: (actionType: TextActionType, selectedText: string, modelType?: ModelType) => Promise<void>;
   onClose: () => void;
   agentId: string;
   isVisible: boolean;
@@ -62,6 +63,46 @@ const textActionCommands = [
     description: '用不同方式表达',
     keywords: ['rewrite', 'cx', '重写', '改写'],
     command: '/rewrite'
+  },
+  {
+    id: 'model',
+    icon: Cpu,
+    name: '模型',
+    description: '选择AI模型',
+    keywords: ['model', 'mx', '模型', 'ai'],
+    command: '/model',
+    hasSubmenu: true
+  }
+];
+
+const modelCommands = [
+  {
+    id: 'research',
+    name: '开启搜索',
+    description: '通用AI研究能力',
+    keywords: ['research', 'yj', '研究', '搜索', '开启'],
+    command: '/research'
+  },
+  {
+    id: 'openai',
+    name: 'OpenAI',
+    description: 'GPT系列模型',
+    keywords: ['openai', 'gpt', 'chatgpt'],
+    command: '/openai'
+  },
+  {
+    id: 'claude',
+    name: 'Claude',
+    description: 'Anthropic Claude模型',
+    keywords: ['claude', 'anthropic'],
+    command: '/claude'
+  },
+  {
+    id: 'gemini',
+    name: 'Gemini',
+    description: 'Google Gemini模型',
+    keywords: ['gemini', 'google'],
+    command: '/gemini'
   }
 ];
 
@@ -76,6 +117,8 @@ export const TextActionToolbar: React.FC<TextActionToolbarProps> = ({
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showModelSubmenu, setShowModelSubmenu] = useState(false);
+  const [selectedModelIndex, setSelectedModelIndex] = useState(0);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -113,12 +156,24 @@ export const TextActionToolbar: React.FC<TextActionToolbarProps> = ({
     ) || query === ''
   );
 
+  // 过滤模型命令
+  const filteredModelCommands = modelCommands.filter(command => {
+    if (query === '') return true;
+    const queryLower = query.toLowerCase();
+    return command.keywords.some(keyword =>
+      keyword.toLowerCase().includes(queryLower)
+    ) || command.name.toLowerCase().includes(queryLower) ||
+    command.description.toLowerCase().includes(queryLower);
+  });
+
   // 自动聚焦输入框
   useEffect(() => {
     if (isVisible && inputRef.current) {
       inputRef.current.focus();
       setQuery('');
       setSelectedIndex(0);
+      setShowModelSubmenu(false);
+      setSelectedModelIndex(0);
     }
   }, [isVisible]);
 
@@ -129,20 +184,56 @@ export const TextActionToolbar: React.FC<TextActionToolbarProps> = ({
 
       switch (event.key) {
         case 'Escape':
-          onClose();
+          if (showModelSubmenu) {
+            setShowModelSubmenu(false);
+            setSelectedModelIndex(0);
+          } else {
+            onClose();
+          }
           break;
         case 'ArrowDown':
           event.preventDefault();
-          setSelectedIndex(prev => (prev + 1) % filteredCommands.length);
+          if (showModelSubmenu) {
+            setSelectedModelIndex(prev => (prev + 1) % filteredModelCommands.length);
+          } else {
+            setSelectedIndex(prev => (prev + 1) % filteredCommands.length);
+          }
           break;
         case 'ArrowUp':
           event.preventDefault();
-          setSelectedIndex(prev => (prev - 1 + filteredCommands.length) % filteredCommands.length);
+          if (showModelSubmenu) {
+            setSelectedModelIndex(prev => (prev - 1 + filteredModelCommands.length) % filteredModelCommands.length);
+          } else {
+            setSelectedIndex(prev => (prev - 1 + filteredCommands.length) % filteredCommands.length);
+          }
+          break;
+        case 'ArrowRight':
+          event.preventDefault();
+          if (!showModelSubmenu && filteredCommands[selectedIndex]?.id === 'model') {
+            setShowModelSubmenu(true);
+            setSelectedModelIndex(0);
+            setQuery(''); // 清空输入框
+          }
+          break;
+        case 'ArrowLeft':
+          event.preventDefault();
+          if (showModelSubmenu) {
+            setShowModelSubmenu(false);
+            setSelectedModelIndex(0);
+          }
           break;
         case 'Enter':
           event.preventDefault();
-          if (filteredCommands[selectedIndex]) {
-            handleAction(filteredCommands[selectedIndex].id as TextActionType);
+          if (showModelSubmenu && filteredModelCommands[selectedModelIndex]) {
+            handleModelSelection(filteredModelCommands[selectedModelIndex].id as ModelType);
+          } else if (filteredCommands[selectedIndex]) {
+            if (filteredCommands[selectedIndex].id === 'model') {
+              setShowModelSubmenu(true);
+              setSelectedModelIndex(0);
+              setQuery(''); // 清空输入框
+            } else {
+              handleAction(filteredCommands[selectedIndex].id as TextActionType);
+            }
           }
           break;
       }
@@ -152,21 +243,30 @@ export const TextActionToolbar: React.FC<TextActionToolbarProps> = ({
       document.addEventListener('keydown', handleKeyDown);
       return () => document.removeEventListener('keydown', handleKeyDown);
     }
-  }, [isVisible, selectedIndex, filteredCommands, onClose]);
+  }, [isVisible, selectedIndex, selectedModelIndex, filteredCommands, filteredModelCommands, showModelSubmenu, onClose]);
 
-  const handleAction = async (actionType: TextActionType) => {
+  const handleAction = async (actionType: TextActionType, modelType?: ModelType) => {
     if (isProcessing) return;
 
     setIsProcessing(true);
 
     try {
-      await onAction(actionType, selectedText);
+      await onAction(actionType, selectedText, modelType);
       onClose();
     } catch (error) {
       console.error('Text action failed:', error);
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const handleModelSelection = async (modelType: ModelType) => {
+    // For now, we'll just show a message. Later this could be used to set a default model
+    // or trigger a specific action with the selected model
+    console.log('Selected model:', modelType);
+    // You could implement model switching logic here
+    setShowModelSubmenu(false);
+    onClose();
   };
 
   if (!isVisible || !selectedText.trim()) {
@@ -205,56 +305,132 @@ export const TextActionToolbar: React.FC<TextActionToolbarProps> = ({
 
       {/* 命令列表 */}
       <div className="max-h-64 overflow-y-auto">
-        {filteredCommands.length === 0 ? (
-          <div className="px-3 py-4 text-sm text-muted-foreground text-center">
-            没有找到匹配的命令
-          </div>
-        ) : (
-          filteredCommands.map((command, index) => {
-            const Icon = command.icon;
-            const isSelected = index === selectedIndex;
-            const isCurrentlyProcessing = isProcessing;
-
-            return (
-              <div
-                key={command.id}
-                className={`px-3 py-2 cursor-pointer transition-colors ${
-                  isSelected
-                    ? 'bg-primary/10 border-l-2 border-l-primary'
-                    : 'hover:bg-muted/50'
-                } ${isCurrentlyProcessing ? 'opacity-50' : ''}`}
-                onClick={() => !isCurrentlyProcessing && handleAction(command.id as TextActionType)}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center justify-center w-8 h-8 bg-muted rounded">
-                    {isCurrentlyProcessing ? (
-                      <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                    ) : (
-                      <Icon className="w-4 h-4 text-muted-foreground" />
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-sm font-medium text-foreground">
-                      {command.name}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {command.description}
-                    </div>
-                  </div>
-                  <div className="text-xs text-muted-foreground font-mono">
-                    {command.command}
-                  </div>
-                </div>
+        {showModelSubmenu ? (
+          // 模型子菜单
+          <>
+            <div className="px-3 py-2 border-b border-border bg-muted/30">
+              <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                <ArrowLeft
+                  className="w-4 h-4 cursor-pointer hover:text-primary"
+                  onClick={() => setShowModelSubmenu(false)}
+                />
+                <Cpu className="w-4 h-4" />
+                <span>选择模型</span>
               </div>
-            );
-          })
+            </div>
+            {filteredModelCommands.length === 0 ? (
+              <div className="px-3 py-4 text-sm text-muted-foreground text-center">
+                没有找到匹配的模型
+              </div>
+            ) : (
+              filteredModelCommands.map((model, index) => {
+                const isSelected = index === selectedModelIndex;
+                const isCurrentlyProcessing = isProcessing;
+
+                return (
+                  <div
+                    key={model.id}
+                    className={`px-3 py-2 cursor-pointer transition-colors ${
+                      isSelected
+                        ? 'bg-primary/10 border-l-2 border-l-primary'
+                        : 'hover:bg-muted/50'
+                    } ${isCurrentlyProcessing ? 'opacity-50' : ''}`}
+                    onClick={() => !isCurrentlyProcessing && handleModelSelection(model.id as ModelType)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-center w-8 h-8 bg-muted rounded">
+                        <Cpu className="w-4 h-4 text-muted-foreground" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="text-sm font-medium text-foreground">
+                          {model.name}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {model.description}
+                        </div>
+                      </div>
+                      <div className="text-xs text-muted-foreground font-mono">
+                        {model.command}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </>
+        ) : (
+          // 主命令列表
+          <>
+            {filteredCommands.length === 0 ? (
+              <div className="px-3 py-4 text-sm text-muted-foreground text-center">
+                没有找到匹配的命令
+              </div>
+            ) : (
+              filteredCommands.map((command, index) => {
+                const Icon = command.icon;
+                const isSelected = index === selectedIndex;
+                const isCurrentlyProcessing = isProcessing;
+                const hasSubmenu = command.hasSubmenu;
+
+                return (
+                  <div
+                    key={command.id}
+                    className={`px-3 py-2 cursor-pointer transition-colors ${
+                      isSelected
+                        ? 'bg-primary/10 border-l-2 border-l-primary'
+                        : 'hover:bg-muted/50'
+                    } ${isCurrentlyProcessing ? 'opacity-50' : ''}`}
+                    onClick={() => {
+                      if (isCurrentlyProcessing) return;
+                      if (command.id === 'model') {
+                        setShowModelSubmenu(true);
+                        setSelectedModelIndex(0);
+                        setQuery(''); // 清空输入框
+                      } else {
+                        handleAction(command.id as TextActionType);
+                      }
+                    }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-center w-8 h-8 bg-muted rounded">
+                        {isCurrentlyProcessing ? (
+                          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                        ) : (
+                          <Icon className="w-4 h-4 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <div className="text-sm font-medium text-foreground">
+                          {command.name}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {command.description}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="text-xs text-muted-foreground font-mono">
+                          {command.command}
+                        </div>
+                        {hasSubmenu && (
+                          <ChevronRight className="w-3 h-3 text-muted-foreground" />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </>
         )}
       </div>
 
       {/* 提示信息 */}
       <div className="px-3 py-2 bg-muted/50 border-t border-border">
         <div className="text-xs text-muted-foreground">
-          ↑↓ 选择 • Enter 执行 • Esc 关闭
+          {showModelSubmenu
+            ? '↑↓ 选择 • Enter 执行 • ← 返回 • Esc 关闭'
+            : '↑↓ 选择 • → 展开 • Enter 执行 • Esc 关闭'
+          }
         </div>
       </div>
 
