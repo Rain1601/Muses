@@ -36,6 +36,8 @@ async def get_user_profile(
         "email": current_user_db.email,
         "avatarUrl": current_user_db.avatarUrl,
         "hasOpenAIKey": bool(current_user_db.openaiKey),
+        "hasClaudeKey": bool(current_user_db.claudeKey),
+        "hasGeminiKey": bool(current_user_db.geminiKey),
         "hasGitHubToken": bool(current_user_db.githubToken),
         "defaultRepoUrl": current_user_db.defaultRepoUrl,
         "createdAt": current_user_db.createdAt,
@@ -77,6 +79,24 @@ async def update_user_settings(
             else:
                 # 清除OpenAI Key
                 current_user_db.openaiKey = None
+
+        if request.claudeKey is not None:
+            if request.claudeKey.strip():
+                # 加密存储Claude Key
+                encrypted_key = encrypt(request.claudeKey.strip())
+                current_user_db.claudeKey = encrypted_key
+            else:
+                # 清除Claude Key
+                current_user_db.claudeKey = None
+
+        if request.geminiKey is not None:
+            if request.geminiKey.strip():
+                # 加密存储Gemini Key
+                encrypted_key = encrypt(request.geminiKey.strip())
+                current_user_db.geminiKey = encrypted_key
+            else:
+                # 清除Gemini Key
+                current_user_db.geminiKey = None
 
         if request.githubToken is not None:
             if request.githubToken.strip():

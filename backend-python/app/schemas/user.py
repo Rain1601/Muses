@@ -50,6 +50,8 @@ class User(UserBase):
     id: str
     githubId: str
     hasOpenAIKey: bool = False
+    hasClaudeKey: bool = False
+    hasGeminiKey: bool = False
     hasGitHubToken: bool = False
     defaultRepoUrl: Optional[str] = None
     createdAt: datetime
@@ -68,6 +70,8 @@ class UserProfile(User):
 class UserSettingsRequest(BaseModel):
     """用户设置更新请求"""
     openaiKey: Optional[str] = None
+    claudeKey: Optional[str] = None
+    geminiKey: Optional[str] = None
     githubToken: Optional[str] = None
     defaultRepoUrl: Optional[str] = None
     language: Optional[str] = None

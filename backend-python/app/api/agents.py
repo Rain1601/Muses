@@ -9,12 +9,15 @@ from ..models import Agent, Article
 from ..schemas.agent import (
     Agent as AgentSchema, AgentCreate, AgentUpdate,
     AgentListResponse, AgentResponse, AgentTemplatesResponse, AgentTemplate,
-    StyleAnalysisRequest, StyleAnalysisResponse, TextActionRequest, TextActionResponse
+    StyleAnalysisRequest, StyleAnalysisResponse, TextActionRequest, TextActionResponse,
+    ModelsListResponse, ModelInfo, GenerateContentRequest, GenerateContentResponse,
+    ValidateModelResponse
 )
 from ..schemas.auth import SuccessResponse
 from ..dependencies import get_current_user_db
 from ..utils.exceptions import HTTPNotFoundError, HTTPValidationError
 from ..services.ai_service import AIService
+from ..agent import agent_service
 
 router = APIRouter()
 
@@ -337,3 +340,76 @@ async def perform_text_action(
 
     except Exception as e:
         raise HTTPValidationError(f"Failed to perform text action: {str(e)}")
+
+
+@router.get("/models", response_model=ModelsListResponse)
+async def get_available_models():
+    """获取可用的AI模型列表"""
+
+    try:
+        models = agent_service.get_available_models()
+        model_info_list = [ModelInfo(**model) for model in models]
+        return ModelsListResponse(models=model_info_list)
+
+    except Exception as e:
+        raise HTTPValidationError(f"Failed to get available models: {str(e)}")
+
+
+@router.post("/{agent_id}/generate", response_model=GenerateContentResponse)
+async def generate_content(
+    request: GenerateContentRequest,
+    agent_id: str = Path(..., description="Agent ID"),
+    current_user = Depends(get_current_user_db),
+    db: Session = Depends(get_db)
+):
+    """使用指定Agent生成内容"""
+
+    try:
+        result = await agent_service.generate_content(
+            agent_id=agent_id,
+            prompt=request.prompt,
+            user_id=current_user.id,
+            db=db,
+            max_tokens=request.max_tokens,
+            temperature=request.temperature,
+            system=request.system
+        )
+
+        return GenerateContentResponse(
+            content=result.content,
+            token_count=result.token_count,
+            model_used=result.model_used,
+            finish_reason=result.finish_reason
+        )
+
+    except ValueError as e:
+        raise HTTPNotFoundError(str(e))
+    except Exception as e:
+        raise HTTPValidationError(f"Failed to generate content: {str(e)}")
+
+
+@router.post("/{agent_id}/validate", response_model=ValidateModelResponse)
+async def validate_agent_model(
+    agent_id: str = Path(..., description="Agent ID"),
+    current_user = Depends(get_current_user_db),
+    db: Session = Depends(get_db)
+):
+    """验证Agent的模型配置是否有效"""
+
+    try:
+        is_valid = await agent_service.validate_agent_model(
+            agent_id=agent_id,
+            user_id=current_user.id,
+            db=db
+        )
+
+        return ValidateModelResponse(
+            valid=is_valid,
+            message="Model configuration is valid" if is_valid else "Model configuration is invalid"
+        )
+
+    except Exception as e:
+        return ValidateModelResponse(
+            valid=False,
+            message=f"Validation failed: {str(e)}"
+        )

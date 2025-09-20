@@ -116,3 +116,40 @@ class TextActionResponse(BaseModel):
     originalText: str = Field(..., description="Original text that was processed")
     processedText: str = Field(..., description="AI-generated result text")
     explanation: Optional[str] = Field(None, description="Explanation of changes made (for improve/rewrite actions)")
+
+
+# 新增：多模型Agent系统相关schemas
+
+class ModelInfo(BaseModel):
+    """模型信息"""
+    type: str = Field(..., description="模型类型 (claude, openai, gemini)")
+    display_name: str = Field(..., description="模型显示名称")
+    default_model: str = Field(..., description="默认模型名称")
+    max_tokens: int = Field(..., description="最大token数")
+    capabilities: dict = Field(..., description="模型能力信息")
+
+class ModelsListResponse(BaseModel):
+    """可用模型列表响应"""
+    models: list[ModelInfo] = Field(..., description="可用模型列表")
+
+class GenerateContentRequest(BaseModel):
+    """生成内容请求"""
+    prompt: str = Field(..., min_length=1, description="输入提示词")
+    max_tokens: Optional[int] = Field(None, description="最大生成token数")
+    temperature: Optional[float] = Field(None, ge=0.0, le=2.0, description="温度参数")
+    system: Optional[str] = Field(None, description="系统消息")
+
+class GenerateContentResponse(BaseModel):
+    """生成内容响应"""
+    content: str = Field(..., description="生成的内容")
+    token_count: Optional[int] = Field(None, description="使用的token数量")
+    model_used: Optional[str] = Field(None, description="使用的模型", alias="model_used")
+    finish_reason: Optional[str] = Field(None, description="完成原因")
+
+    class Config:
+        protected_namespaces = ()
+
+class ValidateModelResponse(BaseModel):
+    """验证模型配置响应"""
+    valid: bool = Field(..., description="配置是否有效")
+    message: Optional[str] = Field(None, description="验证消息")

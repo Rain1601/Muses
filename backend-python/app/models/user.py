@@ -18,6 +18,8 @@ class User(Base):
     email = Column(String, nullable=True)
     avatarUrl = Column(String, nullable=True)
     openaiKey = Column(String, nullable=True)  # 加密存储
+    claudeKey = Column(String, nullable=True)  # 加密存储
+    geminiKey = Column(String, nullable=True)  # 加密存储
     githubToken = Column(String, nullable=True)  # 加密存储
     defaultRepoUrl = Column(String, nullable=True)
     createdAt = Column(DateTime, default=func.now())
