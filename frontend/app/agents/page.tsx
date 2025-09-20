@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { ProtectedRoute } from "@/components/protected-route";
 import Navigation from "@/components/Navigation";
 import { AgentListItem } from "@/components/AgentListItem";
 import { AgentDetailView } from "@/components/AgentDetailView";
 import { AgentEditForm } from "@/components/AgentEditForm";
+import { AgentCreateDialog } from "@/components/AgentCreateDialog";
 import { api } from "@/lib/api";
 import { Plus, Bot, Search, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,7 @@ export default function AgentsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [isEditing, setIsEditing] = useState(false);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   useEffect(() => {
     fetchAgents();
@@ -85,6 +86,15 @@ export default function AgentsPage() {
     setIsEditing(false);
   };
 
+  const handleAgentCreated = (newAgent: Agent) => {
+    // 添加新Agent到列表
+    setAgents(prev => [newAgent, ...prev]);
+    // 选中新创建的Agent
+    setSelectedAgent(newAgent);
+    // 关闭创建弹窗
+    setShowCreateDialog(false);
+  };
+
   // 过滤agents
   const filteredAgents = agents.filter(agent =>
     agent.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -104,12 +114,10 @@ export default function AgentsPage() {
               <div className="p-4 border-b border-border">
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="text-lg font-semibold">AI Agents</h2>
-                  <Link href="/agents/new">
-                    <Button size="sm" className="h-8">
-                      <Plus className="w-4 h-4 mr-1" />
-                      新建
-                    </Button>
-                  </Link>
+                  <Button size="sm" className="h-8" onClick={() => setShowCreateDialog(true)}>
+                    <Plus className="w-4 h-4 mr-1" />
+                    新建
+                  </Button>
                 </div>
 
                 {/* 搜索框 */}
@@ -146,12 +154,10 @@ export default function AgentsPage() {
                         <p className="text-sm text-muted-foreground mb-3">
                           还没有创建任何Agent
                         </p>
-                        <Link href="/agents/new">
-                          <Button size="sm" variant="outline">
-                            <Plus className="w-4 h-4 mr-1" />
-                            创建第一个Agent
-                          </Button>
-                        </Link>
+                        <Button size="sm" variant="outline" onClick={() => setShowCreateDialog(true)}>
+                          <Plus className="w-4 h-4 mr-1" />
+                          创建第一个Agent
+                        </Button>
                       </>
                     )}
                   </div>
@@ -210,6 +216,13 @@ export default function AgentsPage() {
             )}
           </section>
         </main>
+
+        {/* 创建Agent弹窗 */}
+        <AgentCreateDialog
+          open={showCreateDialog}
+          onOpenChange={setShowCreateDialog}
+          onAgentCreated={handleAgentCreated}
+        />
       </div>
     </ProtectedRoute>
   );

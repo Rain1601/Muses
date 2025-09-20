@@ -341,7 +341,15 @@ export function NotionEditor({ initialContent = '', onChange }: NotionEditorProp
           // 生成唯一文件名（不依赖file.name，避免重复）
           const timestamp = new Date().toISOString().replace(/[:-]/g, '').split('.')[0];
           const randomId = Math.random().toString(36).substring(2, 8);
-          const ext = contentType.split('/')[1] || 'png';
+          // 正确处理 SVG 的 MIME 类型 image/svg+xml
+          const contentTypeParts = contentType.split('/');
+          let ext = 'png';
+          if (contentTypeParts.length >= 2) {
+            ext = contentTypeParts[1].split('+')[0]; // 去掉 +xml 部分
+          }
+          if (!['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) {
+            ext = 'png';
+          }
           const uniqueFilename = `image_${timestamp}_${randomId}.${ext}`;
 
           console.log('📤 Sending API request to /api/upload-image with:', {

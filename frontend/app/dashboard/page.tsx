@@ -44,6 +44,7 @@ function DashboardContent() {
   const [rightPanelMode, setRightPanelMode] = useState<'toc' | 'info' | 'sync'>('toc');
   const [activeHeading, setActiveHeading] = useState<string>('');
   const [showSaveToast, setShowSaveToast] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
@@ -127,6 +128,7 @@ function DashboardContent() {
   const manualSave = useCallback(async () => {
     if (!editingContent.trim() && !editingTitle.trim()) return;
 
+    setIsSaving(true);
     try {
       if (selectedArticle) {
         // 更新现有文章
@@ -159,6 +161,8 @@ function DashboardContent() {
       }, 1000);
     } catch (error) {
       console.error('手动保存失败:', error);
+    } finally {
+      setIsSaving(false);
     }
   }, [editingTitle, editingContent, selectedArticle, defaultAgent, showToast]);
 
@@ -572,11 +576,12 @@ summary: ""
                     {/* 手动保存按钮 */}
                     <button
                       onClick={manualSave}
-                      className="flex items-center gap-1 px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground border border-border rounded-lg hover:bg-accent/50 transition-colors"
+                      disabled={isSaving || (!editingTitle.trim() && !editingContent.trim())}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground bg-muted/20 hover:bg-muted/40 border-0 rounded-md hover:shadow-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                       title="手动保存 (Shift+Cmd+S)"
                     >
                       <Save className="w-3.5 h-3.5" />
-                      <span>保存</span>
+                      <span>{isSaving ? '保存中...' : '保存'}</span>
                     </button>
 
                     {/* 发布按钮 */}
