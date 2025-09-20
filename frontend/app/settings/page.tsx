@@ -5,6 +5,15 @@ import { ProtectedRoute } from "@/components/protected-route";
 import Navigation from "@/components/Navigation";
 import { useUserStore } from "@/store/user";
 import { api } from "@/lib/api";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { CheckCircle } from "lucide-react";
 
 export default function SettingsPage() {
   const { user } = useUserStore();
@@ -14,6 +23,8 @@ export default function SettingsPage() {
 
   const [formData, setFormData] = useState({
     openaiKey: "",
+    claudeKey: "",
+    geminiKey: "",
     githubToken: "",
     defaultRepoUrl: "",
     language: "zh-CN",
@@ -25,6 +36,8 @@ export default function SettingsPage() {
     totalAgents: 0,
     storageUsed: "0 MB",
   });
+
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
 
   useEffect(() => {
     // Wait a bit for auth to stabilize, then fetch data
@@ -55,6 +68,8 @@ export default function SettingsPage() {
 
       const newFormData = {
         openaiKey: userData.hasOpenAIKey ? "••••••••" : "",
+        claudeKey: userData.hasClaudeKey ? "••••••••" : "",
+        geminiKey: userData.hasGeminiKey ? "••••••••" : "",
         githubToken: userData.hasGitHubToken ? "••••••••" : "",
         defaultRepoUrl: userData.defaultRepoUrl || "",
         language: userData.settings?.language || "zh-CN",
@@ -104,6 +119,14 @@ export default function SettingsPage() {
         updateData.openaiKey = formData.openaiKey;
       }
 
+      if (formData.claudeKey && formData.claudeKey !== "••••••••") {
+        updateData.claudeKey = formData.claudeKey;
+      }
+
+      if (formData.geminiKey && formData.geminiKey !== "••••••••") {
+        updateData.geminiKey = formData.geminiKey;
+      }
+
       // 只有当用户输入了新的GitHub Token时才更新
       if (formData.githubToken && formData.githubToken !== "••••••••") {
         updateData.githubToken = formData.githubToken;
@@ -112,10 +135,11 @@ export default function SettingsPage() {
       const response = await api.post("/api/user/settings", updateData);
       console.log("Settings saved response:", response.data);
 
+      // 显示成功对话框
+      setShowSuccessDialog(true);
+
       // 重新获取用户数据以确保显示最新值
       await fetchUserData();
-
-      alert("设置保存成功");
 
       // 如果更改了主题，应用新主题
       if (formData.theme === "dark") {
@@ -124,7 +148,7 @@ export default function SettingsPage() {
         document.documentElement.classList.remove("dark");
       }
     } catch (error) {
-      alert("保存失败");
+      alert("保存失败，请重试");
     } finally {
       setIsLoading(false);
     }
@@ -176,14 +200,24 @@ export default function SettingsPage() {
               账户信息
             </button>
             <button
-              onClick={() => setActiveTab("api")}
+              onClick={() => setActiveTab("github")}
               className={`pb-3 px-1 border-b-2 transition-colors ${
-                activeTab === "api"
+                activeTab === "github"
                   ? "border-primary text-primary"
                   : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
-              API配置
+              GitHub配置
+            </button>
+            <button
+              onClick={() => setActiveTab("models")}
+              className={`pb-3 px-1 border-b-2 transition-colors ${
+                activeTab === "models"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              模型配置
             </button>
             <button
               onClick={() => setActiveTab("preferences")}
@@ -241,25 +275,9 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {/* API配置 */}
-          {activeTab === "api" && (
+          {/* GitHub配置 */}
+          {activeTab === "github" && (
             <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  OpenAI API Key
-                </label>
-                <input
-                  type="password"
-                  value={formData.openaiKey}
-                  onChange={(e) => setFormData({ ...formData, openaiKey: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="sk-..."
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  API Key 将被加密存储，仅用于生成文章
-                </p>
-              </div>
-
               <div>
                 <label className="block text-sm font-medium mb-2">
                   GitHub Personal Access Token
@@ -349,6 +367,79 @@ export default function SettingsPage() {
             </div>
           )}
 
+          {/* 模型配置 */}
+          {activeTab === "models" && (
+            <div className="space-y-6">
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+                <h3 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
+                  🤖 AI模型配置说明
+                </h3>
+                <p className="text-sm text-blue-800 dark:text-blue-200 mb-2">
+                  配置不同的AI模型API Key，在创建Agent时可以选择使用的模型：
+                </p>
+                <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
+                  <li>• <strong>OpenAI</strong>：GPT-4、GPT-3.5等模型</li>
+                  <li>• <strong>Claude</strong>：Anthropic的Claude模型系列</li>
+                  <li>• <strong>Gemini</strong>：Google的Gemini模型系列</li>
+                </ul>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  OpenAI API Key
+                </label>
+                <input
+                  type="password"
+                  value={formData.openaiKey}
+                  onChange={(e) => setFormData({ ...formData, openaiKey: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="sk-..."
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  用于GPT-4、GPT-3.5等OpenAI模型，格式：sk-...
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Claude API Key
+                </label>
+                <input
+                  type="password"
+                  value={formData.claudeKey}
+                  onChange={(e) => setFormData({ ...formData, claudeKey: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="sk-ant-..."
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  用于Claude-3.5-Sonnet、Claude-3等Anthropic模型，格式：sk-ant-...
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Gemini API Key
+                </label>
+                <input
+                  type="password"
+                  value={formData.geminiKey}
+                  onChange={(e) => setFormData({ ...formData, geminiKey: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="AI..."
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  用于Gemini Pro、Gemini Ultra等Google模型，格式：AI...
+                </p>
+              </div>
+
+              <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-lg">
+                <p className="text-sm text-amber-800 dark:text-amber-200">
+                  <strong>💡 提示：</strong>所有API Key都将使用AES加密安全存储。您可以只配置需要使用的模型API Key，未配置的模型将在Agent创建时不可选择。
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* 偏好设置 */}
           {activeTab === "preferences" && (
             <div className="space-y-6">
@@ -430,7 +521,7 @@ export default function SettingsPage() {
           )}
 
           {/* 保存按钮 */}
-          {(activeTab === "api" || activeTab === "preferences") && (
+          {(activeTab === "github" || activeTab === "models" || activeTab === "preferences") && (
             <div className="mt-8">
               <button
                 onClick={handleSave}
@@ -443,6 +534,29 @@ export default function SettingsPage() {
           )}
         </main>
       </div>
+
+      {/* Success Dialog */}
+      <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-green-100 rounded-full dark:bg-green-900">
+              <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
+            </div>
+            <DialogTitle className="text-center">设置保存成功</DialogTitle>
+            <DialogDescription className="text-center text-muted-foreground">
+              您的配置已成功更新
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-center mt-6">
+            <Button
+              onClick={() => setShowSuccessDialog(false)}
+              className="w-full"
+            >
+              确定
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </ProtectedRoute>
   );
 }
