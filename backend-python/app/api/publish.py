@@ -2,10 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 import httpx
 import base64
+import time
 from datetime import datetime
 
 from ..database import get_db
 from ..models import Article
+from ..models.sync_history import SyncHistory
 from ..dependencies import get_current_user_db
 from ..utils.security import decrypt
 from ..utils.exceptions import HTTPNotFoundError, HTTPValidationError
@@ -69,6 +71,7 @@ async def publish_batch_to_github(
 ):
     """批量发布文章和图片到GitHub"""
 
+    start_time = time.time()
     article_id = request.get("articleId")
     repo_url = request.get("repoUrl")
     files = request.get("files", [])  # [{"path": "...", "content": "...", "encoding": "utf-8|base64"}]
@@ -163,6 +166,29 @@ async def publish_batch_to_github(
                 article.publishedAt = datetime.utcnow()
                 article.githubUrl = github_url
                 article.repoPath = main_file_path
+
+                # 更新同步状态
+                article.syncStatus = "synced"
+                if not article.firstSyncAt:
+                    article.firstSyncAt = datetime.utcnow()
+                article.lastSyncAt = datetime.utcnow()
+                article.syncCount = str(int(article.syncCount or "0") + 1)
+
+                # 创建同步历史记录
+                sync_record = SyncHistory(
+                    articleId=article_id,
+                    userId=current_user.id,
+                    syncType="publish_to_github",
+                    syncDirection="local_to_github",
+                    syncStatus="success",
+                    hasChanges="true",
+                    syncDuration=int((time.time() - start_time) * 1000),
+                    githubUrl=github_url,
+                    repoPath=main_file_path,
+                    fileSize=len(success_files)
+                )
+                db.add(sync_record)
+
                 db.commit()
 
             return {
@@ -185,14 +211,15 @@ async def publish_to_github(
     db: Session = Depends(get_db)
 ):
     """发布文章到GitHub（保持向后兼容）"""
-    
+
+    start_time = time.time()
     article_id = request.get("articleId")
     repo_url = request.get("repoUrl")
     file_path = request.get("filePath")
     commit_message = request.get("commitMessage", "Add new article")
     custom_content = request.get("content")  # 可选：直接传递的内容
 
-    if not all([article_id, repo_url, file_path]):
+    if not all([article_id, repo_url]):
         raise HTTPValidationError("Missing required parameters")
 
     # 获取文章
@@ -203,6 +230,15 @@ async def publish_to_github(
 
     if not article:
         raise HTTPNotFoundError("Article not found")
+
+    # 如果文章已经发布过，使用已保存的路径；否则使用提供的路径
+    if article.repoPath:
+        file_path = article.repoPath
+        commit_message = request.get("commitMessage", f"Update article: {article.title}")
+    else:
+        if not file_path:
+            raise HTTPValidationError("filePath is required for first-time publishing")
+        commit_message = request.get("commitMessage", f"Add new article: {article.title}")
     
     if not current_user.githubToken:
         raise HTTPValidationError("GitHub token not found")
@@ -308,11 +344,37 @@ async def publish_to_github(
             
             # 更新文章发布状态
             github_url = f"{repo_url}/blob/main/{file_path}"
+            result = commit_response.json()
+
             article.publishStatus = "published"
             article.publishedAt = datetime.utcnow()
             article.githubUrl = github_url
             article.repoPath = file_path
-            
+            article.githubSha = result.get("content", {}).get("sha")  # 保存GitHub文件的SHA值
+
+            # 更新同步状态
+            article.syncStatus = "synced"
+            if not article.firstSyncAt:
+                article.firstSyncAt = datetime.utcnow()
+            article.lastSyncAt = datetime.utcnow()
+            article.syncCount = str(int(article.syncCount or "0") + 1)
+
+            # 创建同步历史记录
+            sync_record = SyncHistory(
+                articleId=article_id,
+                userId=current_user.id,
+                syncType="publish_to_github",
+                syncDirection="local_to_github",
+                syncStatus="success",
+                hasChanges="true",
+                syncDuration=int((time.time() - start_time) * 1000),
+                githubSha=article.githubSha,
+                githubUrl=github_url,
+                repoPath=file_path,
+                fileSize=len(file_content)
+            )
+            db.add(sync_record)
+
             db.commit()
             
             return {
