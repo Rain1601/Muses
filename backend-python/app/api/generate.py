@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 import json
+from datetime import datetime
 
 from ..database import get_db
 from ..models import Agent, Article
@@ -52,19 +53,38 @@ async def generate_article(
         
         # 如果需要保存为草稿
         if request.saveAsDraft:
-            article_data = Article(
-                userId=current_user.id,
-                agentId=request.agentId,
-                title=result["title"],
-                content=result["content"],
-                summary=result["summary"],
-                publishStatus="draft",
-                sourceFiles=json.dumps({"materials": request.materials})
-            )
-            
-            db.add(article_data)
-            db.commit()
-            db.refresh(article_data)
+            # 检查是否已存在同标题的文章（基于标题去重）
+            existing_article = db.query(Article).filter(
+                Article.userId == current_user.id,
+                Article.title == result["title"]
+            ).first()
+
+            if existing_article:
+                # 更新已存在的文章
+                existing_article.agentId = request.agentId
+                existing_article.content = result["content"]
+                existing_article.summary = result["summary"]
+                existing_article.sourceFiles = json.dumps({"materials": request.materials})
+                existing_article.updatedAt = datetime.utcnow()
+
+                db.commit()
+                db.refresh(existing_article)
+                article_data = existing_article
+            else:
+                # 创建新文章
+                article_data = Article(
+                    userId=current_user.id,
+                    agentId=request.agentId,
+                    title=result["title"],
+                    content=result["content"],
+                    summary=result["summary"],
+                    publishStatus="draft",
+                    sourceFiles=json.dumps({"materials": request.materials})
+                )
+
+                db.add(article_data)
+                db.commit()
+                db.refresh(article_data)
             
             # 构建响应
             agent_info = ArticleAgent(name=agent.name, avatar=agent.avatar)
@@ -199,20 +219,39 @@ async def chat_generate(
             }
             if request.materials:
                 source_files["materials"] = request.materials
-            
-            article_data = Article(
-                userId=current_user.id,
-                agentId=request.agentId,
-                title=result["title"],
-                content=result["content"],
-                summary=result["summary"],
-                publishStatus="draft",
-                sourceFiles=json.dumps(source_files)
-            )
-            
-            db.add(article_data)
-            db.commit()
-            db.refresh(article_data)
+
+            # 检查是否已存在同标题的文章（基于标题去重）
+            existing_article = db.query(Article).filter(
+                Article.userId == current_user.id,
+                Article.title == result["title"]
+            ).first()
+
+            if existing_article:
+                # 更新已存在的文章
+                existing_article.agentId = request.agentId
+                existing_article.content = result["content"]
+                existing_article.summary = result["summary"]
+                existing_article.sourceFiles = json.dumps(source_files)
+                existing_article.updatedAt = datetime.utcnow()
+
+                db.commit()
+                db.refresh(existing_article)
+                article_data = existing_article
+            else:
+                # 创建新文章
+                article_data = Article(
+                    userId=current_user.id,
+                    agentId=request.agentId,
+                    title=result["title"],
+                    content=result["content"],
+                    summary=result["summary"],
+                    publishStatus="draft",
+                    sourceFiles=json.dumps(source_files)
+                )
+
+                db.add(article_data)
+                db.commit()
+                db.refresh(article_data)
             
             # 构建响应
             agent_info = ArticleAgent(name=agent.name, avatar=agent.avatar)
