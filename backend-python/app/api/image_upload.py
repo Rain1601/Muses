@@ -21,6 +21,8 @@ class ImageUploadRequest(BaseModel):
 async def upload_image_to_github(request: ImageUploadRequest, current_user: User = Depends(get_current_user_db)):
     """上传图片到GitHub仓库作为图床"""
     try:
+        print(f"🔍 UPLOAD DEBUG: Function called with contentType: {request.contentType}")
+        logger.info(f"🔍 SVG DEBUG: Starting upload with contentType: {request.contentType}")
         logger.info(f"🖼️ Starting image upload for user: {current_user.username}")
         logger.info(f"📊 Request details - filename: {request.filename}, content_type: {request.contentType}")
         logger.info(f"📊 Base64 data length: {len(request.base64Data)} characters")
@@ -59,14 +61,34 @@ async def upload_image_to_github(request: ImageUploadRequest, current_user: User
             logger.error(f"❌ Failed to decrypt GitHub token: {str(e)}")
             raise HTTPException(status_code=400, detail=f"Token解密失败: {str(e)}")
 
-        # 生成文件名
+        # 生成文件名或修复已提供的文件名
         if not request.filename:
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             unique_id = str(uuid.uuid4())[:8]
-            ext = request.contentType.split('/')[-1]
-            if ext not in ['jpg', 'jpeg', 'png', 'gif', 'webp']:
+            # 正确处理 SVG 的 MIME 类型 image/svg+xml
+            logger.info(f"🔍 Processing content type: {request.contentType}")
+            content_type_parts = request.contentType.split('/')
+            if len(content_type_parts) >= 2:
+                ext = content_type_parts[1].split('+')[0]  # 去掉 +xml 部分
+                logger.info(f"🔍 Extracted extension from '{content_type_parts[1]}' -> '{ext}'")
+            else:
+                ext = 'jpg'
+            if ext not in ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg']:
                 ext = 'jpg'
             request.filename = f"image_{timestamp}_{unique_id}.{ext}"
+            logger.info(f"🔍 Generated filename: {request.filename}")
+        else:
+            # 修复前端可能传来的错误文件名（如 .svg+xml）
+            if request.filename.endswith('.svg+xml'):
+                request.filename = request.filename.replace('.svg+xml', '.svg')
+                logger.info(f"🔍 Fixed SVG filename: {request.filename}")
+            elif request.filename.endswith('.jpeg+xml'):
+                request.filename = request.filename.replace('.jpeg+xml', '.jpeg')
+                logger.info(f"🔍 Fixed JPEG filename: {request.filename}")
+            elif '+xml' in request.filename:
+                # 通用修复：移除所有 +xml 部分
+                request.filename = request.filename.replace('+xml', '')
+                logger.info(f"🔍 Fixed filename by removing +xml: {request.filename}")
 
         # GitHub文件路径
         file_path = f"assets/images/{request.filename}"
@@ -253,7 +275,12 @@ async def convert_image_url_to_github(request: ImageUrlRequest, current_user: Us
 
         # 确保文件名有扩展名
         if '.' not in original_filename:
-            ext = content_type.split('/')[-1]
+            # 正确处理 SVG 的 MIME 类型 image/svg+xml
+            content_type_parts = content_type.split('/')
+            if len(content_type_parts) >= 2:
+                ext = content_type_parts[1].split('+')[0]  # 去掉 +xml 部分
+            else:
+                ext = 'jpg'
             if ext not in ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg']:
                 ext = 'jpg'
             original_filename = f"{original_filename}.{ext}"
