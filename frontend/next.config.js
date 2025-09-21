@@ -29,6 +29,10 @@ const nextConfig = {
       },
     ];
   },
+  // 增加服务器端超时时间
+  serverRuntimeConfig: {
+    apiTimeout: 60000, // 60 seconds
+  },
 };
 
 module.exports = nextConfig;
