@@ -6,12 +6,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Muses** is an AI-powered blog article generation platform that converts various source materials (PDF, Markdown, text, conversations) into high-quality blog articles. It features a Next.js frontend and FastAPI (Python) backend with SQLite database.
 
-## important-instruction-reminders
-Do what has been asked; nothing more, nothing less.
-NEVER create files unless they're absolutely necessary for achieving your goal.
-ALWAYS prefer editing an existing file to creating a new one.
-NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
-
 ## Development Commands
 
 ### Quick Start
@@ -147,69 +141,58 @@ OPENAI_API_KEY="your-openai-api-key"
 - Create OAuth App at https://github.com/settings/developers
 - Authorization callback URL: `http://localhost:8080/api/auth/github/callback`
 
-## Testing and Quality
+## Testing
 
-### Running Tests
 ```bash
-# Python backend tests
+# Python backend - run all tests
 cd backend-python && python -m pytest
 
-# Frontend tests  
-cd frontend && npm test
+# Python backend - run specific test file
+cd backend-python && python -m pytest test_unified_ai.py
 
+# Frontend - no test script configured yet
 # Type checking
 cd frontend && npx tsc --noEmit
 ```
 
-### Code Quality
-- ESLint configuration for frontend
-- TypeScript strict mode enabled
-- Python type hints with Pydantic
-- FastAPI automatic validation and serialization
 
-## Security Considerations
+## Key API Endpoints
 
-- All API routes require JWT authentication except auth endpoints
-- User data isolation - users can only access their own data
-- Sensitive data encryption (API keys, tokens)
-- Input validation using Pydantic models
-- CORS and security headers configured via FastAPI
-
-## Common Development Tasks
-
-### Adding New API Endpoint (Python)
-1. Create route handler in `backend-python/app/api/`
-2. Define Pydantic request/response schemas in `app/schemas/`
-3. Implement authentication dependency
-4. Add proper error handling
-5. Register route in FastAPI router
-
-### Adding New Page
-1. Create page component in `frontend/app/`
-2. Wrap with authentication check if required
-3. Add navigation to relevant components
-4. Create corresponding API hooks if needed
-
-### Database Schema Changes (SQLAlchemy)
-1. Modify models in `backend-python/app/models/`
-2. Create Alembic migration: `alembic revision --autogenerate -m "description"`
-3. Apply migration: `alembic upgrade head`
-4. Update Pydantic schemas as needed
-
-### Key API Endpoints
 - `/api/auth/github/callback` - GitHub OAuth callback
 - `/api/agents/` - AI agent CRUD operations
+- `/api/agents/text-action` - Text processing actions (improve, expand, summarize, etc.)
 - `/api/articles/` - Article management
 - `/api/generate/` - AI article generation
 - `/api/upload/` - File upload processing
 - `/api/image-upload/upload-image` - GitHub image hosting
 - `/api/publish/` - GitHub repository publishing
+- `/api/users/settings` - User settings management
 
-### Performance Optimization
-- Use React.memo() for expensive components
-- Implement proper TanStack Query caching strategies
-- Optimize database queries with proper SQLAlchemy select/joins
-- Use Next.js Image component for images
+## Multi-Model AI Support
+
+The system supports multiple AI providers through a unified interface:
+- **OpenAI**: GPT-4, GPT-4 Turbo, GPT-3.5 Turbo
+- **Anthropic**: Claude 3.5 Sonnet, Claude 3 Opus/Sonnet/Haiku
+- **Google**: Gemini 1.5 Pro/Flash, Gemini 2.0 Flash
+
+AI configuration is handled through:
+- `backend-python/app/models_config.py` - Model definitions and mappings
+- `backend-python/app/services/unified_ai.py` - Unified API client with provider-specific formatting
+- Each user can configure different models for different agents
+
+## Database Management
+
+```bash
+# Create Alembic migration
+cd backend-python
+alembic revision --autogenerate -m "description"
+
+# Apply migrations
+alembic upgrade head
+
+# Database backup
+cp muses.db muses.db.backup
+```
 
 ## Deployment
 
@@ -218,7 +201,6 @@ The project includes a complete CI/CD solution for Mac Mini deployment:
 - **Complete Guide**: See `docs/MAC_MINI_DEPLOYMENT.md` for comprehensive setup instructions
 - **Auto-sync**: Push to GitHub → Mac Mini automatically pulls and deploys
 - **External Access**: Includes Cloudflare Tunnel configuration
-- **Tech Stack**: Next.js frontend + FastAPI (Python) backend
 
 ### Traditional Deployment
 The project also includes Docker configuration and PM2 process management for traditional deployment. See `docs/DEPLOYMENT.md` for detailed deployment instructions.
