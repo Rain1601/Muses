@@ -333,7 +333,9 @@ async def perform_text_action(
             text=request.text,
             action_type=request.actionType,
             context=request.context,
-            language=request.language
+            language=request.language,
+            provider=request.provider,
+            model=request.model
         )
 
         return TextActionResponse(**result)

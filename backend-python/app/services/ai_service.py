@@ -1,4 +1,5 @@
 import openai
+import anthropic
 import markdown
 import json
 import re
@@ -9,6 +10,8 @@ from difflib import SequenceMatcher
 from ..models import User, Agent, Article
 from ..utils.security import decrypt
 from ..utils.exceptions import OpenAIKeyError, ValidationError
+from ..models_config import get_model_for_provider, get_model_info
+from .unified_ai import UnifiedAIClient
 
 
 TaskType = Literal["rewrite", "continue", "custom"]
@@ -73,13 +76,92 @@ class AIService:
         """获取OpenAI客户端"""
         if not user.openaiKey:
             raise OpenAIKeyError("OpenAI API Key not configured")
-        
+
         try:
             api_key = decrypt(user.openaiKey)
             return openai.OpenAI(api_key=api_key)
         except Exception as e:
             raise OpenAIKeyError("Failed to decrypt OpenAI API Key")
+
+    @staticmethod
+    def _get_claude_client(user: User) -> anthropic.Anthropic:
+        """获取Claude客户端"""
+        if not user.claudeKey:
+            raise ValidationError("Claude API Key not configured")
+
+        try:
+            api_key = decrypt(user.claudeKey)
+            return anthropic.Anthropic(api_key=api_key)
+        except Exception as e:
+            raise ValidationError("Failed to decrypt Claude API Key")
+
+    @staticmethod
+    def _determine_provider(user: User, preferred_provider: str = None) -> str:
+        """
+        确定使用哪个AI提供商
+
+        Args:
+            user: 用户对象
+            preferred_provider: 偏好的提供商 (openai, claude, gemini)
+
+        Returns:
+            可用的提供商名称
+        """
+        # 如果指定了偏好提供商且该提供商可用
+        if preferred_provider:
+            if preferred_provider == "openai" and user.openaiKey:
+                return "openai"
+            elif preferred_provider == "claude" and user.claudeKey:
+                return "claude"
+            elif preferred_provider == "gemini" and user.geminiKey:
+                return "gemini"
+
+        # 按优先级检查可用的提供商
+        if user.openaiKey:
+            return "openai"
+        elif user.claudeKey:
+            return "claude"
+        elif user.geminiKey:
+            return "gemini"
+        else:
+            raise ValidationError("No AI API keys configured")
     
+    @classmethod
+    async def _call_ai(
+        cls,
+        user: User,
+        messages: List[Dict[str, str]],
+        provider: str = None,
+        model: str = None,
+        temperature: float = 0.7,
+        max_tokens: int = 2000
+    ) -> str:
+        """
+        统一的AI调用接口，支持多个提供商
+
+        使用UnifiedAIClient自动处理不同提供商的消息格式和API差异
+
+        Args:
+            user: 用户对象
+            messages: 消息列表
+            provider: AI提供商 (openai, claude, gemini)
+            model: 指定的模型ID
+            temperature: 温度参数
+            max_tokens: 最大token数
+
+        Returns:
+            AI响应文本
+        """
+        # 使用统一的AI客户端
+        return await UnifiedAIClient.call(
+            user=user,
+            messages=messages,
+            provider=provider,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens
+        )
+
     @staticmethod
     def _build_system_prompt(agent: Agent) -> str:
         """构建系统提示词"""
@@ -235,7 +317,7 @@ class AIService:
         
         try:
             response = client.chat.completions.create(
-                model="gpt-4-turbo-preview",
+                model=get_model_for_provider("openai"),
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
@@ -272,7 +354,7 @@ class AIService:
         
         try:
             response = client.chat.completions.create(
-                model="gpt-4-turbo-preview",
+                model=get_model_for_provider("openai"),
                 messages=chat_messages,
                 temperature=0.7,
                 max_tokens=1000
@@ -308,7 +390,7 @@ class AIService:
         
         try:
             response = client.chat.completions.create(
-                model="gpt-4-turbo-preview",
+                model=get_model_for_provider("openai"),
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
@@ -369,7 +451,7 @@ class AIService:
         
         try:
             response = client.chat.completions.create(
-                model="gpt-4-turbo-preview",
+                model=get_model_for_provider("openai"),
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
@@ -463,7 +545,7 @@ class AIService:
         
         try:
             response = client.chat.completions.create(
-                model="gpt-4-turbo-preview",
+                model=get_model_for_provider("openai"),
                 messages=[
                     {"role": "system", "content": json_format_prompt},
                     {"role": "user", "content": user_prompt}
@@ -529,11 +611,12 @@ class AIService:
         text: str,
         action_type: str,
         context: Optional[str] = None,
-        language: Optional[str] = None
+        language: Optional[str] = None,
+        provider: str = None,
+        model: str = None
     ) -> Dict[str, Any]:
         """执行文本操作（改进、解释、扩展等）"""
 
-        client = cls._get_openai_client(user)
         system_prompt = cls._build_system_prompt(agent)
 
         # 根据操作类型构建不同的提示词
@@ -558,25 +641,31 @@ class AIService:
             user_prompt += "\n\n请提供简要的修改说明。"
 
         try:
-            response = client.chat.completions.create(
-                model="gpt-4-turbo-preview",
+            # 使用统一的AI调用方法
+            processed_text = await cls._call_ai(
+                user=user,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
+                provider=provider,
+                model=model,
                 temperature=0.7,
                 max_tokens=2000
             )
 
-            processed_text = response.choices[0].message.content or ""
-
             # 对于改进和重写操作，尝试分离结果和说明
             explanation = None
-            if action_type in ["improve", "rewrite"] and "修改说明" in processed_text:
-                parts = processed_text.split("修改说明")
-                if len(parts) == 2:
-                    processed_text = parts[0].strip()
-                    explanation = parts[1].strip()
+            if action_type in ["improve", "rewrite"]:
+                # 尝试多种分隔符
+                separators = ["修改说明：", "修改说明:", "说明：", "说明:", "\n\n修改说明", "\n修改说明"]
+                for sep in separators:
+                    if sep in processed_text:
+                        parts = processed_text.split(sep, 1)  # 只分割第一次出现
+                        if len(parts) == 2:
+                            processed_text = parts[0].strip()
+                            explanation = parts[1].strip()
+                            break
 
             return {
                 "actionType": action_type,

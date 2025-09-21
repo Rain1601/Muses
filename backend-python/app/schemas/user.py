@@ -86,3 +86,33 @@ class VerifyOpenAIKeyRequest(BaseModel):
 class VerifyOpenAIKeyResponse(BaseModel):
     """验证OpenAI Key响应"""
     valid: bool
+
+
+class VerifyClaudeKeyRequest(BaseModel):
+    """验证Claude Key请求"""
+    claudeKey: str
+
+
+class VerifyClaudeKeyResponse(BaseModel):
+    """验证Claude Key响应"""
+    valid: bool
+
+
+class VerifyGeminiKeyRequest(BaseModel):
+    """验证Gemini Key请求"""
+    geminiKey: str
+
+
+class VerifyGeminiKeyResponse(BaseModel):
+    """验证Gemini Key响应"""
+    valid: bool
+
+
+class GetApiKeyRequest(BaseModel):
+    """获取API Key请求"""
+    keyType: str  # "openai", "claude", "gemini", "github"
+
+
+class GetApiKeyResponse(BaseModel):
+    """获取API Key响应"""
+    key: str

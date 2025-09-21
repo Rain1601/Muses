@@ -109,6 +109,8 @@ class TextActionRequest(BaseModel):
     actionType: TextActionTypeEnum = Field(..., description="Type of action to perform")
     context: Optional[str] = Field(None, description="Additional context or instructions")
     language: Optional[str] = Field(None, description="Target language for translation (if applicable)")
+    provider: Optional[str] = Field(None, description="AI provider to use (openai, claude, gemini)")
+    model: Optional[str] = Field(None, description="Specific model to use (gpt-5, claude-sonnet-4-20250514, etc)")
 
 
 class TextActionResponse(BaseModel):
