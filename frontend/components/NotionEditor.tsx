@@ -29,7 +29,7 @@ import css from 'highlight.js/lib/languages/css';
 import python from 'highlight.js/lib/languages/python';
 import { api } from '@/lib/api';
 import { useImageViewer } from './ImageViewer';
-import TextActionToolbar, { TextActionType, ModelType } from './TextActionToolbar';
+import TextActionToolbar, { TextActionType, ModelConfig } from './TextActionToolbar';
 import AIDisabledTooltip from './AIDisabledTooltip';
 import { useTextActions } from '@/lib/hooks/useTextActions';
 import { useAIAssistantStore } from '@/store/aiAssistant';
@@ -224,34 +224,61 @@ export function NotionEditor({ initialContent = '', onChange, agentId }: NotionE
   // 文本选择处理已移至全局 selectionchange 监听器
 
   // 处理文本操作
-  const handleTextAction = useCallback(async (actionType: TextActionType, text: string, modelType?: ModelType) => {
+  const handleTextAction = useCallback(async (actionType: TextActionType, text: string, modelConfig?: ModelConfig, additionalInput?: string) => {
     if (!agentId) {
       console.error('No agent ID provided');
-      return;
+      throw new Error('No agent ID provided');
     }
 
     try {
-      // Log the selected model type for debugging
-      if (modelType) {
-        console.log('Selected model type:', modelType);
+      // Log the selected model config for debugging
+      if (modelConfig) {
+        console.log('Selected model config:', modelConfig);
       }
 
-      const result = await executeAction(agentId, text, actionType);
+      const result = await executeAction(agentId, text, actionType, {
+        provider: modelConfig?.provider,
+        model: modelConfig?.modelId,
+        context: additionalInput
+      });
 
-      // 如果操作成功，可以选择是否替换选中的文本
-      if (result && onChange) {
-        // 这里可以实现文本替换逻辑
-        // 暂时只是显示结果
-        console.log('Text action result:', result);
-      }
-
-      setShowTextActionToolbar(false);
-      setSelectedText('');
-      setSelectionRange(null);
+      return result;
     } catch (error) {
       console.error('Text action failed:', error);
+      throw error;
     }
-  }, [agentId, executeAction, onChange]);
+  }, [agentId, executeAction]);
+
+  // 处理文本替换
+  // 注意：这个函数依赖于 editor 实例，但 editor 是由 useEditor hook 创建的
+  // 所以我们不把它加入依赖数组，而是在使用时检查
+  const handleReplaceText = (newText: string) => {
+    if (!editor || !selectionRange) return;
+
+    // 获取选中范围在编辑器中的位置
+    const view = editor.view;
+    const state = view.state;
+    const { from, to } = state.selection;
+
+    // 替换选中的文本
+    const transaction = state.tr.replaceRangeWith(
+      from,
+      to,
+      state.schema.text(newText)
+    );
+
+    view.dispatch(transaction);
+
+    // 清除选择状态
+    setSelectedText('');
+    setSelectionRange(null);
+    setShowTextActionToolbar(false);
+
+    // 触发onChange回调
+    if (onChange) {
+      onChange(editor.getHTML());
+    }
+  };
 
   // 定义模型选项列表（与TextActionToolbar保持一致）
   const modelOptions = [
@@ -1188,6 +1215,7 @@ export function NotionEditor({ initialContent = '', onChange, agentId }: NotionE
         selectedText={selectedText}
         position={textActionPosition}
         onAction={handleTextAction}
+        onReplace={handleReplaceText}
         onClose={() => {
           setShowTextActionToolbar(false);
           setSelectedText('');

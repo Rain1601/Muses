@@ -2,14 +2,21 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Wand2, MessageSquare, PlusCircle, FileText, Languages, RotateCw, Loader2, Cpu, ChevronRight, ArrowLeft } from 'lucide-react';
+import { TextActionDialog } from './TextActionDialog';
 
 export type TextActionType = 'improve' | 'explain' | 'expand' | 'summarize' | 'translate' | 'rewrite';
 export type ModelType = 'research' | 'openai' | 'claude' | 'gemini';
 
+export interface ModelConfig {
+  provider: string;
+  modelId: string;
+}
+
 interface TextActionToolbarProps {
   selectedText: string;
   position: { x: number; y: number };
-  onAction: (actionType: TextActionType, selectedText: string, modelType?: ModelType) => Promise<void>;
+  onAction: (actionType: TextActionType, selectedText: string, modelConfig?: ModelConfig, additionalInput?: string) => Promise<any>;
+  onReplace?: (newText: string) => void;
   onClose: () => void;
   agentId: string;
   isVisible: boolean;
@@ -77,32 +84,49 @@ const textActionCommands = [
 
 const modelCommands = [
   {
-    id: 'research',
-    name: '开启搜索',
-    description: '通用AI研究能力',
-    keywords: ['research', 'yj', '研究', '搜索', '开启'],
-    command: '/research'
+    id: 'openai-gpt5',
+    name: 'GPT-5 (Latest)',
+    description: '最先进的模型，卓越的推理和创造力',
+    keywords: ['gpt5', 'gpt-5', 'latest', 'advanced'],
+    command: '/gpt5',
+    provider: 'openai',
+    modelId: 'gpt-5'
   },
   {
-    id: 'openai',
-    name: 'OpenAI',
-    description: 'GPT系列模型',
-    keywords: ['openai', 'gpt', 'chatgpt'],
-    command: '/openai'
+    id: 'openai-gpt5-mini',
+    name: 'GPT-5 Mini',
+    description: '轻量级GPT-5，快速高效',
+    keywords: ['gpt5mini', 'gpt-5-mini', 'mini'],
+    command: '/gpt5mini',
+    provider: 'openai',
+    modelId: 'gpt-5-mini'
   },
   {
-    id: 'claude',
-    name: 'Claude',
-    description: 'Anthropic Claude模型',
-    keywords: ['claude', 'anthropic'],
-    command: '/claude'
+    id: 'openai-gpt4.1',
+    name: 'GPT-4.1',
+    description: '增强版GPT-4，性能提升',
+    keywords: ['gpt4.1', 'gpt-4.1', 'enhanced'],
+    command: '/gpt4.1',
+    provider: 'openai',
+    modelId: 'gpt-4.1-2025-04-14'
   },
   {
-    id: 'gemini',
-    name: 'Gemini',
-    description: 'Google Gemini模型',
-    keywords: ['gemini', 'google'],
-    command: '/gemini'
+    id: 'claude-sonnet4',
+    name: 'Claude Sonnet 4',
+    description: '最新Claude模型，能力增强',
+    keywords: ['claude', 'sonnet', 'sonnet4', 'anthropic'],
+    command: '/sonnet4',
+    provider: 'claude',
+    modelId: 'claude-sonnet-4-20250514'
+  },
+  {
+    id: 'claude-haiku',
+    name: 'Claude Haiku',
+    description: '快速高效的Claude模型',
+    keywords: ['claude', 'haiku', 'fast'],
+    command: '/haiku',
+    provider: 'claude',
+    modelId: 'claude-3-haiku-20240307'
   }
 ];
 
@@ -110,6 +134,7 @@ export const TextActionToolbar: React.FC<TextActionToolbarProps> = ({
   selectedText,
   position,
   onAction,
+  onReplace,
   onClose,
   agentId,
   isVisible
@@ -119,8 +144,25 @@ export const TextActionToolbar: React.FC<TextActionToolbarProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [showModelSubmenu, setShowModelSubmenu] = useState(false);
   const [selectedModelIndex, setSelectedModelIndex] = useState(0);
+  const [selectedModel, setSelectedModel] = useState<ModelConfig | null>(null);
+  const [showActionDialog, setShowActionDialog] = useState(false);
+  const [currentAction, setCurrentAction] = useState<{ type: TextActionType; name: string } | null>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // 当 selectedText 改变或组件不可见时，重置状态到初始工具栏
+  useEffect(() => {
+    if (selectedText && isVisible) {
+      // 重置所有状态到初始值
+      setShowActionDialog(false);
+      setCurrentAction(null);
+      setQuery('');
+      setSelectedIndex(0);
+      setShowModelSubmenu(false);
+      setSelectedModelIndex(0);
+      setIsProcessing(false);
+    }
+  }, [selectedText, isVisible]);
 
   // 外部点击关闭逻辑
   useEffect(() => {
@@ -225,7 +267,7 @@ export const TextActionToolbar: React.FC<TextActionToolbarProps> = ({
         case 'Enter':
           event.preventDefault();
           if (showModelSubmenu && filteredModelCommands[selectedModelIndex]) {
-            handleModelSelection(filteredModelCommands[selectedModelIndex].id as ModelType);
+            handleModelSelection(filteredModelCommands[selectedModelIndex]);
           } else if (filteredCommands[selectedIndex]) {
             if (filteredCommands[selectedIndex].id === 'model') {
               setShowModelSubmenu(true);
@@ -245,32 +287,88 @@ export const TextActionToolbar: React.FC<TextActionToolbarProps> = ({
     }
   }, [isVisible, selectedIndex, selectedModelIndex, filteredCommands, filteredModelCommands, showModelSubmenu, onClose]);
 
-  const handleAction = async (actionType: TextActionType, modelType?: ModelType) => {
+  const handleAction = async (actionType: TextActionType) => {
     if (isProcessing) return;
 
-    setIsProcessing(true);
+    // 获取动作名称
+    const action = textActionCommands.find(cmd => cmd.id === actionType);
+    if (!action) return;
 
+    // 设置当前动作并显示对话框
+    setCurrentAction({ type: actionType, name: action.name });
+    setShowActionDialog(true);
+    // 隐藏工具栏但不关闭（保持状态）
+    // 工具栏会在对话框关闭后重新显示或完全关闭
+  };
+
+  const handleActionConfirm = async (additionalInput: string) => {
+    if (!currentAction) throw new Error('No action selected');
+
+    setIsProcessing(true);
     try {
-      await onAction(actionType, selectedText, modelType);
-      onClose();
-    } catch (error) {
-      console.error('Text action failed:', error);
+      // 调用实际的文本处理
+      const result = await onAction(currentAction.type, selectedText, selectedModel || undefined, additionalInput);
+
+      // 返回处理结果
+      return {
+        processedText: result?.processedText || result || selectedText,
+        explanation: result?.explanation
+      };
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const handleModelSelection = async (modelType: ModelType) => {
-    // For now, we'll just show a message. Later this could be used to set a default model
-    // or trigger a specific action with the selected model
-    console.log('Selected model:', modelType);
-    // You could implement model switching logic here
-    setShowModelSubmenu(false);
+  const handleActionAccept = (newText: string) => {
+    // 替换编辑器中的文本
+    if (onReplace) {
+      onReplace(newText);
+    }
     onClose();
+  };
+
+  const handleActionReject = () => {
+    // 重新显示工具栏
+    setShowActionDialog(false);
+    setCurrentAction(null);
+  };
+
+  const handleDialogClose = () => {
+    setShowActionDialog(false);
+    setCurrentAction(null);
+    onClose();
+  };
+
+  const handleModelSelection = (modelCommand: typeof modelCommands[0]) => {
+    // Set the selected model configuration
+    setSelectedModel({
+      provider: modelCommand.provider,
+      modelId: modelCommand.modelId
+    });
+    setShowModelSubmenu(false);
+    setQuery(''); // Clear query
   };
 
   if (!isVisible || !selectedText.trim()) {
     return null;
+  }
+
+  // 如果正在显示动作对话框，隐藏工具栏
+  if (showActionDialog && currentAction) {
+    return (
+      <TextActionDialog
+        actionType={currentAction.type}
+        actionName={currentAction.name}
+        selectedText={selectedText}
+        selectedModel={selectedModel}
+        position={position}
+        onConfirm={handleActionConfirm}
+        onAccept={handleActionAccept}
+        onReject={handleActionReject}
+        onClose={handleDialogClose}
+        isVisible={showActionDialog}
+      />
+    );
   }
 
   return (

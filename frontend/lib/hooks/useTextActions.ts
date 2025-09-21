@@ -9,6 +9,8 @@ interface TextActionRequest {
   actionType: TextActionType;
   context?: string;
   language?: string;
+  provider?: string;
+  model?: string;
 }
 
 interface TextActionResponse {
@@ -67,7 +69,7 @@ export const useTextActions = () => {
     agentId: string,
     text: string,
     actionType: TextActionType,
-    options?: { context?: string; language?: string }
+    options?: { context?: string; language?: string; provider?: string; model?: string }
   ): Promise<TextActionResponse> => {
     return mutation.mutateAsync({
       agentId,
@@ -75,6 +77,8 @@ export const useTextActions = () => {
       actionType,
       context: options?.context,
       language: options?.language,
+      provider: options?.provider,
+      model: options?.model,
     });
   };
 

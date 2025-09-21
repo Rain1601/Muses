@@ -1,0 +1,334 @@
+"use client";
+
+import React, { useState, useRef, useEffect } from 'react';
+import { Check, Copy, X, Loader2, AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
+
+interface TextActionDialogProps {
+  actionType: string;
+  actionName: string;
+  selectedText: string;
+  selectedModel?: { provider: string; modelId: string };
+  position: { x: number; y: number };
+  onConfirm: (additionalInput: string) => Promise<{ processedText: string; explanation?: string }>;
+  onAccept: (newText: string) => void;
+  onReject: () => void;
+  onClose: () => void;
+  isVisible: boolean;
+}
+
+export const TextActionDialog: React.FC<TextActionDialogProps> = ({
+  actionType,
+  actionName,
+  selectedText,
+  selectedModel,
+  position,
+  onConfirm,
+  onAccept,
+  onReject,
+  onClose,
+  isVisible
+}) => {
+  const [additionalInput, setAdditionalInput] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [result, setResult] = useState<{ processedText: string; explanation?: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // 自动聚焦输入框
+  useEffect(() => {
+    if (isVisible && !result && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isVisible, result]);
+
+  // 处理外部点击
+  useEffect(() => {
+    if (!isVisible) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dialogRef.current && !dialogRef.current.contains(event.target as Node)) {
+        onClose();
+      }
+    };
+
+    const timeout = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+    }, 100);
+
+    return () => {
+      clearTimeout(timeout);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isVisible, onClose]);
+
+  // 键盘事件处理
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!isVisible) return;
+
+      if (event.key === 'Escape') {
+        if (result) {
+          handleReject();
+        } else {
+          onClose();
+        }
+      } else if (event.key === 'Enter' && !event.shiftKey) {
+        if (result) {
+          // 如果有结果，Enter接受
+          handleAccept();
+        } else if (!isProcessing) {
+          // 如果没有结果，Enter提交
+          event.preventDefault();
+          handleSubmit();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isVisible, result, isProcessing, additionalInput]);
+
+  const handleSubmit = async () => {
+    if (isProcessing) return;
+
+    setIsProcessing(true);
+    setError(null);
+
+    try {
+      const response = await onConfirm(additionalInput);
+      setResult(response);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Processing failed');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleAccept = () => {
+    if (result) {
+      onAccept(result.processedText);
+      onClose();
+    }
+  };
+
+  const handleReject = () => {
+    setResult(null);
+    setAdditionalInput('');
+    setError(null);
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  };
+
+  const handleCopy = () => {
+    if (result) {
+      navigator.clipboard.writeText(result.processedText);
+      toast.success('已复制到剪贴板');
+    }
+  };
+
+  // 获取操作提示文本
+  const getActionHint = () => {
+    switch (actionType) {
+      case 'improve':
+        return '输入改进要求（可选，如：更正式、更简洁等）';
+      case 'explain':
+        return '输入解释重点（可选，如：技术细节、背景等）';
+      case 'expand':
+        return '输入扩展方向（可选，如：添加例子、更多细节等）';
+      case 'summarize':
+        return '输入总结要求（可选，如：要点数量、重点等）';
+      case 'translate':
+        return '输入目标语言（如：英文、日文、法文等）';
+      case 'rewrite':
+        return '输入重写风格（可选，如：更友好、更专业等）';
+      default:
+        return '输入额外要求（可选）';
+    }
+  };
+
+  if (!isVisible) return null;
+
+  // 计算对话框位置，确保不超出屏幕
+  const dialogWidth = Math.min(window.innerWidth - 40, 500);
+  const dialogHeight = 450; // 增加对话框高度以确保按钮可见
+
+  // 计算位置
+  let dialogLeft = position.x;
+  let dialogTop = position.y + 20;
+
+  // 确保不超出右边界
+  if (dialogLeft + dialogWidth > window.innerWidth - 20) {
+    dialogLeft = window.innerWidth - dialogWidth - 20;
+  }
+
+  // 确保不超出左边界
+  if (dialogLeft < 20) {
+    dialogLeft = 20;
+  }
+
+  // 如果对话框会超出底部，则显示在选中文本上方
+  if (dialogTop + dialogHeight > window.innerHeight - 20) {
+    dialogTop = position.y - dialogHeight - 20;
+    // 如果上方也不够空间，则固定在屏幕中间
+    if (dialogTop < 20) {
+      dialogTop = Math.max(20, (window.innerHeight - dialogHeight) / 2);
+    }
+  }
+
+  return (
+    <div
+      ref={dialogRef}
+      className="fixed z-50 bg-background border border-border rounded-lg shadow-2xl overflow-hidden flex flex-col"
+      style={{
+        left: `${dialogLeft}px`,
+        top: `${dialogTop}px`,
+        width: `${dialogWidth}px`,
+        height: `${Math.min(dialogHeight, window.innerHeight - dialogTop - 20)}px`,
+        maxHeight: `${Math.min(dialogHeight, window.innerHeight - dialogTop - 20)}px`
+      }}
+    >
+      {/* 标题栏 */}
+      <div className="px-3 py-2 bg-muted/50 border-b border-border">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-medium">{actionName}</h3>
+          <button
+            onClick={onClose}
+            className="text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {!result ? (
+        // 输入阶段
+        <div className="p-3">
+          <div className="space-y-2">
+            {/* 原文预览 */}
+            <div className="p-2 bg-muted/30 rounded-md max-h-[100px] overflow-y-auto">
+              <p className="text-xs text-muted-foreground mb-1">原文：</p>
+              <p className="text-xs break-words">{selectedText}</p>
+            </div>
+
+            {/* 输入框 */}
+            <div>
+              <p className="text-xs text-muted-foreground mb-2">{getActionHint()}</p>
+              <input
+                ref={inputRef}
+                type="text"
+                value={additionalInput}
+                onChange={(e) => setAdditionalInput(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && !isProcessing) {
+                    e.preventDefault();
+                    handleSubmit();
+                  }
+                }}
+                placeholder={`[${actionName}] 按 Enter 执行...`}
+                className="w-full px-3 py-2 text-sm border border-input rounded focus:outline-none focus:ring-2 focus:ring-primary bg-background"
+                disabled={isProcessing}
+              />
+            </div>
+
+            {/* 错误提示 */}
+            {error && (
+              <div className="flex items-center gap-2 p-3 bg-destructive/10 text-destructive rounded-md">
+                <AlertCircle className="w-4 h-4" />
+                <span className="text-sm">{error}</span>
+              </div>
+            )}
+
+            {/* 操作提示 */}
+            <div className="text-xs text-muted-foreground">
+              Enter 执行 • Esc 取消
+            </div>
+          </div>
+        </div>
+      ) : (
+        // 结果展示阶段
+        <div className="flex flex-col flex-1 min-h-0">
+          {/* 可滚动的内容区域 */}
+          <div className="flex-1 p-3 overflow-y-auto">
+            <div className="space-y-3">
+              {/* 对比展示 - 垂直布局 */}
+              <div className="space-y-2">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">原文</p>
+                  <div className="p-2 bg-muted/30 rounded-md max-h-[100px] overflow-y-auto">
+                    <p className="text-xs whitespace-pre-wrap break-words">{selectedText}</p>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-green-600">处理后</p>
+                  <div className="p-2 bg-green-500/5 border border-green-500/20 rounded-md max-h-[150px] overflow-y-auto">
+                    <p className="text-xs whitespace-pre-wrap break-words">{result.processedText}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* 说明（如果有） */}
+              {result.explanation && (
+                <div className="p-2 bg-blue-500/5 border border-blue-500/20 rounded-md">
+                  <p className="text-xs font-medium text-blue-600 mb-1">修改说明</p>
+                  <p className="text-xs text-muted-foreground break-words">{result.explanation}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 固定在底部的操作按钮 */}
+          <div className="border-t border-border px-3 py-2 bg-background flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <div className="text-xs text-muted-foreground">
+                Enter 采纳 • Esc 重试
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleCopy}
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs bg-muted hover:bg-muted/80 rounded transition-colors"
+                >
+                  <Copy className="w-3 h-3" />
+                  复制
+                </button>
+                <button
+                  onClick={handleReject}
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs bg-destructive/10 hover:bg-destructive/20 text-destructive rounded transition-colors"
+                >
+                  <X className="w-3 h-3" />
+                  重试
+                </button>
+                <button
+                  onClick={handleAccept}
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs bg-primary hover:bg-primary/90 text-primary-foreground rounded transition-colors"
+                >
+                  <Check className="w-3 h-3" />
+                  采纳
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 加载状态 */}
+      {isProcessing && (
+        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center">
+          <div className="flex flex-col items-center gap-2">
+            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+            <span className="text-sm text-muted-foreground">处理中...</span>
+            {selectedModel && (
+              <span className="text-xs text-muted-foreground">
+                使用模型: {selectedModel.provider === 'openai' ? 'OpenAI' : selectedModel.provider === 'claude' ? 'Claude' : selectedModel.provider} {selectedModel.modelId}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default TextActionDialog;
