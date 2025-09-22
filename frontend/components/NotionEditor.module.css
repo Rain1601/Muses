@@ -527,3 +527,29 @@
   pointer-events: none;
   height: 0;
 }
+
+/* 保持文本选中状态的样式 */
+.notionEditor ::selection {
+  background-color: rgba(59, 130, 246, 0.3);
+  color: inherit;
+}
+
+/* 暗色模式下的选中样式 */
+:global(.dark) .notionEditor ::selection {
+  background-color: rgba(59, 130, 246, 0.4);
+}
+
+/* 当工具栏显示时，保持选中状态的视觉效果 */
+.notionEditor.keep-selection-highlight ::selection {
+  background-color: rgba(59, 130, 246, 0.4) !important;
+}
+
+/* Firefox 兼容性 */
+.notionEditor ::-moz-selection {
+  background-color: rgba(59, 130, 246, 0.3);
+  color: inherit;
+}
+
+:global(.dark) .notionEditor ::-moz-selection {
+  background-color: rgba(59, 130, 246, 0.4);
+}

@@ -208,14 +208,47 @@ export const TextActionToolbar: React.FC<TextActionToolbarProps> = ({
     command.description.toLowerCase().includes(queryLower);
   });
 
-  // 自动聚焦输入框
+  // 自动聚焦输入框 - 延迟执行以保持文本选中状态
   useEffect(() => {
     if (isVisible && inputRef.current) {
-      inputRef.current.focus();
+      // 使用 setTimeout 延迟聚焦，保持文本选中状态
+      const timerId = setTimeout(() => {
+        // 保存当前选中状态
+        const selection = window.getSelection();
+        const rangeCount = selection ? selection.rangeCount : 0;
+        const ranges: Range[] = [];
+
+        // 保存所有选中范围
+        for (let i = 0; i < rangeCount; i++) {
+          ranges.push(selection!.getRangeAt(i).cloneRange());
+        }
+
+        // 聚焦输入框，但阻止滚动
+        if (inputRef.current) {
+          inputRef.current.focus({ preventScroll: true });
+        }
+
+        // 恢复选中状态
+        if (selection && ranges.length > 0) {
+          selection.removeAllRanges();
+          ranges.forEach(range => {
+            try {
+              selection.addRange(range);
+            } catch (e) {
+              // 忽略可能的错误
+            }
+          });
+        }
+      }, 100); // 延迟100ms
+
       setQuery('');
       setSelectedIndex(0);
       setShowModelSubmenu(false);
       setSelectedModelIndex(0);
+
+      return () => {
+        clearTimeout(timerId);
+      };
     }
   }, [isVisible]);
 
