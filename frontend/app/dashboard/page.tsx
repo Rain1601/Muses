@@ -250,7 +250,7 @@ function DashboardContent() {
           filePath = articleToPublish.repoPath;
         } else {
           // 生成文件路径：使用首次同步时间（如果没有则使用当前时间，这将成为首次同步时间）
-          // 时间精确到分钟：年-月-日-时-分-标题
+          // 时间精确到日期：年-月-日-标题
           const syncDate = articleToPublish.firstSyncAt
             ? new Date(articleToPublish.firstSyncAt)
             : new Date(); // 如果是首次同步，使用当前时间
@@ -258,15 +258,13 @@ function DashboardContent() {
           const year = syncDate.getFullYear();
           const month = String(syncDate.getMonth() + 1).padStart(2, '0');
           const day = String(syncDate.getDate()).padStart(2, '0');
-          const hour = String(syncDate.getHours()).padStart(2, '0');
-          const minute = String(syncDate.getMinutes()).padStart(2, '0');
 
-          // 生成文件夹名：年-月-日-时-分-标题
+          // 生成文件夹名：年-月-日-标题
           const titleSlug = (editingTitle || '无标题')
             .toLowerCase()
             .replace(/[^a-z0-9\u4e00-\u9fa5]+/gi, '-')
             .replace(/^-|-$/g, '');
-          const folderName = `${year}-${month}-${day}-${hour}-${minute}-${titleSlug}`;
+          const folderName = `${year}-${month}-${day}-${titleSlug}`;
 
           // 文件路径：posts/年/月/文章文件夹/index.md
           const articleFolder = `posts/${year}/${month}/${folderName}`;

@@ -448,12 +448,27 @@
   margin: 2rem 0;
 }
 
-/* 高亮文本 */
+/* 高亮文本 - 荧光黄色适配暗色模式 */
 .notionEditor mark {
-  background-color: hsl(var(--primary) / 0.2);
+  background-color: rgba(255, 235, 59, 0.3);
   color: hsl(var(--foreground));
   padding: 2px 4px;
   border-radius: 3px;
+  border-bottom: 2px solid rgba(255, 235, 59, 0.6);
+}
+
+/* 暗色模式下的高亮优化 */
+:global(.dark) .notionEditor mark {
+  background-color: rgba(255, 235, 59, 0.25);
+  border-bottom: 2px solid rgba(255, 235, 59, 0.5);
+  color: inherit;
+}
+
+/* 高亮hover效果 */
+.notionEditor mark:hover {
+  background-color: rgba(255, 235, 59, 0.4);
+  border-bottom-color: rgba(255, 235, 59, 0.7);
+  transition: all 0.2s ease;
 }
 
 /* 整体容器 */
