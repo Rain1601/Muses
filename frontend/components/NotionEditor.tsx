@@ -1218,8 +1218,8 @@ export function NotionEditor({ initialContent = '', onChange, agentId }: NotionE
         onReplace={handleReplaceText}
         onClose={() => {
           setShowTextActionToolbar(false);
-          setSelectedText('');
-          setSelectionRange(null);
+          // 保持选中状态，不清除selectedText和selectionRange
+          // 这样用户可以继续使用 Cmd+B 等快捷键操作
         }}
         agentId={agentId || ''}
         isVisible={showTextActionToolbar && !!agentId && aiAssistantEnabled}

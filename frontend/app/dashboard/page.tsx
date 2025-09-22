@@ -242,40 +242,60 @@ function DashboardContent() {
       showNotifications(notifications);
 
       try {
-        // 使用文章的创建时间或已保存的路径
+        // 使用首次同步时间或已保存的路径
         let filePath;
 
         if (articleToPublish.repoPath) {
           // 如果文章已经有保存的路径，使用保存的路径
           filePath = articleToPublish.repoPath;
         } else {
-          // 生成文件路径：使用文章创建时间的年/月/文章文件夹/index.md结构
-          const articleDate = new Date(articleToPublish.createdAt);
-          const year = articleDate.getFullYear();
-          const month = String(articleDate.getMonth() + 1).padStart(2, '0');
-          const day = String(articleDate.getDate()).padStart(2, '0');
+          // 生成文件路径：使用首次同步时间（如果没有则使用当前时间，这将成为首次同步时间）
+          // 时间精确到分钟：年-月-日-时-分-标题
+          const syncDate = articleToPublish.firstSyncAt
+            ? new Date(articleToPublish.firstSyncAt)
+            : new Date(); // 如果是首次同步，使用当前时间
 
-          // 生成文件夹名：日期-标题
+          const year = syncDate.getFullYear();
+          const month = String(syncDate.getMonth() + 1).padStart(2, '0');
+          const day = String(syncDate.getDate()).padStart(2, '0');
+          const hour = String(syncDate.getHours()).padStart(2, '0');
+          const minute = String(syncDate.getMinutes()).padStart(2, '0');
+
+          // 生成文件夹名：年-月-日-时-分-标题
           const titleSlug = (editingTitle || '无标题')
             .toLowerCase()
             .replace(/[^a-z0-9\u4e00-\u9fa5]+/gi, '-')
             .replace(/^-|-$/g, '');
-          const folderName = `${year}-${month}-${day}-${titleSlug}`;
+          const folderName = `${year}-${month}-${day}-${hour}-${minute}-${titleSlug}`;
 
           // 文件路径：posts/年/月/文章文件夹/index.md
           const articleFolder = `posts/${year}/${month}/${folderName}`;
           filePath = `${articleFolder}/index.md`;
         }
 
-        // 生成带有Frontmatter的内容 - 使用文章创建时间
+        // 生成带有Frontmatter的内容
         const articleDate = new Date(articleToPublish.createdAt);
-        const frontmatterYear = articleDate.getFullYear();
-        const frontmatterMonth = String(articleDate.getMonth() + 1).padStart(2, '0');
-        const frontmatterDay = String(articleDate.getDate()).padStart(2, '0');
+        const now = new Date();
+
+        // 格式化日期时间函数
+        const formatDateTime = (date: Date) => {
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const day = String(date.getDate()).padStart(2, '0');
+          const hour = String(date.getHours()).padStart(2, '0');
+          const minute = String(date.getMinutes()).padStart(2, '0');
+          return `${year}-${month}-${day} ${hour}:${minute}`;
+        };
+
+        // 如果是首次同步，firstSyncAt将在后端设置为当前时间
+        const isFirstSync = !articleToPublish.firstSyncAt;
+        const firstSyncTime = isFirstSync ? now : new Date(articleToPublish.firstSyncAt);
 
         const frontmatter = `---
 title: "${editingTitle || '无标题'}"
-date: "${frontmatterYear}-${frontmatterMonth}-${frontmatterDay}"
+date: "${formatDateTime(articleDate)}"
+first_sync: "${formatDateTime(firstSyncTime)}"
+last_update: "${formatDateTime(now)}"
 tags: []
 categories: []
 author: "Muses"

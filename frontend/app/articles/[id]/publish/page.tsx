@@ -14,6 +14,8 @@ interface Article {
   githubUrl?: string;
   repoPath?: string;
   createdAt: string;
+  firstSyncAt?: string;
+  lastSyncAt?: string;
 }
 
 interface Repo {
@@ -66,21 +68,30 @@ export default function PublishArticlePage() {
       const articleData = articleRes.data.article;
       setArticle(articleData);
       
-      // 生成默认文件路径 - 使用文章创建时间而不是当前时间
+      // 生成默认文件路径 - 使用首次同步时间（精确到分钟）
       // 如果文章已经有保存的路径，使用保存的路径
       if (articleData.repoPath) {
         setFilePath(articleData.repoPath);
         setCommitMessage(`Update article: ${articleData.title}`);
       } else {
-        // 使用文章创建时间生成路径
-        const articleDate = new Date(articleData.createdAt);
-        const year = articleDate.getFullYear();
-        const month = String(articleDate.getMonth() + 1).padStart(2, '0');
+        // 使用首次同步时间或当前时间生成路径（精确到分钟）
+        const syncDate = articleData.firstSyncAt
+          ? new Date(articleData.firstSyncAt)
+          : new Date(); // 如果是首次同步，使用当前时间
+
+        const year = syncDate.getFullYear();
+        const month = String(syncDate.getMonth() + 1).padStart(2, '0');
+        const day = String(syncDate.getDate()).padStart(2, '0');
+        const hour = String(syncDate.getHours()).padStart(2, '0');
+        const minute = String(syncDate.getMinutes()).padStart(2, '0');
+
         const slug = articleData.title
           .toLowerCase()
           .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '-')
           .replace(/^-|-$/g, '');
-        setFilePath(`posts/${year}/${month}/${slug}.md`);
+
+        // 文件名格式：posts/年/月/年-月-日-时-分-标题.md
+        setFilePath(`posts/${year}/${month}/${year}-${month}-${day}-${hour}-${minute}-${slug}.md`);
         setCommitMessage(`Add article: ${articleData.title}`);
       }
 
