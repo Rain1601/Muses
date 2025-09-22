@@ -12,6 +12,8 @@ interface Article {
   title: string;
   publishStatus: string;
   githubUrl?: string;
+  repoPath?: string;
+  createdAt: string;
 }
 
 interface Repo {
@@ -64,16 +66,23 @@ export default function PublishArticlePage() {
       const articleData = articleRes.data.article;
       setArticle(articleData);
       
-      // 生成默认文件路径
-      const date = new Date();
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const slug = articleData.title
-        .toLowerCase()
-        .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '-')
-        .replace(/^-|-$/g, '');
-      setFilePath(`posts/${year}/${month}/${slug}.md`);
-      setCommitMessage(`Add article: ${articleData.title}`);
+      // 生成默认文件路径 - 使用文章创建时间而不是当前时间
+      // 如果文章已经有保存的路径，使用保存的路径
+      if (articleData.repoPath) {
+        setFilePath(articleData.repoPath);
+        setCommitMessage(`Update article: ${articleData.title}`);
+      } else {
+        // 使用文章创建时间生成路径
+        const articleDate = new Date(articleData.createdAt);
+        const year = articleDate.getFullYear();
+        const month = String(articleDate.getMonth() + 1).padStart(2, '0');
+        const slug = articleData.title
+          .toLowerCase()
+          .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '-')
+          .replace(/^-|-$/g, '');
+        setFilePath(`posts/${year}/${month}/${slug}.md`);
+        setCommitMessage(`Add article: ${articleData.title}`);
+      }
 
       // 获取用户的仓库列表
       console.log('Fetching repos...');

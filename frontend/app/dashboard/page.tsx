@@ -242,27 +242,40 @@ function DashboardContent() {
       showNotifications(notifications);
 
       try {
-        // 生成文件路径：使用年/月/文章文件夹/index.md结构
-        const date = new Date();
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
+        // 使用文章的创建时间或已保存的路径
+        let filePath;
 
-        // 生成文件夹名：日期-标题
-        const titleSlug = (editingTitle || '无标题')
-          .toLowerCase()
-          .replace(/[^a-z0-9\u4e00-\u9fa5]+/gi, '-')
-          .replace(/^-|-$/g, '');
-        const folderName = `${year}-${month}-${day}-${titleSlug}`;
+        if (articleToPublish.repoPath) {
+          // 如果文章已经有保存的路径，使用保存的路径
+          filePath = articleToPublish.repoPath;
+        } else {
+          // 生成文件路径：使用文章创建时间的年/月/文章文件夹/index.md结构
+          const articleDate = new Date(articleToPublish.createdAt);
+          const year = articleDate.getFullYear();
+          const month = String(articleDate.getMonth() + 1).padStart(2, '0');
+          const day = String(articleDate.getDate()).padStart(2, '0');
 
-        // 文件路径：posts/年/月/文章文件夹/index.md
-        const articleFolder = `posts/${year}/${month}/${folderName}`;
-        const filePath = `${articleFolder}/index.md`;
+          // 生成文件夹名：日期-标题
+          const titleSlug = (editingTitle || '无标题')
+            .toLowerCase()
+            .replace(/[^a-z0-9\u4e00-\u9fa5]+/gi, '-')
+            .replace(/^-|-$/g, '');
+          const folderName = `${year}-${month}-${day}-${titleSlug}`;
 
-        // 生成带有Frontmatter的内容
+          // 文件路径：posts/年/月/文章文件夹/index.md
+          const articleFolder = `posts/${year}/${month}/${folderName}`;
+          filePath = `${articleFolder}/index.md`;
+        }
+
+        // 生成带有Frontmatter的内容 - 使用文章创建时间
+        const articleDate = new Date(articleToPublish.createdAt);
+        const frontmatterYear = articleDate.getFullYear();
+        const frontmatterMonth = String(articleDate.getMonth() + 1).padStart(2, '0');
+        const frontmatterDay = String(articleDate.getDate()).padStart(2, '0');
+
         const frontmatter = `---
 title: "${editingTitle || '无标题'}"
-date: "${year}-${month}-${day}"
+date: "${frontmatterYear}-${frontmatterMonth}-${frontmatterDay}"
 tags: []
 categories: []
 author: "Muses"
