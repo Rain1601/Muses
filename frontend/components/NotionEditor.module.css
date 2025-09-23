@@ -67,24 +67,29 @@
 }
 
 /* 表格内容单元格 */
+.notionEditor .ProseMirror table td,
 .notionEditor table td {
-  background-color: transparent;
+  background-color: transparent !important;
   font-size: 0.95rem;
   line-height: 1.6;
-  color: hsl(var(--foreground));
+  color: hsl(var(--foreground)) !important;
 }
 
 /* 悬停效果 - 使用系统颜色 */
+.notionEditor .ProseMirror table tbody tr,
 .notionEditor table tbody tr {
   transition: background-color 0.15s ease;
+  background: transparent !important;
 }
 
+.notionEditor .ProseMirror table tbody tr:hover,
 .notionEditor table tbody tr:hover {
-  background-color: hsl(var(--muted) / 0.3);
+  background-color: hsl(var(--muted) / 0.15) !important;
 }
 
+:global(.dark) .notionEditor .ProseMirror table tbody tr:hover,
 :global(.dark) .notionEditor table tbody tr:hover {
-  background-color: hsl(var(--muted) / 0.2);
+  background-color: hsl(var(--muted) / 0.1) !important;
 }
 
 /* 第一列特殊样式（如果需要） */
@@ -142,9 +147,29 @@
 /* 选中的单元格高亮 */
 .notionEditor table td.selected,
 .notionEditor table th.selected {
-  background-color: hsl(var(--primary) / 0.1) !important;
-  outline: 2px solid hsl(var(--primary) / 0.5);
+  background-color: hsl(var(--muted) / 0.3) !important;
+  outline: 2px solid hsl(var(--border));
   outline-offset: -1px;
+}
+
+/* 强制覆盖所有可能的表格背景色 */
+.notionEditor .ProseMirror table *,
+.notionEditor table * {
+  background-image: none !important;
+}
+
+.notionEditor .ProseMirror tbody,
+.notionEditor tbody {
+  background: transparent !important;
+}
+
+/* 覆盖任何可能的蓝色类 */
+.notionEditor .ProseMirror table [class*="blue"],
+.notionEditor .ProseMirror table [class*="primary"],
+.notionEditor table [class*="blue"],
+.notionEditor table [class*="primary"] {
+  background-color: transparent !important;
+  color: inherit !important;
 }
 
 /* 代码块样式 */
