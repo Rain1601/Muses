@@ -10,7 +10,7 @@ import { ArticleDetailView } from "@/components/ArticleDetailView";
 import { NotionEditor } from '@/components/NotionEditor';
 import { SyncPanel } from '@/components/SyncPanel';
 import { FileImport } from '@/components/FileImport';
-import '@/app/editor-demo/mermaid-styles.css';
+// import '@/app/editor-demo/mermaid-styles.css'; // 移除这个导入，避免表格样式冲突
 import { api } from "@/lib/api";
 import { List, Info, GitBranch, ChevronLeft, ChevronRight, Send, Save, Eye, Clock, PenTool } from "lucide-react";
 import { useToast } from "@/components/Toast";
