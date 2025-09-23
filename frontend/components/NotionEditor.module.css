@@ -10,27 +10,25 @@
   border-spacing: 0;
   width: 100%;
   margin: 2rem 0;
-  background: hsl(var(--background));
-  border: 1px solid hsl(var(--border) / 0.5);
-  border-radius: 12px;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 /* 暗色模式下的表格容器 */
 :global(.dark) .notionEditor table {
-  background: hsl(var(--background) / 0.5);
-  border: 1px solid hsl(var(--border) / 0.3);
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
 }
 
 .notionEditor table th,
 .notionEditor table td {
-  padding: 14px 20px;
+  padding: 12px 16px;
   text-align: left;
   vertical-align: middle;
-  border-right: 1px solid hsl(var(--border) / 0.3);
-  border-bottom: 1px solid hsl(var(--border) / 0.3);
+  border-right: 1px solid hsl(var(--border));
+  border-bottom: 1px solid hsl(var(--border));
   transition: background-color 0.2s ease;
 }
 
@@ -45,26 +43,22 @@
   border-bottom: none;
 }
 
-/* 表头样式 */
+/* 表头样式 - 使用系统颜色 */
 .notionEditor table th {
-  background: linear-gradient(to bottom,
-    hsl(var(--muted) / 0.3),
-    hsl(var(--muted) / 0.2));
+  background: hsl(var(--muted));
   font-weight: 600;
   font-size: 0.875rem;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: hsl(var(--foreground) / 0.9);
-  border-bottom: 2px solid hsl(var(--border) / 0.5);
+  letter-spacing: 0.02em;
+  color: hsl(var(--muted-foreground));
+  border-bottom: 1px solid hsl(var(--border));
 }
 
 /* 暗色模式下的表头 */
 :global(.dark) .notionEditor table th {
-  background: linear-gradient(to bottom,
-    hsl(var(--muted) / 0.5),
-    hsl(var(--muted) / 0.4));
-  color: hsl(var(--foreground) / 0.95);
-  border-bottom: 2px solid hsl(var(--primary) / 0.3);
+  background: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+  border-bottom: 1px solid hsl(var(--border));
 }
 
 /* 表格内容单元格 */
@@ -72,29 +66,20 @@
   background-color: transparent;
   font-size: 0.95rem;
   line-height: 1.6;
+  color: hsl(var(--foreground));
 }
 
-/* 斑马纹效果 - 更柔和 */
-.notionEditor table tbody tr:nth-child(even) {
-  background-color: hsl(var(--muted) / 0.08);
-}
-
-/* 暗色模式斑马纹 */
-:global(.dark) .notionEditor table tbody tr:nth-child(even) {
-  background-color: hsl(var(--muted) / 0.15);
-}
-
-/* 悬停效果 */
+/* 悬停效果 - 使用系统颜色 */
 .notionEditor table tbody tr {
   transition: background-color 0.15s ease;
 }
 
 .notionEditor table tbody tr:hover {
-  background-color: hsl(var(--primary) / 0.05);
+  background-color: hsl(var(--accent));
 }
 
 :global(.dark) .notionEditor table tbody tr:hover {
-  background-color: hsl(var(--primary) / 0.08);
+  background-color: hsl(var(--accent));
 }
 
 /* 第一列特殊样式（如果需要） */
