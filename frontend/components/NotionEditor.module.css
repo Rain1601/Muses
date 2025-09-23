@@ -10,7 +10,7 @@
   border-spacing: 0;
   width: 100%;
   margin: 2rem 0;
-  background: hsl(var(--card));
+  background: hsl(var(--background));
   border: 1px solid hsl(var(--border));
   border-radius: 8px;
   overflow: hidden;
@@ -18,7 +18,7 @@
 
 /* 暗色模式下的表格容器 */
 :global(.dark) .notionEditor table {
-  background: hsl(var(--card));
+  background: hsl(var(--background));
   border: 1px solid hsl(var(--border));
 }
 
@@ -45,19 +45,17 @@
 
 /* 表头样式 - 使用系统颜色 */
 .notionEditor table th {
-  background: hsl(var(--muted));
+  background: hsl(var(--muted) / 0.5);
   font-weight: 600;
-  font-size: 0.875rem;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  color: hsl(var(--muted-foreground));
+  font-size: 0.9rem;
+  color: hsl(var(--foreground));
   border-bottom: 1px solid hsl(var(--border));
 }
 
 /* 暗色模式下的表头 */
 :global(.dark) .notionEditor table th {
-  background: hsl(var(--muted));
-  color: hsl(var(--muted-foreground));
+  background: hsl(var(--muted) / 0.3);
+  color: hsl(var(--foreground));
   border-bottom: 1px solid hsl(var(--border));
 }
 
@@ -75,11 +73,11 @@
 }
 
 .notionEditor table tbody tr:hover {
-  background-color: hsl(var(--accent));
+  background-color: hsl(var(--muted) / 0.3);
 }
 
 :global(.dark) .notionEditor table tbody tr:hover {
-  background-color: hsl(var(--accent));
+  background-color: hsl(var(--muted) / 0.2);
 }
 
 /* 第一列特殊样式（如果需要） */
