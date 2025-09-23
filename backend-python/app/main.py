@@ -7,7 +7,7 @@ from .database import create_tables
 from .config import settings
 
 # Import routers
-from .api import auth, users, agents, articles, generate, upload, publish, process, proxy, image_upload, sync, import_files
+from .api import auth, users, agents, articles, generate, upload, publish, process, proxy, image_upload, sync, import_files, knowledge
 
 
 @asynccontextmanager
@@ -55,6 +55,7 @@ app.include_router(proxy.router, prefix="/api", tags=["proxy"])
 app.include_router(image_upload.router, prefix="/api", tags=["image-upload"])
 app.include_router(sync.router, prefix="/api/sync", tags=["sync"])
 app.include_router(import_files.router, prefix="/api/import", tags=["import"])
+app.include_router(knowledge.router, tags=["knowledge"])  # prefix已在router中定义
 
 
 @app.get("/")
