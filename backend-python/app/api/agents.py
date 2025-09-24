@@ -17,6 +17,7 @@ from ..schemas.auth import SuccessResponse
 from ..dependencies import get_current_user_db
 from ..utils.exceptions import HTTPNotFoundError, HTTPValidationError
 from ..services.ai_service import AIService
+from ..services.ai_service_enhanced import EnhancedAIService
 from ..agent import agent_service
 
 router = APIRouter()
@@ -326,8 +327,8 @@ async def perform_text_action(
         raise HTTPNotFoundError("Agent not found")
 
     try:
-        # 调用AI服务执行文本操作
-        result = await AIService.perform_text_action(
+        # 使用增强版AI服务执行文本操作（带prompt系统）
+        result = await EnhancedAIService.perform_text_action(
             user=current_user,
             agent=agent,
             text=request.text,
@@ -335,7 +336,8 @@ async def perform_text_action(
             context=request.context,
             language=request.language,
             provider=request.provider,
-            model=request.model
+            model=request.model,
+            instruction=request.context  # 将context作为用户指令
         )
 
         return TextActionResponse(**result)
