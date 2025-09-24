@@ -9,7 +9,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from app.agent.prompts import PromptBuilder, AgentContext, PromptTemplate
-from app.agent.prompts.task_prompts import ImprovePrompt, ExpandPrompt, SummarizePrompt
+from app.agent.prompts.action_prompts import ImprovePrompt, ExpandPrompt, SummarizePrompt
 
 
 def test_prompt_template():

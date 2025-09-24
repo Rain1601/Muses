@@ -4,7 +4,7 @@ Prompt管理模块
 """
 
 from .base import PromptTemplate, BasePromptBuilder
-from .task_prompts import (
+from .action_prompts import (
     ImprovePrompt,
     ExpandPrompt,
     SummarizePrompt,

@@ -78,7 +78,7 @@ prompt_registry = PromptRegistry()
 # 注册默认的任务prompt
 def register_default_prompts():
     """注册默认的任务prompt"""
-    from .task_prompts import (
+    from .action_prompts import (
         ImprovePrompt,
         ExpandPrompt,
         SummarizePrompt,
