@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG知识库测试</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        .card h2 {
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        textarea {
+            resize: vertical;
+            min-height: 120px;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .result {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .result.error {
+            background: #fee;
+            color: #c00;
+        }
+        .result.success {
+            background: #efe;
+            color: #060;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .stat-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .stat-label {
+            color: #666;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        .search-results {
+            margin-top: 20px;
+        }
+        .search-item {
+            background: #f8f9fa;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        .search-score {
+            color: #667eea;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .search-text {
+            color: #333;
+            line-height: 1.6;
+        }
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        .tab {
+            padding: 10px 20px;
+            background: none;
+            border: none;
+            color: #666;
+            cursor: pointer;
+            position: relative;
+            transition: color 0.3s;
+        }
+        .tab.active {
+            color: #667eea;
+        }
+        .tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: #667eea;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 RAG知识库测试面板</h1>
+
+        <div class="card">
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('add')">添加文档</button>
+                <button class="tab" onclick="switchTab('search')">搜索知识</button>
+                <button class="tab" onclick="switchTab('build')">构建知识库</button>
+                <button class="tab" onclick="switchTab('stats')">统计信息</button>
+            </div>
+
+            <!-- 添加文档 -->
+            <div id="add" class="tab-content active">
+                <h2>添加文档到知识库</h2>
+                <div class="form-group">
+                    <label for="docText">文档内容</label>
+                    <textarea id="docText" placeholder="输入要添加的文档内容...">
+# 人工智能与未来
+
+人工智能（AI）正在革命性地改变我们的世界。从医疗诊断到自动驾驶，从智能助手到创意生成，AI的应用无处不在。
+
+## 机器学习的突破
+
+深度学习技术的发展让AI在图像识别、自然语言处理等领域取得了前所未有的成就。
+
+## 未来展望
+
+随着技术的不断进步，AI将在更多领域发挥重要作用，帮助人类解决复杂问题，提高生活质量。</textarea>
+                </div>
+                <div class="form-group">
+                    <label for="docSource">文档来源</label>
+                    <input type="text" id="docSource" placeholder="例如：article, manual, note" value="manual">
+                </div>
+                <button onclick="addDocument()">添加文档</button>
+                <div id="addResult"></div>
+            </div>
+
+            <!-- 搜索知识 -->
+            <div id="search" class="tab-content">
+                <h2>搜索知识库</h2>
+                <div class="form-group">
+                    <label for="searchQuery">搜索查询</label>
+                    <input type="text" id="searchQuery" placeholder="输入搜索内容..." value="深度学习">
+                </div>
+                <div class="form-group">
+                    <label for="searchCount">返回结果数</label>
+                    <input type="number" id="searchCount" value="3" min="1" max="10">
+                </div>
+                <button onclick="searchKnowledge()">搜索</button>
+                <div id="searchResult"></div>
+            </div>
+
+            <!-- 构建知识库 -->
+            <div id="build" class="tab-content">
+                <h2>从文章构建知识库</h2>
+                <p style="color: #666; margin-bottom: 20px;">
+                    将你的历史文章导入知识库，用于增强写作质量
+                </p>
+                <button onclick="buildFromArticles()">构建知识库</button>
+                <button onclick="clearKnowledge()" style="background: #e74c3c; margin-left: 10px;">清空知识库</button>
+                <div id="buildResult"></div>
+            </div>
+
+            <!-- 统计信息 -->
+            <div id="stats" class="tab-content">
+                <h2>知识库统计</h2>
+                <button onclick="getStats()">获取统计信息</button>
+                <div id="statsResult"></div>
+            </div>
+        </div>
+
+        <!-- 测试RAG生成 -->
+        <div class="card">
+            <h2>测试RAG生成</h2>
+            <div class="form-group">
+                <label for="ragQuery">查询问题</label>
+                <input type="text" id="ragQuery" placeholder="输入你的问题..." value="什么是人工智能？">
+            </div>
+            <button onclick="testRAG()">测试RAG</button>
+            <div id="ragResult"></div>
+        </div>
+    </div>
+
+    <script>
+        // 获取JWT Token (需要先登录)
+        const getToken = () => {
+            return localStorage.getItem('token') || '';
+        };
+
+        // API基础URL
+        const API_BASE = 'http://localhost:8080/api/knowledge';
+
+        // 切换标签
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            document.getElementById(tabName).classList.add('active');
+        }
+
+        // 添加文档
+        async function addDocument() {
+            const text = document.getElementById('docText').value;
+            const source = document.getElementById('docSource').value;
+
+            if (!text) {
+                alert('请输入文档内容');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/add`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${getToken()}`
+                    },
+                    body: JSON.stringify({
+                        text: text,
+                        source: source,
+                        metadata: { timestamp: new Date().toISOString() }
+                    })
+                });
+
+                const data = await response.json();
+                const resultDiv = document.getElementById('addResult');
+
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = `✅ ${data.message}\n文档ID: ${data.ids.join(', ')}`;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ 错误: ${data.detail || '添加失败'}`;
+                }
+            } catch (error) {
+                document.getElementById('addResult').className = 'result error';
+                document.getElementById('addResult').textContent = `❌ 请求失败: ${error.message}`;
+            }
+        }
+
+        // 搜索知识
+        async function searchKnowledge() {
+            const query = document.getElementById('searchQuery').value;
+            const n_results = document.getElementById('searchCount').value;
+
+            if (!query) {
+                alert('请输入搜索内容');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/search`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${getToken()}`
+                    },
+                    body: JSON.stringify({
+                        query: query,
+                        n_results: parseInt(n_results)
+                    })
+                });
+
+                const data = await response.json();
+                const resultDiv = document.getElementById('searchResult');
+
+                if (response.ok) {
+                    let html = '<div class="search-results">';
+                    data.forEach((item, index) => {
+                        html += `
+                            <div class="search-item">
+                                <div class="search-score">相似度: ${(item.score * 100).toFixed(1)}%</div>
+                                <div class="search-text">${item.text}</div>
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                    resultDiv.innerHTML = html;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ 错误: ${data.detail || '搜索失败'}`;
+                }
+            } catch (error) {
+                document.getElementById('searchResult').className = 'result error';
+                document.getElementById('searchResult').textContent = `❌ 请求失败: ${error.message}`;
+            }
+        }
+
+        // 从文章构建知识库
+        async function buildFromArticles() {
+            try {
+                const response = await fetch(`${API_BASE}/build-from-articles`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${getToken()}`
+                    },
+                    body: JSON.stringify({})
+                });
+
+                const data = await response.json();
+                const resultDiv = document.getElementById('buildResult');
+
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = `✅ ${data.message}`;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ 错误: ${data.detail || '构建失败'}`;
+                }
+            } catch (error) {
+                document.getElementById('buildResult').className = 'result error';
+                document.getElementById('buildResult').textContent = `❌ 请求失败: ${error.message}`;
+            }
+        }
+
+        // 清空知识库
+        async function clearKnowledge() {
+            if (!confirm('确定要清空知识库吗？此操作不可恢复！')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/clear`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${getToken()}`
+                    }
+                });
+
+                const data = await response.json();
+                const resultDiv = document.getElementById('buildResult');
+
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = `✅ ${data.message}`;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ 错误: ${data.detail || '清空失败'}`;
+                }
+            } catch (error) {
+                document.getElementById('buildResult').className = 'result error';
+                document.getElementById('buildResult').textContent = `❌ 请求失败: ${error.message}`;
+            }
+        }
+
+        // 获取统计信息
+        async function getStats() {
+            try {
+                const response = await fetch(`${API_BASE}/stats`, {
+                    headers: {
+                        'Authorization': `Bearer ${getToken()}`
+                    }
+                });
+
+                const data = await response.json();
+                const resultDiv = document.getElementById('statsResult');
+
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <div class="stats">
+                            <div class="stat-item">
+                                <div class="stat-value">${data.total_documents}</div>
+                                <div class="stat-label">文档总数</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">${data.embedding_dimension}</div>
+                                <div class="stat-label">向量维度</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">${data.collection_name}</div>
+                                <div class="stat-label">集合名称</div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ 错误: ${data.detail || '获取失败'}`;
+                }
+            } catch (error) {
+                document.getElementById('statsResult').className = 'result error';
+                document.getElementById('statsResult').textContent = `❌ 请求失败: ${error.message}`;
+            }
+        }
+
+        // 测试RAG生成
+        async function testRAG() {
+            const query = document.getElementById('ragQuery').value;
+
+            if (!query) {
+                alert('请输入查询问题');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/test-rag?query=${encodeURIComponent(query)}`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${getToken()}`
+                    }
+                });
+
+                const data = await response.json();
+                const resultDiv = document.getElementById('ragResult');
+
+                if (response.ok) {
+                    resultDiv.className = 'result';
+                    resultDiv.innerHTML = `
+                        <strong>查询：</strong> ${data.query}\n\n
+                        <strong>获取的上下文：</strong>\n${data.context || '无相关上下文'}\n\n
+                        <strong>消息：</strong> ${data.message}
+                    `;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `❌ 错误: ${data.detail || 'RAG测试失败'}`;
+                }
+            } catch (error) {
+                document.getElementById('ragResult').className = 'result error';
+                document.getElementById('ragResult').textContent = `❌ 请求失败: ${error.message}`;
+            }
+        }
+
+        // 检查是否已登录
+        window.onload = function() {
+            const token = getToken();
+            if (!token) {
+                alert('请先在主应用中登录，然后刷新此页面');
+            }
+        };
+    </script>
+</body>
+</html>
