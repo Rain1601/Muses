@@ -82,46 +82,78 @@ class PromptTemplate:
 
 
 class BasePromptBuilder(ABC):
-    """Prompt构建器基类"""
-
-    def __init__(self):
-        self.template = PromptTemplate()
+    """Prompt构建器基类 - 专注于任务执行指导"""
 
     @abstractmethod
-    def build_role(self) -> str:
-        """构建角色定义"""
+    def build_task_guidance(self) -> str:
+        """构建任务执行指导
+        返回格式示例：
+        对于改进文本任务，你需要识别并修正文本中的问题。
+        执行这个任务的关键是保持原意的同时提升表达质量。
+        """
         pass
 
     @abstractmethod
-    def build_task(self, **kwargs) -> str:
-        """构建任务描述"""
+    def build_execution_steps(self) -> List[str]:
+        """构建具体执行步骤"""
         pass
 
-    def build_constraints(self) -> List[str]:
-        """构建约束条件"""
+    @abstractmethod
+    def build_quality_criteria(self) -> List[str]:
+        """构建质量标准"""
+        pass
+
+    def build_attention_points(self) -> List[str]:
+        """构建注意事项（可选）"""
         return []
 
     def build_examples(self) -> List[Dict[str, str]]:
-        """构建示例"""
+        """构建示例（可选）"""
         return []
 
-    def build_quality_requirements(self) -> List[str]:
-        """构建质量要求"""
-        return [
-            "确保内容准确无误",
-            "逻辑清晰连贯",
-            "表达自然流畅"
-        ]
+    def build_output_format(self) -> str:
+        """构建输出格式要求（可选）"""
+        return ""
 
-    def build(self, **kwargs) -> str:
-        """构建完整的prompt"""
-        self.template.role = self.build_role()
-        self.template.task = self.build_task(**kwargs)
-        self.template.constraints = self.build_constraints()
-        self.template.examples = self.build_examples()
-        self.template.quality_requirements = self.build_quality_requirements()
+    def build(self) -> str:
+        """构建完整的任务指导prompt"""
+        sections = []
 
-        return self.template.build(**kwargs)
+        # 任务指导
+        guidance = self.build_task_guidance()
+        if guidance:
+            sections.append(f"# 任务指导\n{guidance}")
+
+        # 执行步骤
+        steps = self.build_execution_steps()
+        if steps:
+            sections.append(f"# 执行步骤\n" + "\n".join(f"{i+1}. {step}" for i, step in enumerate(steps)))
+
+        # 质量标准
+        criteria = self.build_quality_criteria()
+        if criteria:
+            sections.append(f"# 质量标准\n" + "\n".join(f"- {criterion}" for criterion in criteria))
+
+        # 注意事项
+        attention = self.build_attention_points()
+        if attention:
+            sections.append(f"# 注意事项\n" + "\n".join(f"- {point}" for point in attention))
+
+        # 示例
+        examples = self.build_examples()
+        if examples:
+            examples_text = "\n\n".join(
+                f"**示例{i+1}**\n原文：{ex.get('input', '')}\n处理后：{ex.get('output', '')}"
+                for i, ex in enumerate(examples)
+            )
+            sections.append(f"# 参考示例\n{examples_text}")
+
+        # 输出格式
+        output_format = self.build_output_format()
+        if output_format:
+            sections.append(f"# 输出格式\n{output_format}")
+
+        return "\n\n".join(sections)
 
 
 class ChainOfThoughtMixin:

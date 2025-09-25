@@ -6,7 +6,7 @@ Prompt构建器
 from typing import Optional, Dict, Any
 from dataclasses import dataclass
 from .base import PromptTemplate
-from .task_prompts import (
+from .action_prompts import (
     ImprovePrompt,
     ExpandPrompt,
     SummarizePrompt,
@@ -113,26 +113,32 @@ class PromptBuilder:
         """
         sections = []
 
-        # Agent身份
-        sections.append(f"# Agent信息\n你的身份是：{context.name}")
+        # 角色定义（新增：把Agent的身份作为角色）
+        role_description = f"你是{context.name}"
+        if context.description:
+            role_description += f"，{context.description}"
+        sections.append(f"# 角色\n{role_description}")
+
+        # 工作参数
+        work_params = []
 
         # 语言偏好
         if context.language:
             lang_text = "中文" if context.language == "zh-CN" else "英文" if context.language == "en" else context.language
-            sections.append(f"工作语言：{lang_text}")
+            work_params.append(f"工作语言：{lang_text}")
 
         # 语气风格
         if context.tone:
             tone_text = cls.TONE_MAP.get(context.tone, context.tone)
-            sections.append(f"表达风格：{tone_text}")
+            work_params.append(f"表达风格：{tone_text}")
 
         # 目标受众
         if context.target_audience:
-            sections.append(f"目标受众：{context.target_audience}")
+            work_params.append(f"目标受众：{context.target_audience}")
 
-        # Agent描述
-        if context.description:
-            sections.append(f"特点说明：{context.description}")
+        if work_params:
+            sections.append("\n# 工作参数")
+            sections.extend(work_params)
 
         # 自定义prompt
         if context.custom_prompt:

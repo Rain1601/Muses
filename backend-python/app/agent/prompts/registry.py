@@ -93,6 +93,7 @@ def register_default_prompts():
         GenerateOutlinePrompt
     )
 
+    # improve/continue/
     prompt_registry.register("improve", ImprovePrompt)
     prompt_registry.register("expand", ExpandPrompt)
     prompt_registry.register("summarize", SummarizePrompt)
