@@ -37,3 +37,4 @@ class Agent(Base):
     # 关系
     user = relationship("User", back_populates="agents")
     articles = relationship("Article", back_populates="agent")
+    muses_configs = relationship("AgentMusesConfig", back_populates="agent", cascade="all, delete-orphan")

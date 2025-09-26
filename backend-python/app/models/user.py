@@ -29,6 +29,7 @@ class User(Base):
     agents = relationship("Agent", back_populates="user", cascade="all, delete-orphan")
     articles = relationship("Article", back_populates="user", cascade="all, delete-orphan")
     settings = relationship("UserSettings", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    muses_configs = relationship("MusesConfig", back_populates="user", cascade="all, delete-orphan")
 
 
 class UserSettings(Base):
