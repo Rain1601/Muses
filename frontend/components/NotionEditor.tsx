@@ -9,7 +9,7 @@ import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import Highlight from '@tiptap/extension-highlight';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
-import Image from '@tiptap/extension-image';
+import ResizableImage from '@/lib/tiptap-extensions/ResizableImage';
 import Dropcursor from '@tiptap/extension-dropcursor';
 import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
@@ -20,8 +20,6 @@ import { TaskItem } from '@tiptap/extension-task-item';
 import { Link } from '@tiptap/extension-link';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { Color } from '@tiptap/extension-color';
-import { Node, mergeAttributes } from '@tiptap/core';
-import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react';
 import { createLowlight } from 'lowlight';
 import javascript from 'highlight.js/lib/languages/javascript';
 import typescript from 'highlight.js/lib/languages/typescript';
@@ -50,152 +48,6 @@ interface NotionEditorProps {
   onChange?: (content: string) => void;
   agentId?: string; // 当前使用的Agent ID
 }
-
-// 可缩放图片组件
-const ResizableImageComponent = ({ node, updateAttributes, selected }: any) => {
-  const [isResizing, setIsResizing] = useState(false);
-  const [startPos, setStartPos] = useState({ x: 0, y: 0 });
-  const [startSize, setStartSize] = useState({ width: 0, height: 0 });
-  const imgRef = React.useRef<HTMLImageElement>(null);
-  const imageViewerContext = React.useContext(ImageViewerContext);
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsResizing(true);
-    setStartPos({ x: e.clientX, y: e.clientY });
-
-    if (imgRef.current) {
-      const rect = imgRef.current.getBoundingClientRect();
-      setStartSize({ width: rect.width, height: rect.height });
-    }
-  };
-
-  React.useEffect(() => {
-    if (!isResizing) return;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (imgRef.current) {
-        const deltaX = e.clientX - startPos.x;
-        const newWidth = Math.max(100, startSize.width + deltaX);
-
-        updateAttributes({
-          width: newWidth,
-          height: 'auto'
-        });
-      }
-    };
-
-    const handleMouseUp = () => {
-      setIsResizing(false);
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isResizing, startPos, startSize, updateAttributes]);
-
-  return (
-    <NodeViewWrapper className="resizable-image-wrapper">
-      <div className={`image-container ${selected ? 'selected' : ''}`} style={{ position: 'relative', display: 'inline-block' }}>
-        <img
-          ref={imgRef}
-          src={node.attrs.src}
-          alt={node.attrs.alt || ''}
-          width={node.attrs.width || 'auto'}
-          height={node.attrs.height || 'auto'}
-          className="rounded-lg max-w-full h-auto cursor-pointer transition-opacity hover:opacity-90"
-          style={{
-            width: node.attrs.width ? `${node.attrs.width}px` : 'auto',
-            height: node.attrs.height ? `${node.attrs.height}px` : 'auto',
-            display: 'block'
-          }}
-          onClick={(e) => {
-            // 如果正在拖拽resize handle，不要打开图片查看器
-            if (!isResizing && imageViewerContext) {
-              e.preventDefault();
-              e.stopPropagation();
-              console.log('Image clicked:', node.attrs.src);
-              imageViewerContext.openViewer(node.attrs.src, node.attrs.alt || '图片');
-            }
-          }}
-        />
-        {selected && (
-          <div
-            className="resize-handle"
-            onMouseDown={handleMouseDown}
-            style={{
-              position: 'absolute',
-              bottom: '-4px',
-              right: '-4px',
-              width: '12px',
-              height: '12px',
-              background: 'hsl(var(--primary))',
-              border: '2px solid hsl(var(--background))',
-              borderRadius: '50%',
-              cursor: 'se-resize',
-              zIndex: 10
-            }}
-          />
-        )}
-      </div>
-    </NodeViewWrapper>
-  );
-};
-
-// 自定义可缩放图片扩展
-const ResizableImage = Node.create({
-  name: 'resizableImage',
-
-  group: 'block',
-
-  draggable: true,
-
-  addAttributes() {
-    return {
-      src: {
-        default: null,
-      },
-      alt: {
-        default: null,
-      },
-      title: {
-        default: null,
-      },
-      width: {
-        default: null,
-      },
-      height: {
-        default: null,
-      },
-      isUploading: {
-        default: false,
-      },
-      uploadId: {
-        default: null,
-      },
-    }
-  },
-
-  parseHTML() {
-    return [
-      {
-        tag: 'img',
-      },
-    ]
-  },
-
-  renderHTML({ HTMLAttributes }) {
-    return ['img', mergeAttributes(HTMLAttributes)]
-  },
-
-  addNodeView() {
-    return ReactNodeViewRenderer(ResizableImageComponent)
-  },
-});
 
 export function NotionEditor({ initialContent = '', onChange, agentId }: NotionEditorProps) {
   // Component initialized with agentId

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试可调整大小的图片</title>
+</head>
+<body>
+    <h1>测试图片大小调整后的HTML输出</h1>
+
+    <h2>原始图片（100%宽度）</h2>
+    <img src="https://via.placeholder.com/800x400" alt="测试图片" style="width: 100%;">
+
+    <h2>调整后的图片（60%宽度）</h2>
+    <img src="https://via.placeholder.com/800x400" alt="测试图片" style="width: 60%;">
+
+    <h2>调整后的图片（40%宽度）</h2>
+    <img src="https://via.placeholder.com/800x400" alt="测试图片" style="width: 40%;">
+
+    <p>这个HTML文件演示了带有width样式的img标签应该如何显示。当我们的ResizableImage扩展正确工作时，它应该生成类似的HTML代码。</p>
+
+    <h2>期望的HTML输出</h2>
+    <pre>&lt;img src="your-image-url" alt="描述" style="width: 60%;"&gt;</pre>
+</body>
+</html>
