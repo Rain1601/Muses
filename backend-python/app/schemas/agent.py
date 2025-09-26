@@ -1,20 +1,11 @@
 from pydantic import BaseModel, Field
-from typing import Optional, Any
+from typing import Optional, Any, List
 from datetime import datetime
 from enum import Enum
 
 
-class ToneEnum(str, Enum):
-    professional = "professional"
-    casual = "casual"
-    humorous = "humorous"
-    serious = "serious"
 
 
-class LengthPreferenceEnum(str, Enum):
-    short = "short"
-    medium = "medium"
-    long = "long"
 
 
 class OutputFormatEnum(str, Enum):
@@ -27,8 +18,7 @@ class AgentBase(BaseModel):
     description: Optional[str] = None
     avatar: Optional[str] = None
     language: str = "zh-CN"
-    tone: ToneEnum = ToneEnum.professional
-    lengthPreference: LengthPreferenceEnum = LengthPreferenceEnum.medium
+    tone: str = Field(default="professional", max_length=200)  # Support comma-separated multiple tones
     targetAudience: Optional[str] = None
     customPrompt: Optional[str] = None
     outputFormat: OutputFormatEnum = OutputFormatEnum.markdown
@@ -45,8 +35,7 @@ class AgentUpdate(BaseModel):
     description: Optional[str] = None
     avatar: Optional[str] = None
     language: Optional[str] = None
-    tone: Optional[ToneEnum] = None
-    lengthPreference: Optional[LengthPreferenceEnum] = None
+    tone: Optional[str] = Field(None, max_length=200)  # Support comma-separated multiple tones
     targetAudience: Optional[str] = None
     customPrompt: Optional[str] = None
     outputFormat: Optional[OutputFormatEnum] = None
@@ -155,3 +144,20 @@ class ValidateModelResponse(BaseModel):
     """验证模型配置响应"""
     valid: bool = Field(..., description="配置是否有效")
     message: Optional[str] = Field(None, description="验证消息")
+
+
+class ActionInfo(BaseModel):
+    """文本操作信息"""
+    id: str = Field(..., description="操作ID")
+    label: str = Field(..., description="操作显示名称")
+    icon: str = Field(..., description="操作图标")
+    description: str = Field(..., description="操作描述")
+    shortcut: Optional[str] = Field(None, description="快捷命令")
+    keywords: List[str] = Field(default_factory=list, description="搜索关键词")
+    visibility: str = Field(..., description="可见性级别")
+
+
+class ActionsListResponse(BaseModel):
+    """文本操作列表响应"""
+    actions: List[ActionInfo]
+    total: int = Field(..., description="总数")

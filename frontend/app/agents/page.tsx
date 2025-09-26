@@ -4,9 +4,8 @@ import { useEffect, useState } from "react";
 import { ProtectedRoute } from "@/components/protected-route";
 import Navigation from "@/components/Navigation";
 import { AgentListItem } from "@/components/AgentListItem";
-import { AgentDetailView } from "@/components/AgentDetailView";
-import { AgentEditForm } from "@/components/AgentEditForm";
-import { AgentCreateDialog } from "@/components/AgentCreateDialog";
+import { AgentInlineEdit } from "@/components/AgentInlineEdit";
+import { AgentInlineCreate } from "@/components/AgentInlineCreate";
 import { api } from "@/lib/api";
 import { Plus, Bot, Search, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,10 +15,8 @@ interface Agent {
   name: string;
   description?: string;
   avatar?: string;
-  language: string;
-  tone: string;
-  lengthPreference: string;
-  targetAudience?: string;
+  language: string | string[];
+  tone: string | string[];
   customPrompt?: string;
   isDefault: boolean;
   createdAt: string;
@@ -31,8 +28,7 @@ export default function AgentsPage() {
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [isEditing, setIsEditing] = useState(false);
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showInlineCreate, setShowInlineCreate] = useState(false);
 
   useEffect(() => {
     fetchAgents();
@@ -58,32 +54,21 @@ export default function AgentsPage() {
 
   const handleAgentSelect = (agent: Agent) => {
     setSelectedAgent(agent);
-    setIsEditing(false); // 切换agent时退出编辑模式
+    setShowInlineCreate(false); // 切换agent时关闭内联创建
   };
 
   const handleAgentDelete = () => {
     setSelectedAgent(null);
-    setIsEditing(false);
     fetchAgents();
   };
 
-  const handleStartEdit = () => {
-    setIsEditing(true);
-  };
-
-  const handleCancelEdit = () => {
-    setIsEditing(false);
-  };
-
-  const handleSaveAgent = (updatedAgent: Agent) => {
+  const handleAgentUpdate = (updatedAgent: Agent) => {
     // 更新agents列表中的数据
     setAgents(prev => prev.map(agent =>
       agent.id === updatedAgent.id ? updatedAgent : agent
     ));
     // 更新选中的agent
     setSelectedAgent(updatedAgent);
-    // 退出编辑模式
-    setIsEditing(false);
   };
 
   const handleAgentCreated = (newAgent: Agent) => {
@@ -91,8 +76,17 @@ export default function AgentsPage() {
     setAgents(prev => [newAgent, ...prev]);
     // 选中新创建的Agent
     setSelectedAgent(newAgent);
-    // 关闭创建弹窗
-    setShowCreateDialog(false);
+    // 关闭内联创建
+    setShowInlineCreate(false);
+  };
+
+  const handleStartCreate = () => {
+    setShowInlineCreate(true);
+    setSelectedAgent(null); // 取消选中当前agent
+  };
+
+  const handleCancelCreate = () => {
+    setShowInlineCreate(false);
   };
 
   // 过滤agents
@@ -114,7 +108,7 @@ export default function AgentsPage() {
               <div className="p-4 border-b border-border">
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="text-lg font-semibold">AI Agents</h2>
-                  <Button size="sm" className="h-8" onClick={() => setShowCreateDialog(true)}>
+                  <Button size="sm" className="h-8" onClick={handleStartCreate}>
                     <Plus className="w-4 h-4 mr-1" />
                     新建
                   </Button>
@@ -132,6 +126,14 @@ export default function AgentsPage() {
                   />
                 </div>
               </div>
+
+              {/* 内联创建表单 */}
+              {showInlineCreate && (
+                <AgentInlineCreate
+                  onAgentCreated={handleAgentCreated}
+                  onCancel={handleCancelCreate}
+                />
+              )}
 
               {/* Agent列表 */}
               <div className="flex-1 overflow-y-auto">
@@ -154,7 +156,7 @@ export default function AgentsPage() {
                         <p className="text-sm text-muted-foreground mb-3">
                           还没有创建任何Agent
                         </p>
-                        <Button size="sm" variant="outline" onClick={() => setShowCreateDialog(true)}>
+                        <Button size="sm" variant="outline" onClick={handleStartCreate}>
                           <Plus className="w-4 h-4 mr-1" />
                           创建第一个Agent
                         </Button>
@@ -186,23 +188,15 @@ export default function AgentsPage() {
             </div>
           </aside>
 
-          {/* 右侧区域 - Agent详情或编辑 */}
+          {/* 右侧区域 - Agent内联编辑 */}
           <section className="flex-1 bg-background">
             {selectedAgent ? (
-              isEditing ? (
-                <AgentEditForm
-                  agent={selectedAgent}
-                  onCancel={handleCancelEdit}
-                  onSave={handleSaveAgent}
-                />
-              ) : (
-                <AgentDetailView
-                  agent={selectedAgent}
-                  onDelete={handleAgentDelete}
-                  onRefresh={fetchAgents}
-                  onEdit={handleStartEdit}
-                />
-              )
+              <AgentInlineEdit
+                agent={selectedAgent}
+                onDelete={handleAgentDelete}
+                onRefresh={fetchAgents}
+                onUpdate={handleAgentUpdate}
+              />
             ) : (
               <div className="h-full flex items-center justify-center">
                 <div className="text-center text-muted-foreground">
@@ -216,13 +210,6 @@ export default function AgentsPage() {
             )}
           </section>
         </main>
-
-        {/* 创建Agent弹窗 */}
-        <AgentCreateDialog
-          open={showCreateDialog}
-          onOpenChange={setShowCreateDialog}
-          onAgentCreated={handleAgentCreated}
-        />
       </div>
     </ProtectedRoute>
   );

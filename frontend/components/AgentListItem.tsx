@@ -7,9 +7,8 @@ interface Agent {
   name: string;
   description?: string;
   avatar?: string;
-  language: string;
-  tone: string;
-  lengthPreference: string;
+  language: string | string[];
+  tone: string | string[];
   isDefault: boolean;
   createdAt: string;
 }
@@ -20,14 +19,35 @@ interface AgentListItemProps {
   onClick: () => void;
 }
 
-const toneLabels = {
-  professional: "专业",
-  casual: "轻松",
-  humorous: "幽默",
-  serious: "严肃",
+const languageLabels: { [key: string]: string } = {
+  "zh-CN": "中文",
+  "en": "English",
+  "ja": "日本語",
+  "ko": "한국어",
+  "fr": "Français",
+  "de": "Deutsch",
+  "es": "Español",
+  "ru": "Русский"
 };
 
 export function AgentListItem({ agent, isSelected, onClick }: AgentListItemProps) {
+  // 处理多选语言和语气的显示
+  const getDisplayItems = (value: string | string[] | undefined): string[] => {
+    if (Array.isArray(value)) return value;
+    if (!value) return [];
+    return value.includes(',') ? value.split(',').map(v => v.trim()) : [value];
+  };
+
+  const getLanguageDisplay = (languages: string[]) => {
+    return languages.map(lang => languageLabels[lang] || lang).join(', ');
+  };
+
+  const getToneDisplay = (tones: string[]) => {
+    return tones.join(', ');
+  };
+
+  const displayLanguages = getDisplayItems(agent.language);
+  const displayTones = getDisplayItems(agent.tone);
   return (
     <div
       className={`
@@ -67,10 +87,10 @@ export function AgentListItem({ agent, isSelected, onClick }: AgentListItemProps
 
           <div className="flex items-center gap-3 mt-1.5">
             <span className="text-xs text-muted-foreground">
-              {toneLabels[agent.tone as keyof typeof toneLabels]}
+              {getToneDisplay(displayTones)}
             </span>
             <span className="text-xs text-muted-foreground">
-              {agent.language === "zh-CN" ? "中文" : "英文"}
+              {getLanguageDisplay(displayLanguages)}
             </span>
           </div>
         </div>
