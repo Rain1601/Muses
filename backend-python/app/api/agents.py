@@ -332,7 +332,7 @@ async def perform_text_action(
             user=current_user,
             agent=agent,
             text=request.text,
-            action_type=request.actionType,
+            action_type=request.actionType.value,  # 获取枚举的值
             context=request.context,
             language=request.language,
             provider=request.provider,
@@ -342,6 +342,9 @@ async def perform_text_action(
 
         return TextActionResponse(**result)
 
+    except ValueError as e:
+        # 更具体的错误处理
+        raise HTTPValidationError(str(e))
     except Exception as e:
         raise HTTPValidationError(f"Failed to perform text action: {str(e)}")
 
