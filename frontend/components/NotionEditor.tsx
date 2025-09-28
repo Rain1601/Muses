@@ -10,6 +10,8 @@ import Placeholder from '@tiptap/extension-placeholder';
 import Highlight from '@tiptap/extension-highlight';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import ResizableImage from '@/lib/tiptap-extensions/ResizableImage';
+import BilibiliVideo from '@/lib/tiptap-extensions/BilibiliVideo';
+import Youtube from '@tiptap/extension-youtube';
 import Dropcursor from '@tiptap/extension-dropcursor';
 import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
@@ -26,6 +28,7 @@ import typescript from 'highlight.js/lib/languages/typescript';
 import css from 'highlight.js/lib/languages/css';
 import python from 'highlight.js/lib/languages/python';
 import { api } from '@/lib/api';
+import { VideoInsertDialog } from './VideoInsertDialog';
 import { useImageViewer } from './ImageViewer';
 import TextActionToolbar, { TextActionType, ModelConfig } from './TextActionToolbar';
 import AIDisabledTooltip from './AIDisabledTooltip';
@@ -60,6 +63,7 @@ export function NotionEditor({ initialContent = '', onChange, agentId }: NotionE
   const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
   const [showModelSubmenu, setShowModelSubmenu] = useState(false);
   const [selectedModelIndex, setSelectedModelIndex] = useState(0);
+  const [showVideoInput, setShowVideoInput] = useState(false);
 
   // 文本操作工具栏状态
   const [showTextActionToolbar, setShowTextActionToolbar] = useState(false);
@@ -164,6 +168,56 @@ export function NotionEditor({ initialContent = '', onChange, agentId }: NotionE
     }
   ];
 
+  // 视频插入处理函数 - 使用 useRef 存储以便在定义时访问最新的 editor
+  const editorRef = useRef<any>(null);
+
+  // 视频插入处理
+  const insertVideo = useCallback((url: string) => {
+    if (!url || !url.trim()) return;
+
+    const currentEditor = editorRef.current;
+    console.log('🎬 尝试插入视频:', url);
+
+    if (!currentEditor || !currentEditor.commands) {
+      console.error('❌ Editor 未初始化');
+      alert('编辑器未正确初始化，请刷新页面重试');
+      return;
+    }
+
+    // 检测是 YouTube 还是 Bilibili
+    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+      console.log('🔴 检测到 YouTube 视频');
+      try {
+        const result = currentEditor.commands.setYoutubeVideo({
+          src: url,
+          width: 640,
+          height: 480
+        });
+        console.log('✅ YouTube 插入结果:', result);
+        if (!result) {
+          alert('YouTube 视频插入失败，请检查链接格式');
+        }
+      } catch (error) {
+        console.error('❌ YouTube 插入错误:', error);
+        alert('YouTube 视频插入失败: ' + (error as Error).message);
+      }
+    } else if (url.includes('bilibili.com')) {
+      console.log('🔵 检测到 Bilibili 视频');
+      try {
+        const result = currentEditor.commands.setBilibiliVideo({ src: url });
+        console.log('✅ Bilibili 插入结果:', result);
+        if (!result) {
+          alert('Bilibili 视频插入失败，请检查链接格式');
+        }
+      } catch (error) {
+        console.error('❌ Bilibili 插入错误:', error);
+        alert('Bilibili 视频插入失败: ' + (error as Error).message);
+      }
+    } else {
+      alert('不支持的视频平台，目前仅支持 YouTube 和 Bilibili');
+    }
+  }, []);
+
   // 定义斜杠命令列表
   const slashCommands = [
     {
@@ -173,6 +227,17 @@ export function NotionEditor({ initialContent = '', onChange, agentId }: NotionE
       icon: '📷',
       keywords: ['img', 'image', 'tp', '图片', '上传'],
       action: (editor: any) => handleFileUpload(editor),
+    },
+    {
+      id: 'video',
+      name: '视频',
+      description: '插入 YouTube/Bilibili 视频',
+      icon: '🎬',
+      keywords: ['video', 'youtube', 'bilibili', 'sp', '视频', 'b站'],
+      action: () => {
+        // 显示视频插入对话框
+        setShowVideoInput(true);
+      },
     },
     {
       id: 'model',
@@ -360,18 +425,26 @@ export function NotionEditor({ initialContent = '', onChange, agentId }: NotionE
             // 进入模型子菜单
             setShowModelSubmenu(true);
             setSelectedModelIndex(0);
-          } else {
-            // 删除斜杠命令文本
+          } else if (selectedCommand.id === 'video') {
+            // 视频命令：删除斜杠文本，显示对话框
             const tr = state.tr.delete($from.start(), $from.pos);
             view.dispatch(tr);
 
-            // 隐藏菜单
+            setShowSlashMenu(false);
+            setSlashQuery('');
+            setShowVideoInput(true);
+          } else {
+            // 其他命令：删除斜杠文本，执行命令，隐藏菜单
+            const tr = state.tr.delete($from.start(), $from.pos);
+            view.dispatch(tr);
+
             setShowSlashMenu(false);
             setSlashQuery('');
 
             // 执行命令
             setTimeout(() => {
-              selectedCommand.action(view);
+              const editorFromView = (view as any).editor;
+              selectedCommand.action(editorFromView || view);
             }, 10);
           }
         }
@@ -509,6 +582,14 @@ export function NotionEditor({ initialContent = '', onChange, agentId }: NotionE
 
   const editor = useEditor({
     immediatelyRender: false,
+    onCreate: ({ editor }) => {
+      console.log('✅ Editor 创建成功');
+      console.log('📦 加载的扩展:', editor.extensionManager.extensions.map(e => e.name));
+      console.log('🔍 setYoutubeVideo 可用:', typeof (editor.commands as any).setYoutubeVideo);
+      console.log('🔍 setBilibiliVideo 可用:', typeof (editor.commands as any).setBilibiliVideo);
+      // 保存 editor 到 ref
+      editorRef.current = editor;
+    },
     extensions: [
       Placeholder.configure({
         placeholder: ({ node }) => {
@@ -541,6 +622,19 @@ export function NotionEditor({ initialContent = '', onChange, agentId }: NotionE
         lowlight,
       }),
       ResizableImage,
+      Youtube.configure({
+        width: 640,
+        height: 480,
+        controls: true,
+        nocookie: true,
+        allowFullscreen: true,
+        addPasteHandler: false, // 禁用自动粘贴，避免页面刷新
+      }),
+      BilibiliVideo.configure({
+        width: 640,
+        height: 480,
+        allowFullscreen: true,
+      }),
       Dropcursor,
       Table.configure({
         resizable: true,
@@ -858,8 +952,11 @@ export function NotionEditor({ initialContent = '', onChange, agentId }: NotionE
   }, [agentId, aiAssistantEnabled]);
 
   useEffect(() => {
-    if (editor && initialContent !== editor.getHTML()) {
-      editor.commands.setContent(initialContent || '');
+    if (editor) {
+      editorRef.current = editor;
+      if (initialContent !== editor.getHTML()) {
+        editor.commands.setContent(initialContent || '');
+      }
     }
   }, [editor, initialContent]);
 
@@ -913,8 +1010,15 @@ export function NotionEditor({ initialContent = '', onChange, agentId }: NotionE
       {/* 图片查看器 */}
       <ImageViewerComponent />
 
+      {/* 视频插入对话框 */}
+      <VideoInsertDialog
+        isOpen={showVideoInput}
+        onClose={() => setShowVideoInput(false)}
+        onInsert={insertVideo}
+      />
+
       {/* 斜杠命令菜单 */}
-      {showSlashMenu && filteredCommands.length > 0 && (
+      {showSlashMenu && (showModelSubmenu || filteredCommands.length > 0) && (
         <div
           className="slash-menu absolute z-50 bg-popover border border-border rounded-md shadow-md p-1 min-w-[200px] max-w-[300px]"
           style={{
@@ -1002,17 +1106,30 @@ export function NotionEditor({ initialContent = '', onChange, agentId }: NotionE
                         if (command.id === 'model') {
                           setShowModelSubmenu(true);
                           setSelectedModelIndex(0);
-                        } else {
+                        } else if (command.id === 'video') {
+                          // 视频命令：删除斜杠文本，显示对话框
                           const view = editor?.view;
                           if (view) {
-                            // 删除斜杠命令文本
+                            const { state } = view;
+                            const { selection } = state;
+                            const { $from } = selection;
+                            const tr = state.tr.delete($from.start(), $from.pos);
+                            view.dispatch(tr);
+                          }
+
+                          setShowSlashMenu(false);
+                          setSlashQuery('');
+                          setShowVideoInput(true);
+                        } else {
+                          // 其他命令：删除斜杠文本，执行命令，隐藏菜单
+                          const view = editor?.view;
+                          if (view) {
                             const { state } = view;
                             const { selection } = state;
                             const { $from } = selection;
                             const tr = state.tr.delete($from.start(), $from.pos);
                             view.dispatch(tr);
 
-                            // 隐藏菜单
                             setShowSlashMenu(false);
                             setSlashQuery('');
 
