@@ -4,9 +4,12 @@
 """
 
 from typing import Dict, Optional, Any
+import time
 from ..models import User, Agent
 from ..agent.prompts import PromptBuilder, AgentContext
+from ..agent.prompts.action_config import get_action_by_alias, is_action_enabled, get_default_instruction
 from .ai_service import AIService
+from ..utils.agent_logger import agent_logger
 
 
 class EnhancedAIService(AIService):
@@ -42,6 +45,24 @@ class EnhancedAIService(AIService):
         Returns:
             处理结果字典
         """
+        start_time = time.time()
+
+        # 记录Agent配置
+        agent_logger.log_agent_execution(
+            agent_id=agent.id,
+            action=action_type,
+            stage="agent_config",
+            data={
+                "agent_config": {
+                    "name": agent.name,
+                    "role": agent.description,
+                    "tone": agent.tone,
+                    "target_audience": agent.targetAudience,
+                    "language": agent.language
+                }
+            }
+        )
+
         # 构建Agent上下文
         agent_context = AgentContext(
             name=agent.name,
@@ -52,24 +73,28 @@ class EnhancedAIService(AIService):
             description=agent.description
         )
 
-        # 映射action_type到prompt系统的任务名
-        action_map = {
-            "improve": "improve",
-            "explain": "explain",
-            "expand": "expand",
-            "summarize": "summarize",
-            "translate": "translate",
-            "simplify": "simplify",
-            "polish": "polish",
-            "continue": "continue",
-            "fix_grammar": "fix_grammar",
-            "make_professional": "make_professional",
-            "extract_key_points": "extract_key_points",
-            "generate_outline": "generate_outline",
-            "rewrite": "polish"  # 重写映射到润色
-        }
+        # 通过别名系统获取实际的action ID
+        actual_action = get_action_by_alias(action_type)
 
-        task = action_map.get(action_type, "improve")
+        # 检查action是否启用（这里可以根据用户级别进一步控制）
+        # 暂时使用advanced级别，允许使用高级功能
+        if not is_action_enabled(actual_action, user_level="advanced"):
+            raise ValueError(f"Action '{action_type}' is not available for current user")
+
+        task = actual_action
+
+        # 处理指令：如果用户没有输入，使用默认指令
+        final_instruction = instruction or context
+        if not final_instruction:
+            # 获取action的默认指令
+            default_inst = get_default_instruction(actual_action)
+            final_instruction = default_inst
+        else:
+            # 如果用户输入了指令，将默认指令作为前缀
+            default_inst = get_default_instruction(actual_action)
+            if default_inst:
+                # 组合默认指令和用户指令，例如："改进文本，更简洁"
+                final_instruction = f"{default_inst}，{final_instruction}"
 
         # 构建kwargs
         kwargs = {}
@@ -77,15 +102,54 @@ class EnhancedAIService(AIService):
             kwargs["target_language"] = language
 
         # 使用PromptBuilder构建prompt
+        prompt_start = time.time()
         system_prompt, user_prompt = PromptBuilder.build_for_action(
             action=task,
             text=text,
             agent_context=agent_context,
-            instruction=instruction or context,
+            instruction=final_instruction,
             **kwargs
         )
 
+        # 记录prompt构建
+        agent_logger.log_agent_execution(
+            agent_id=agent.id,
+            action=actual_action,
+            stage="prompt_construction",
+            data={
+                "agent_config": {
+                    "name": agent.name,
+                    "role": agent.description,
+                    "tone": agent.tone,
+                    "target_audience": agent.targetAudience
+                },
+                "system_prompt": system_prompt,
+                "user_prompt": user_prompt,
+                "task_guidance": f"执行{actual_action}操作",
+                "final_instruction": final_instruction,
+                "user_instruction": instruction or context,
+                "default_instruction": get_default_instruction(actual_action),
+                "has_user_input": bool(instruction or context),
+                "text_length": len(text)
+            },
+            execution_time=time.time() - prompt_start
+        )
+
         try:
+            # 记录API调用开始
+            api_start = time.time()
+            agent_logger.log_agent_execution(
+                agent_id=agent.id,
+                action=actual_action,
+                stage="api_call",
+                data={
+                    "model": model or "default",
+                    "provider": provider or "auto",
+                    "temperature": 0.7,
+                    "max_tokens": 3000
+                }
+            )
+
             # 调用AI
             processed_text = await cls._call_ai(
                 user=user,
@@ -97,6 +161,18 @@ class EnhancedAIService(AIService):
                 model=model,
                 temperature=0.7,
                 max_tokens=3000
+            )
+
+            # 记录API响应
+            agent_logger.log_agent_execution(
+                agent_id=agent.id,
+                action=actual_action,
+                stage="api_response",
+                data={
+                    "response_length": len(processed_text),
+                    "success": True
+                },
+                execution_time=time.time() - api_start
             )
 
             # 构建响应
@@ -119,85 +195,53 @@ class EnhancedAIService(AIService):
                     result["processedText"] = '\n'.join(lines[:-1])
                     result["explanation"] = lines[-1]
 
+            # 记录最终结果
+            agent_logger.log_agent_execution(
+                agent_id=agent.id,
+                action=actual_action,
+                stage="result",
+                data={
+                    "success": True,
+                    "output_length": len(processed_text),
+                    "has_explanation": "explanation" in result
+                },
+                execution_time=time.time() - start_time
+            )
+
             return result
 
         except Exception as e:
+            # 记录错误
+            agent_logger.log_agent_execution(
+                agent_id=agent.id,
+                action=actual_action,
+                stage="error",
+                data={
+                    "error": str(e),
+                    "success": False
+                },
+                execution_time=time.time() - start_time
+            )
             raise ValueError(f"Text action failed: {str(e)}")
 
     @classmethod
-    def get_available_actions(cls) -> list:
-        """获取所有可用的文本操作"""
-        return [
-            {
-                "action": "improve",
-                "label": "改进文本",
-                "description": "提升文本清晰度和说服力",
-                "icon": "✨"
-            },
-            {
-                "action": "explain",
-                "label": "解释文本",
-                "description": "详细解释概念和术语",
-                "icon": "💡"
-            },
-            {
-                "action": "expand",
-                "label": "扩展文本",
-                "description": "添加更多细节和例子",
-                "icon": "➕"
-            },
-            {
-                "action": "summarize",
-                "label": "总结文本",
-                "description": "提取关键要点",
-                "icon": "📋"
-            },
-            {
-                "action": "translate",
-                "label": "翻译文本",
-                "description": "翻译为其他语言",
-                "icon": "🌐"
-            },
-            {
-                "action": "simplify",
-                "label": "简化文本",
-                "description": "使文本更易理解",
-                "icon": "📝"
-            },
-            {
-                "action": "polish",
-                "label": "润色文本",
-                "description": "提升文采和表达",
-                "icon": "✏️"
-            },
-            {
-                "action": "continue",
-                "label": "续写文本",
-                "description": "延续内容发展",
-                "icon": "📄"
-            },
-            {
-                "action": "fix_grammar",
-                "label": "修正语法",
-                "description": "纠正语法和拼写错误",
-                "icon": "🔧"
-            },
-            {
-                "action": "make_professional",
-                "label": "专业化",
-                "description": "转换为专业风格",
-                "icon": "👔"
-            },
-            {
-                "action": "extract_key_points",
-                "label": "提取要点",
-                "description": "识别关键信息",
-                "icon": "🎯"
-            },
-            {
-                "action": "generate_outline",
-                "label": "生成大纲",
-                "description": "创建结构化大纲",
-                "icon": "📑"
-            }
-        ]
+    def get_available_actions(cls, user_level: str = "basic") -> list:
+        """
+        获取用户可用的文本操作
+
+        Args:
+            user_level: 用户级别 (basic, advanced, experimental)
+
+        Returns:
+            可用操作列表
+        """
+        from ..agent.prompts.action_config import get_visible_actions
+
+        # 根据用户级别决定显示哪些功能
+        include_advanced = user_level in ["advanced", "experimental"]
+        include_experimental = user_level == "experimental"
+
+        return get_visible_actions(
+            include_advanced=include_advanced,
+            include_experimental=include_experimental
+        )
