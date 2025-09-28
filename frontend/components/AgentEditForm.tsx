@@ -21,10 +21,8 @@ interface Agent {
   name: string;
   description?: string;
   avatar?: string;
-  language: string;
-  tone: string;
-  lengthPreference: string;
-  targetAudience?: string;
+  language: string | string[]; // Support both single and multiple languages
+  tone: string | string[]; // Support both single and multiple tones
   customPrompt?: string;
   isDefault: boolean;
   createdAt: string;
@@ -37,34 +35,33 @@ interface AgentEditFormProps {
   onSave: (updatedAgent: Agent) => void;
 }
 
-const toneOptions = [
-  { value: "professional", label: "专业" },
-  { value: "casual", label: "轻松" },
-  { value: "humorous", label: "幽默" },
-  { value: "serious", label: "严肃" },
-];
-
-const lengthOptions = [
-  { value: "short", label: "简洁" },
-  { value: "medium", label: "适中" },
-  { value: "long", label: "详细" },
-];
+// Tone options for multi-select
 
 const languageOptions = [
-  { value: "zh-CN", label: "中文" },
-  { value: "en", label: "英文" },
+  { value: "zh-CN", label: "中文", flag: "🇨🇳" },
+  { value: "en", label: "English", flag: "🇺🇸" },
+  { value: "ja", label: "日本語", flag: "🇯🇵" },
+  { value: "ko", label: "한국어", flag: "🇰🇷" },
+  { value: "fr", label: "Français", flag: "🇫🇷" },
+  { value: "de", label: "Deutsch", flag: "🇩🇪" },
+  { value: "es", label: "Español", flag: "🇪🇸" },
+  { value: "ru", label: "Русский", flag: "🇷🇺" }
 ];
 
 export function AgentEditForm({ agent, onCancel, onSave }: AgentEditFormProps) {
   const [formData, setFormData] = useState({
     name: agent.name,
     description: agent.description || "",
-    language: agent.language,
-    tone: agent.tone,
-    lengthPreference: agent.lengthPreference,
-    targetAudience: agent.targetAudience || "",
+    language: Array.isArray(agent.language) ? agent.language : [agent.language],
+    tone: Array.isArray(agent.tone) ? agent.tone : [agent.tone],
     customPrompt: agent.customPrompt || "",
   });
+  const [selectedLanguages, setSelectedLanguages] = useState<string[]>(
+    Array.isArray(agent.language) ? agent.language : [agent.language]
+  );
+  const [selectedTones, setSelectedTones] = useState<string[]>(
+    Array.isArray(agent.tone) ? agent.tone : [agent.tone]
+  );
   const [isSaving, setIsSaving] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
@@ -83,6 +80,14 @@ export function AgentEditForm({ agent, onCancel, onSave }: AgentEditFormProps) {
       newErrors.description = "描述不能超过200个字符";
     }
 
+    if (selectedLanguages.length === 0) {
+      newErrors.language = "请至少选择一种语言";
+    }
+
+    if (selectedTones.length === 0) {
+      newErrors.tone = "请至少选择一种语气风格";
+    }
+
     if (formData.customPrompt.length > 2000) {
       newErrors.customPrompt = "自定义提示词不能超过2000个字符";
     }
@@ -98,7 +103,14 @@ export function AgentEditForm({ agent, onCancel, onSave }: AgentEditFormProps) {
 
     setIsSaving(true);
     try {
-      const response = await api.put(`/api/agents/${agent.id}`, formData);
+      // Convert arrays to comma-separated strings for API compatibility
+      const submitData = {
+        ...formData,
+        language: selectedLanguages.join(','),
+        tone: selectedTones.join(',')
+      };
+
+      const response = await api.put(`/api/agents/${agent.id}`, submitData);
       onSave(response.data);
     } catch (error: any) {
       alert(error.response?.data?.error || "保存失败");
@@ -113,6 +125,38 @@ export function AgentEditForm({ agent, onCancel, onSave }: AgentEditFormProps) {
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: "" }));
     }
+  };
+
+  const handleLanguageToggle = (languageValue: string) => {
+    setSelectedLanguages(prev => {
+      const newSelection = prev.includes(languageValue)
+        ? prev.filter(lang => lang !== languageValue)
+        : [...prev, languageValue];
+
+      // Update formData
+      setFormData(prevForm => ({
+        ...prevForm,
+        language: newSelection
+      }));
+
+      return newSelection;
+    });
+  };
+
+  const handleToneToggle = (toneValue: string) => {
+    setSelectedTones(prev => {
+      const newSelection = prev.includes(toneValue)
+        ? prev.filter(tone => tone !== toneValue)
+        : [...prev, toneValue];
+
+      // Update formData
+      setFormData(prevForm => ({
+        ...prevForm,
+        tone: newSelection
+      }));
+
+      return newSelection;
+    });
   };
 
   return (
@@ -230,78 +274,75 @@ export function AgentEditForm({ agent, onCancel, onSave }: AgentEditFormProps) {
               写作风格
             </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Language */}
+            <div className="space-y-6">
+              {/* Language Multi-Select */}
               <div>
                 <label className="block text-sm font-medium mb-2 flex items-center gap-2">
                   <Globe className="w-4 h-4" />
-                  语言
+                  语言 (可多选)
                 </label>
-                <select
-                  value={formData.language}
-                  onChange={(e) => handleInputChange("language", e.target.value)}
-                  className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                >
-                  {languageOptions.map(option => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex flex-wrap gap-2">
+                  {languageOptions.map(option => {
+                    const isSelected = selectedLanguages.includes(option.value);
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => handleLanguageToggle(option.value)}
+                        className={`px-3 py-2 rounded-lg border text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
+                          isSelected
+                            ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                            : 'bg-background text-foreground border-border hover:border-primary/50 hover:bg-primary/5'
+                        }`}
+                      >
+                        <span className="text-base">{option.flag}</span>
+                        <span>{option.label}</span>
+                        {isSelected && (
+                          <span className="text-xs opacity-75">✓</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                {selectedLanguages.length === 0 && (
+                  <p className="text-red-500 text-sm mt-1">请至少选择一种语言</p>
+                )}
               </div>
 
-              {/* Tone */}
+              {/* Tone Multi-Select */}
               <div>
                 <label className="block text-sm font-medium mb-2 flex items-center gap-2">
                   <MessageSquare className="w-4 h-4" />
-                  语气风格
+                  语气风格 (可多选)
                 </label>
-                <select
-                  value={formData.tone}
-                  onChange={(e) => handleInputChange("tone", e.target.value)}
-                  className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                >
-                  {toneOptions.map(option => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex flex-wrap gap-2">
+                  {['专业', '轻松', '幽默', '严肃', '友好', '温和', '权威', '创意'].map(tone => {
+                    const isSelected = selectedTones.includes(tone);
+                    return (
+                      <button
+                        key={tone}
+                        type="button"
+                        onClick={() => handleToneToggle(tone)}
+                        className={`px-3 py-2 rounded-lg border text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
+                          isSelected
+                            ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                            : 'bg-background text-foreground border-border hover:border-primary/50 hover:bg-primary/5'
+                        }`}
+                      >
+                        <span>{tone}</span>
+                        {isSelected && (
+                          <span className="text-xs opacity-75">✓</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                {selectedTones.length === 0 && (
+                  <p className="text-red-500 text-sm mt-1">请至少选择一种语气风格</p>
+                )}
               </div>
 
-              {/* Length Preference */}
-              <div>
-                <label className="block text-sm font-medium mb-2 flex items-center gap-2">
-                  <FileText className="w-4 h-4" />
-                  篇幅偏好
-                </label>
-                <select
-                  value={formData.lengthPreference}
-                  onChange={(e) => handleInputChange("lengthPreference", e.target.value)}
-                  className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                >
-                  {lengthOptions.map(option => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
 
-              {/* Target Audience */}
-              <div>
-                <label className="block text-sm font-medium mb-2 flex items-center gap-2">
-                  <User className="w-4 h-4" />
-                  目标受众
-                </label>
-                <input
-                  type="text"
-                  value={formData.targetAudience}
-                  onChange={(e) => handleInputChange("targetAudience", e.target.value)}
-                  placeholder="如：技术开发者、普通读者..."
-                  className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                />
-              </div>
             </div>
           </div>
 

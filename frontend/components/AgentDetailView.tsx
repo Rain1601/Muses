@@ -12,11 +12,9 @@ import {
   Edit3,
   Trash2,
   Star,
-  Settings,
   Copy,
-  User,
-  Check,
-  X
+  FileText,
+  Wand2
 } from "lucide-react";
 import { api } from "@/lib/api";
 
@@ -25,10 +23,8 @@ interface Agent {
   name: string;
   description?: string;
   avatar?: string;
-  language: string;
-  tone: string;
-  lengthPreference: string;
-  targetAudience?: string;
+  language: string | string[];
+  tone: string | string[];
   customPrompt?: string;
   isDefault: boolean;
   createdAt: string;
@@ -42,17 +38,22 @@ interface AgentDetailViewProps {
   onEdit: () => void;
 }
 
+const languageOptions = [
+  { value: "zh-CN", label: "中文", flag: "🇨🇳" },
+  { value: "en", label: "English", flag: "🇺🇸" },
+  { value: "ja", label: "日本語", flag: "🇯🇵" },
+  { value: "ko", label: "한국어", flag: "🇰🇷" },
+  { value: "fr", label: "Français", flag: "🇫🇷" },
+  { value: "de", label: "Deutsch", flag: "🇩🇪" },
+  { value: "es", label: "Español", flag: "🇪🇸" },
+  { value: "ru", label: "Русский", flag: "🇷🇺" }
+];
 
 
 export function AgentDetailView({ agent, onDelete, onRefresh, onEdit }: AgentDetailViewProps) {
   const router = useRouter();
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSettingDefault, setIsSettingDefault] = useState(false);
-  const [editingCustomPrompt, setEditingCustomPrompt] = useState(false);
-  const [editingUsageTips, setEditingUsageTips] = useState(false);
-  const [tempCustomPrompt, setTempCustomPrompt] = useState(agent.customPrompt || "");
-  const [tempUsageTips, setTempUsageTips] = useState("在创建文章时选择此Agent，AI将按照设定的风格生成内容\n默认Agent会在创建新文章时自动选择\n可以随时编辑Agent配置以调整生成效果");
-  const [isUpdating, setIsUpdating] = useState(false);
 
   const handleDelete = async () => {
     if (!confirm("确定要删除这个Agent吗？")) return;
@@ -88,7 +89,6 @@ export function AgentDetailView({ agent, onDelete, onRefresh, onEdit }: AgentDet
         language: agent.language,
         tone: agent.tone,
         lengthPreference: agent.lengthPreference,
-        targetAudience: agent.targetAudience,
         customPrompt: agent.customPrompt,
       });
       onRefresh();
@@ -98,45 +98,37 @@ export function AgentDetailView({ agent, onDelete, onRefresh, onEdit }: AgentDet
     }
   };
 
-  const handleFieldChange = async (field: string, value: string) => {
-    setIsUpdating(true);
-    try {
-      await api.put(`/api/agents/${agent.id}`, {
-        ...agent,
-        [field]: value
-      });
-      onRefresh();
-    } catch (error: any) {
-      alert(error.response?.data?.error || "更新失败");
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-
-  const handleSaveCustomPrompt = async () => {
-    setIsUpdating(true);
-    try {
-      await api.put(`/api/agents/${agent.id}`, {
-        ...agent,
-        customPrompt: tempCustomPrompt
-      });
-      setEditingCustomPrompt(false);
-      onRefresh();
-    } catch (error: any) {
-      alert(error.response?.data?.error || "保存失败");
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-
-  const handleCancelCustomPrompt = () => {
-    setTempCustomPrompt(agent.customPrompt || "");
-    setEditingCustomPrompt(false);
-  };
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('zh-CN');
   };
+
+  const getSelectedLanguages = () => {
+    if (Array.isArray(agent.language)) {
+      return agent.language;
+    }
+    return agent.language.includes(',')
+      ? agent.language.split(',').map(l => l.trim())
+      : [agent.language];
+  };
+
+  const getSelectedTones = () => {
+    if (Array.isArray(agent.tone)) {
+      return agent.tone;
+    }
+    return agent.tone.includes(',')
+      ? agent.tone.split(',').map(t => t.trim())
+      : [agent.tone];
+  };
+
+  const getLanguageDisplay = (languages: string[]) => {
+    return languageOptions.filter(option =>
+      languages.includes(option.value)
+    );
+  };
+
+  const selectedLanguages = getSelectedLanguages();
+  const selectedTones = getSelectedTones();
+  const displayLanguages = getLanguageDisplay(selectedLanguages);
 
   return (
     <div className="h-full flex flex-col">
@@ -219,206 +211,137 @@ export function AgentDetailView({ agent, onDelete, onRefresh, onEdit }: AgentDet
         </div>
       </div>
 
-      {/* Content */}
+      {/* Form Content - Read Only */}
       <div className="flex-1 overflow-y-auto p-6">
         <div className="space-y-6">
-          {/* Configuration Section */}
+          {/* Basic Information */}
           <div>
             <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <Settings className="w-5 h-5" />
-              配置信息
+              <Bot className="w-5 h-5" />
+              基本信息
             </h3>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <Globe className="w-4 h-4 text-muted-foreground" />
-                  <div className="flex-1">
-                    <div className="text-sm text-muted-foreground mb-1">语言</div>
-                    <select
-                      value={agent.language}
-                      onChange={(e) => handleFieldChange('language', e.target.value)}
-                      disabled={isUpdating}
-                      className="font-medium bg-transparent border-0 outline-0 cursor-pointer hover:bg-accent/50 rounded px-2 py-1 -mx-2 -my-1 text-foreground"
-                    >
-                      <option value="zh-CN" className="bg-background text-foreground">中文</option>
-                      <option value="en" className="bg-background text-foreground">英文</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <MessageSquare className="w-4 h-4 text-muted-foreground" />
-                  <div className="flex-1">
-                    <div className="text-sm text-muted-foreground mb-1">语气风格</div>
-                    <input
-                      type="text"
-                      value={agent.tone}
-                      onChange={(e) => handleFieldChange('tone', e.target.value)}
-                      disabled={isUpdating}
-                      className="font-medium bg-transparent border-0 outline-0 hover:bg-accent/50 rounded px-2 py-1 -mx-2 -my-1 text-foreground w-full"
-                      placeholder="输入语气风格..."
-                    />
-                  </div>
+            <div className="space-y-4">
+              {/* Name */}
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Agent名称
+                </label>
+                <div className="w-full px-3 py-2 border border-border rounded-lg bg-muted/30 text-foreground">
+                  {agent.name}
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <User className="w-4 h-4 text-muted-foreground" />
-                  <div className="flex-1">
-                    <div className="text-sm text-muted-foreground mb-1">目标受众</div>
-                    <select
-                      value={agent.targetAudience || ""}
-                      onChange={(e) => handleFieldChange('targetAudience', e.target.value)}
-                      disabled={isUpdating}
-                      className="font-medium bg-transparent border-0 outline-0 cursor-pointer hover:bg-accent/50 rounded px-2 py-1 -mx-2 -my-1 text-foreground w-full"
+              {/* Description */}
+              {agent.description && (
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    描述
+                  </label>
+                  <div className="w-full px-3 py-2 border border-border rounded-lg bg-muted/30 text-foreground min-h-[80px] whitespace-pre-wrap">
+                    {agent.description}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Writing Style */}
+          <div>
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <Wand2 className="w-5 h-5" />
+              写作风格
+            </h3>
+
+            <div className="space-y-6">
+              {/* Language Multi-Display */}
+              <div>
+                <label className="block text-sm font-medium mb-2 flex items-center gap-2">
+                  <Globe className="w-4 h-4" />
+                  语言
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {displayLanguages.map(option => (
+                    <div
+                      key={option.value}
+                      className="px-3 py-2 rounded-lg border border-primary bg-primary text-primary-foreground shadow-sm flex items-center gap-2 text-sm font-medium"
                     >
-                      <option value="" className="bg-background text-foreground">请选择...</option>
-                      <option value="技术开发者" className="bg-background text-foreground">技术开发者</option>
-                      <option value="普通读者" className="bg-background text-foreground">普通读者</option>
-                      <option value="学生群体" className="bg-background text-foreground">学生群体</option>
-                      <option value="商务人士" className="bg-background text-foreground">商务人士</option>
-                      <option value="创作者" className="bg-background text-foreground">创作者</option>
-                      <option value="研究人员" className="bg-background text-foreground">研究人员</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <Calendar className="w-4 h-4 text-muted-foreground" />
-                  <div>
-                    <div className="text-sm text-muted-foreground">创建时间</div>
-                    <div className="font-medium">{formatDate(agent.createdAt)}</div>
-                  </div>
-                </div>
-
-                {agent.updatedAt !== agent.createdAt && (
-                  <div className="flex items-center gap-3">
-                    <Calendar className="w-4 h-4 text-muted-foreground" />
-                    <div>
-                      <div className="text-sm text-muted-foreground">更新时间</div>
-                      <div className="font-medium">{formatDate(agent.updatedAt)}</div>
+                      <span className="text-base">{option.flag}</span>
+                      <span>{option.label}</span>
+                      <span className="text-xs opacity-75">✓</span>
                     </div>
-                  </div>
-                )}
+                  ))}
+                </div>
+              </div>
+
+              {/* Tone Multi-Display */}
+              <div>
+                <label className="block text-sm font-medium mb-2 flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4" />
+                  语气风格
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {selectedTones.map(tone => (
+                    <div
+                      key={tone}
+                      className="px-3 py-2 rounded-lg border border-primary bg-primary text-primary-foreground shadow-sm flex items-center gap-2 text-sm font-medium"
+                    >
+                      <span>{tone}</span>
+                      <span className="text-xs opacity-75">✓</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Custom Prompt Section */}
+          {/* Custom Prompt */}
           <div>
             <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <MessageSquare className="w-5 h-5" />
               自定义提示词
             </h3>
 
-            <div className="bg-muted/30 rounded-lg p-4 border border-border group relative">
-              {editingCustomPrompt ? (
-                <div className="space-y-3">
-                  <textarea
-                    value={tempCustomPrompt}
-                    onChange={(e) => setTempCustomPrompt(e.target.value)}
-                    placeholder="输入自定义的AI提示词..."
-                    rows={6}
-                    className="w-full p-2 text-sm bg-background border border-border rounded resize-none focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                  <div className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      onClick={handleSaveCustomPrompt}
-                      disabled={isUpdating}
-                      className="h-7 px-2"
-                    >
-                      <Check className="w-3 h-3 mr-1" />
-                      保存
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={handleCancelCustomPrompt}
-                      disabled={isUpdating}
-                      className="h-7 px-2"
-                    >
-                      <X className="w-3 h-3 mr-1" />
-                      取消
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div
-                  className="cursor-pointer hover:bg-accent/20 rounded p-1 -m-1 transition-colors"
-                  onClick={() => {
-                    setTempCustomPrompt(agent.customPrompt || "");
-                    setEditingCustomPrompt(true);
-                  }}
-                >
-                  {agent.customPrompt ? (
-                    <p className="text-sm whitespace-pre-wrap leading-relaxed">
-                      {agent.customPrompt}
-                    </p>
-                  ) : (
-                    <p className="text-sm text-muted-foreground italic">
-                      点击添加自定义提示词
-                    </p>
-                  )}
-                </div>
-              )}
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                自定义提示词
+              </label>
+              <div className="w-full px-3 py-2 border border-border rounded-lg bg-muted/30 text-foreground min-h-[120px] whitespace-pre-wrap">
+                {agent.customPrompt || (
+                  <span className="text-muted-foreground italic">未设置自定义提示词</span>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                自定义提示词将覆盖默认的AI指令
+              </p>
             </div>
           </div>
 
-          {/* Usage Tips */}
+          {/* Metadata */}
           <div>
-            <h3 className="text-lg font-semibold mb-4">使用提示</h3>
-            <div className="bg-muted/30 rounded-lg p-4 border border-border group relative">
-              {editingUsageTips ? (
-                <div className="space-y-3">
-                  <textarea
-                    value={tempUsageTips}
-                    onChange={(e) => setTempUsageTips(e.target.value)}
-                    placeholder="输入使用提示..."
-                    rows={4}
-                    className="w-full p-2 text-sm bg-background border border-border rounded resize-none focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                  <div className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      onClick={() => setEditingUsageTips(false)}
-                      className="h-7 px-2"
-                    >
-                      <Check className="w-3 h-3 mr-1" />
-                      保存
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setEditingUsageTips(false)}
-                      className="h-7 px-2"
-                    >
-                      <X className="w-3 h-3 mr-1" />
-                      取消
-                    </Button>
-                  </div>
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <Calendar className="w-5 h-5" />
+              创建信息
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  创建时间
+                </label>
+                <div className="w-full px-3 py-2 border border-border rounded-lg bg-muted/30 text-foreground">
+                  {formatDate(agent.createdAt)}
                 </div>
-              ) : (
-                <div
-                  className="cursor-pointer hover:bg-accent/20 rounded p-1 -m-1 transition-colors"
-                  onClick={() => setEditingUsageTips(true)}
-                >
-                  <ul className="space-y-2 text-sm text-muted-foreground">
-                    <li className="flex items-start gap-2">
-                      <span className="text-primary">•</span>
-                      <span>在创建文章时选择此Agent，AI将按照设定的风格生成内容</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-primary">•</span>
-                      <span>默认Agent会在创建新文章时自动选择</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-primary">•</span>
-                      <span>可以随时编辑Agent配置以调整生成效果</span>
-                    </li>
-                  </ul>
+              </div>
+
+              {agent.updatedAt !== agent.createdAt && (
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    更新时间
+                  </label>
+                  <div className="w-full px-3 py-2 border border-border rounded-lg bg-muted/30 text-foreground">
+                    {formatDate(agent.updatedAt)}
+                  </div>
                 </div>
               )}
             </div>
