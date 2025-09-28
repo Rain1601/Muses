@@ -33,6 +33,8 @@ const ResizableImageComponent = ({ node, updateAttributes }: any) => {
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+
+    // 立即开始拖拽
     setIsResizing(true);
     startX.current = e.clientX;
 
@@ -41,41 +43,37 @@ const ResizableImageComponent = ({ node, updateAttributes }: any) => {
       startWidth.current = rect.width;
     }
 
-    // 添加全局事件监听器
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-  };
+    // 使用 ref 跟踪最新的宽度值
+    let latestWidth = currentWidth;
 
-  const handleMouseMove = (e: MouseEvent) => {
-    if (!isResizing || !containerRef.current) return;
+    // 立即添加全局事件监听器，实现点击即拖拽
+    const moveHandler = (moveEvent: MouseEvent) => {
+      if (!containerRef.current) return;
 
-    const containerWidth = containerRef.current.offsetWidth;
-    const diff = e.clientX - startX.current;
-    const newWidth = startWidth.current + diff;
-    const percentage = Math.min(Math.max((newWidth / containerWidth) * 100, 10), 100);
+      const containerWidth = containerRef.current.offsetWidth;
+      const diff = moveEvent.clientX - startX.current;
+      const newWidth = startWidth.current + diff;
+      const percentage = Math.min(Math.max((newWidth / containerWidth) * 100, 10), 100);
 
-    setCurrentWidth(Math.round(percentage));
-  };
-
-  const handleMouseUp = () => {
-    if (isResizing) {
-      setIsResizing(false);
-      // 保存最终宽度
-      updateAttributes({ width: `${currentWidth}%` });
-    }
-
-    // 移除全局事件监听器
-    document.removeEventListener('mousemove', handleMouseMove);
-    document.removeEventListener('mouseup', handleMouseUp);
-  };
-
-  // 组件卸载时清理
-  useEffect(() => {
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+      latestWidth = Math.round(percentage);
+      setCurrentWidth(latestWidth);
     };
-  }, []);
+
+    const upHandler = () => {
+      setIsResizing(false);
+      // 保存最终宽度（使用 ref 中的最新值）
+      updateAttributes({ width: `${latestWidth}%` });
+
+      // 移除事件监听器
+      document.removeEventListener('mousemove', moveHandler);
+      document.removeEventListener('mouseup', upHandler);
+    };
+
+    // 添加全局事件监听器
+    document.addEventListener('mousemove', moveHandler);
+    document.addEventListener('mouseup', upHandler);
+  };
+
 
   const handleAlignChange = (align: 'left' | 'center' | 'right') => {
     updateAttributes({ align });
