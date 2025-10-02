@@ -1,0 +1,115 @@
+/* 可折叠代码块样式 */
+.ProseMirror pre {
+  background: rgb(39, 39, 42);
+  border-radius: 0.5rem;
+  color: #e4e4e7;
+  font-family: 'JetBrainsMono', 'Fira Code', 'Monaco', 'Courier New', monospace;
+  font-size: 0.875rem;
+  margin: 1rem 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.ProseMirror pre code {
+  background: none;
+  color: inherit;
+  font-size: inherit;
+  padding: 0;
+  display: block;
+  overflow-x: auto;
+}
+
+/* 代码高亮主题 */
+.hljs {
+  color: #e4e4e7;
+  background: rgb(39, 39, 42);
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: #71717a;
+  font-style: italic;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-addition {
+  color: #c084fc;
+}
+
+.hljs-number,
+.hljs-string,
+.hljs-meta .hljs-string,
+.hljs-literal,
+.hljs-doctag,
+.hljs-regexp {
+  color: #86efac;
+}
+
+.hljs-title,
+.hljs-section,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class {
+  color: #67e8f9;
+}
+
+.hljs-attribute,
+.hljs-attr,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-class .hljs-title,
+.hljs-type {
+  color: #fbbf24;
+}
+
+.hljs-symbol,
+.hljs-bullet,
+.hljs-subst,
+.hljs-meta,
+.hljs-link {
+  color: #f472b6;
+}
+
+.hljs-built_in,
+.hljs-deletion {
+  color: #ef4444;
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: bold;
+}
+
+/* 暗色模式调整 */
+@media (prefers-color-scheme: dark) {
+  .ProseMirror pre {
+    background: rgb(24, 24, 27);
+    border: 1px solid rgb(39, 39, 42);
+  }
+
+  .hljs {
+    background: rgb(24, 24, 27);
+  }
+}
+
+/* 滚动条样式 */
+.ProseMirror pre code::-webkit-scrollbar {
+  height: 8px;
+}
+
+.ProseMirror pre code::-webkit-scrollbar-track {
+  background: rgb(39, 39, 42);
+}
+
+.ProseMirror pre code::-webkit-scrollbar-thumb {
+  background: rgb(63, 63, 70);
+  border-radius: 4px;
+}
+
+.ProseMirror pre code::-webkit-scrollbar-thumb:hover {
+  background: rgb(82, 82, 91);
+}

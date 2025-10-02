@@ -1,7 +1,7 @@
 /* TipTap Placeholder Styles */
 
-/* 主要占位符样式 */
-.ProseMirror p.is-empty::before {
+/* 主要占位符样式 - 仅使用 data-placeholder 属性 */
+.ProseMirror p.is-empty:first-child::before {
   content: attr(data-placeholder);
   color: #9ca3af;
   pointer-events: none;
@@ -17,24 +17,6 @@
 .ProseMirror h5.is-empty::before,
 .ProseMirror h6.is-empty::before {
   content: attr(data-placeholder);
-  color: #9ca3af;
-  pointer-events: none;
-  position: absolute;
-  left: 0;
-}
-
-/* 通用占位符 */
-.ProseMirror .is-empty::before {
-  content: attr(data-placeholder);
-  color: #9ca3af;
-  pointer-events: none;
-  position: absolute;
-  left: 0;
-}
-
-/* 编辑器完全为空时 */
-.ProseMirror.is-editor-empty > p:first-child::before {
-  content: "输入 "/" 查看命令，或开始输入内容...";
   color: #9ca3af;
   pointer-events: none;
   position: absolute;

@@ -1,0 +1,41 @@
+/* 响应式视频容器样式 */
+
+/* YouTube 视频容器 */
+.ProseMirror iframe[src*="youtube.com"],
+.ProseMirror iframe[src*="youtu.be"] {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  aspect-ratio: 16/9;
+  border-radius: 0.5rem;
+  margin: 1rem 0;
+}
+
+/* Bilibili 视频容器 - 已由组件内部处理 */
+.video-wrapper {
+  width: 100%;
+  max-width: 100%;
+  margin: 1rem auto;
+}
+
+/* 通用视频容器样式 */
+.ProseMirror .video-container {
+  width: 100%;
+  max-width: 100%;
+  margin: 1rem 0;
+}
+
+/* 确保编辑器内容区域不会因为视频而溢出 */
+.ProseMirror {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* 移动端优化 */
+@media (max-width: 768px) {
+  .ProseMirror iframe[src*="youtube.com"],
+  .ProseMirror iframe[src*="youtu.be"],
+  .video-wrapper {
+    margin: 0.5rem 0;
+  }
+}

@@ -5,10 +5,13 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import styles from './NotionEditor.module.css';
 import '../styles/tiptap-placeholder.css';
 import '../styles/text-selection.css';
+import '../styles/video-responsive.css';
+import '../styles/editor-selection-persist.css';
+import '../styles/collapsible-code.css';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import Highlight from '@tiptap/extension-highlight';
-import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
+import CollapsibleCodeBlock from '@/lib/tiptap-extensions/CollapsibleCodeBlock';
 import ResizableImage from '@/lib/tiptap-extensions/ResizableImage';
 import BilibiliVideo from '@/lib/tiptap-extensions/BilibiliVideo';
 import Youtube from '@tiptap/extension-youtube';
@@ -22,11 +25,7 @@ import { TaskItem } from '@tiptap/extension-task-item';
 import { Link } from '@tiptap/extension-link';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { Color } from '@tiptap/extension-color';
-import { createLowlight } from 'lowlight';
-import javascript from 'highlight.js/lib/languages/javascript';
-import typescript from 'highlight.js/lib/languages/typescript';
-import css from 'highlight.js/lib/languages/css';
-import python from 'highlight.js/lib/languages/python';
+// Lowlight 现在在 CollapsibleCodeBlock 中处理
 import { api } from '@/lib/api';
 import { VideoInsertDialog } from './VideoInsertDialog';
 import { useImageViewer } from './ImageViewer';
@@ -34,17 +33,14 @@ import TextActionToolbar, { TextActionType, ModelConfig } from './TextActionTool
 import AIDisabledTooltip from './AIDisabledTooltip';
 import { useTextActions } from '@/lib/hooks/useTextActions';
 import { useAIAssistantStore } from '@/store/aiAssistant';
+// import { SelectionHighlight } from '@/lib/tiptap-extensions/SelectionHighlight';  // 移除装饰系统
 
 // 创建上下文来传递图片查看器函数
 const ImageViewerContext = React.createContext<{
   openViewer: (src: string, alt?: string) => void;
 } | null>(null);
 
-const lowlight = createLowlight();
-lowlight.register('javascript', javascript);
-lowlight.register('typescript', typescript);
-lowlight.register('css', css);
-lowlight.register('python', python);
+// lowlight 配置已移至 CollapsibleCodeBlock 组件中
 
 interface NotionEditorProps {
   initialContent?: string;
@@ -73,6 +69,20 @@ export function NotionEditor({ initialContent = '', onChange, agentId }: NotionE
 
   // AI 禁用提示工具提示状态
   const [showAIDisabledTooltip, setShowAIDisabledTooltip] = useState(false);
+
+  // 使用 ref 避免闭包问题和重复触发
+  const toolbarStateRef = useRef({
+    showTextActionToolbar: false,
+    showAIDisabledTooltip: false,
+    lastSelectionTime: 0,
+    lastSelectedText: ''
+  });
+
+  // 同步更新 ref
+  useEffect(() => {
+    toolbarStateRef.current.showTextActionToolbar = showTextActionToolbar;
+    toolbarStateRef.current.showAIDisabledTooltip = showAIDisabledTooltip;
+  }, [showTextActionToolbar, showAIDisabledTooltip]);
 
   const { viewerState, openViewer, closeViewer, ImageViewerComponent } = useImageViewer();
   const { executeAction } = useTextActions();
@@ -129,6 +139,13 @@ export function NotionEditor({ initialContent = '', onChange, agentId }: NotionE
     setSelectedText('');
     setSelectionRange(null);
     setShowTextActionToolbar(false);
+
+    // 设置光标位置到替换文本的末尾，保持焦点
+    const newCursorPos = from + newText.length;
+    editor.chain()
+      .focus()
+      .setTextSelection(newCursorPos)
+      .run();
 
     // 触发onChange回调
     if (onChange) {
@@ -190,7 +207,7 @@ export function NotionEditor({ initialContent = '', onChange, agentId }: NotionE
       try {
         const result = currentEditor.commands.setYoutubeVideo({
           src: url,
-          width: 640,
+          width: '100%',
           height: 480
         });
         console.log('✅ YouTube 插入结果:', result);
@@ -292,9 +309,59 @@ export function NotionEditor({ initialContent = '', onChange, agentId }: NotionE
 
   // 键盘处理函数
   const handleKeyDown = useCallback((view: any, event: KeyboardEvent) => {
+    // 当文本操作工具栏显示时，阻止编辑器处理键盘输入
+    // 让工具栏的输入框独占键盘输入
+    if (toolbarStateRef.current.showTextActionToolbar) {
+      // 只允许编辑器处理格式化快捷键（Cmd+B, Cmd+I 等）
+      if (event.metaKey || event.ctrlKey) {
+        return false; // 让编辑器处理
+      }
+      // 阻止其他所有键盘输入
+      event.preventDefault();
+      event.stopPropagation();
+      return true; // 阻止编辑器处理
+    }
+
     const { state } = view;
     const { selection } = state;
     const { $from } = selection;
+
+    // 检测空格键，用于触发列表转换（输入 "1. " 后按空格自动创建有序列表）
+    if (event.key === ' ' && !slashMenuState.current.showSlashMenu) {
+      const currentLine = state.doc.textBetween($from.start(), $from.pos);
+      // 匹配 "数字. " 格式（如 "1. "）
+      const orderedListMatch = currentLine.match(/^(\d+)\.$/);
+      if (orderedListMatch) {
+        event.preventDefault();
+
+        // 使用 editorRef 来访问 editor 实例，立即执行以减少闪烁
+        if (editorRef.current) {
+          // 先转换为有序列表，再删除 "1." 文本
+          editorRef.current.chain()
+            .deleteRange({ from: $from.start(), to: $from.pos })
+            .toggleOrderedList()
+            .focus()
+            .run();
+        }
+        return true;
+      }
+      // 匹配 "- " 或 "* " 格式（无序列表）
+      const bulletListMatch = currentLine.match(/^[-*]$/);
+      if (bulletListMatch) {
+        event.preventDefault();
+
+        // 使用 editorRef 来访问 editor 实例，立即执行以减少闪烁
+        if (editorRef.current) {
+          // 先转换为无序列表，再删除 "-" 或 "*" 文本
+          editorRef.current.chain()
+            .deleteRange({ from: $from.start(), to: $from.pos })
+            .toggleBulletList()
+            .focus()
+            .run();
+        }
+        return true;
+      }
+    }
 
     // 检测斜杠输入 - 只在行首显示菜单
     if (event.key === '/') {
@@ -599,39 +666,46 @@ export function NotionEditor({ initialContent = '', onChange, agentId }: NotionE
           }
           return '输入 "/" 查看命令，或开始输入内容...'
         },
-        includeChildren: true, // 也在子节点显示占位符
         showOnlyCurrent: true, // 只在当前节点显示
         emptyEditorClass: 'is-editor-empty',
         emptyNodeClass: 'is-empty',
       }),
       StarterKit.configure({
-        // 配置斜杠命令
-        commands: {
-          addCommands() {
-            return {
-              insertImageCommand: () => ({ commands, editor }) => {
-                handleFileUpload(editor);
-                return true;
-              },
-            };
+        // 启用列表的自动转换
+        orderedList: {
+          HTMLAttributes: {
+            class: 'list-decimal ml-6',
           },
         },
+        bulletList: {
+          HTMLAttributes: {
+            class: 'list-disc ml-6',
+          },
+        },
+        listItem: {
+          HTMLAttributes: {
+            class: 'my-1',
+          },
+        },
+        // 禁用 CodeBlock，因为我们使用自定义的 CollapsibleCodeBlock
+        codeBlock: false,
       }),
       Highlight,
-      CodeBlockLowlight.configure({
-        lowlight,
-      }),
+      CollapsibleCodeBlock,
       ResizableImage,
       Youtube.configure({
-        width: 640,
+        width: '100%',
         height: 480,
         controls: true,
         nocookie: true,
         allowFullscreen: true,
         addPasteHandler: false, // 禁用自动粘贴，避免页面刷新
+        HTMLAttributes: {
+          style: 'max-width: 100%; height: auto; aspect-ratio: 16/9;'
+        }
       }),
       BilibiliVideo.configure({
-        width: 640,
+        width: '100%',
         height: 480,
         allowFullscreen: true,
       }),
@@ -649,6 +723,9 @@ export function NotionEditor({ initialContent = '', onChange, agentId }: NotionE
       }),
       TextStyle,
       Color,
+      // SelectionHighlight.configure({
+      //   highlightClass: 'selection-highlight-decoration',
+      // }),
     ],
     content: initialContent || '',
     onUpdate: ({ editor, transaction }) => {
@@ -881,75 +958,180 @@ export function NotionEditor({ initialContent = '', onChange, agentId }: NotionE
   // 使用更稳定的文本选择检测
   useEffect(() => {
     if (!agentId) return;
+    if (!editor) {
+      console.log('⏳ Editor not ready yet, skipping selection detection');
+      return;
+    }
+    console.log('✅ Selection detection effect running with editor:', !!editor);
 
     let selectionTimeout: NodeJS.Timeout;
+    let isSelecting = false;
 
     const checkSelection = () => {
-      const selection = window.getSelection();
-      if (!selection || selection.rangeCount === 0) {
-        if (showTextActionToolbar) {
+      try {
+        const selection = window.getSelection();
+
+        // 错误处理：selection 可能为 null
+        if (!selection) {
+          console.warn('⚠️ getSelection returned null');
+          return;
+        }
+
+        // 没有选中文本
+        if (selection.isCollapsed || selection.rangeCount === 0) {
+        // 只有在确实需要关闭时才关闭
+        if (toolbarStateRef.current.showTextActionToolbar && !isSelecting) {
           setShowTextActionToolbar(false);
           setSelectedText('');
           setSelectionRange(null);
+          toolbarStateRef.current.lastSelectedText = '';
+        }
+        if (toolbarStateRef.current.showAIDisabledTooltip) {
+          setShowAIDisabledTooltip(false);
         }
         return;
       }
 
       const selectedText = selection.toString().trim();
+
+      // 避免重复处理相同的选择
+      const now = Date.now();
+      if (selectedText === toolbarStateRef.current.lastSelectedText &&
+          now - toolbarStateRef.current.lastSelectionTime < 500) {
+        return;
+      }
+
       if (selectedText.length >= 3 && aiAssistantEnabled && agentId) {
         const range = selection.getRangeAt(0);
         const rect = range.getBoundingClientRect();
 
         if (rect.width > 0 && rect.height > 0) {
+          // 更新状态
+          toolbarStateRef.current.lastSelectedText = selectedText;
+          toolbarStateRef.current.lastSelectionTime = now;
+
           setSelectedText(selectedText);
           setSelectionRange(range.cloneRange());
+
+          // 计算工具栏位置，确保不超出屏幕
+          const toolbarX = Math.min(rect.right + 10, window.innerWidth - 340);
+          const toolbarY = rect.bottom + 20;
+
           setTextActionPosition({
-            x: rect.right + 10,
-            y: rect.bottom + 20
+            x: Math.max(10, toolbarX),
+            y: toolbarY
           });
+
           setShowTextActionToolbar(true);
-          setShowAIDisabledTooltip(false); // 隐藏 AI 禁用提示
+          setShowAIDisabledTooltip(false);
+
+          console.log('📍 Text selection detected:', selectedText.slice(0, 50));
         }
       } else if (selectedText.length >= 3 && !aiAssistantEnabled) {
         // 显示 AI 禁用提示
         setShowAIDisabledTooltip(true);
         setShowTextActionToolbar(false);
+        toolbarStateRef.current.lastSelectedText = '';
       } else {
-        // 清理所有状态
-        if (showTextActionToolbar) {
+        // 清理状态
+        if (toolbarStateRef.current.showTextActionToolbar) {
           setShowTextActionToolbar(false);
           setSelectedText('');
           setSelectionRange(null);
+          toolbarStateRef.current.lastSelectedText = '';
         }
-        if (showAIDisabledTooltip) {
+        if (toolbarStateRef.current.showAIDisabledTooltip) {
           setShowAIDisabledTooltip(false);
         }
       }
+      } catch (error) {
+        console.error('❌ Error in checkSelection:', error);
+      }
+    };
+
+    const handleMouseDown = () => {
+      isSelecting = true;
     };
 
     const handleMouseUp = (event: MouseEvent) => {
-      // 延迟检查选择，给浏览器时间更新选择
+      // 避免点击工具栏时触发
+      const target = event.target as HTMLElement;
+      if (target.closest('[data-text-action-toolbar]') ||
+          target.closest('[data-text-action-dialog]')) {
+        return;
+      }
+
+      // 延迟检查选择
       clearTimeout(selectionTimeout);
-      selectionTimeout = setTimeout(checkSelection, 100);
+      selectionTimeout = setTimeout(() => {
+        checkSelection();
+        isSelecting = false;
+      }, 150);
     };
 
     const handleKeyUp = (event: KeyboardEvent) => {
-      // 对于键盘选择（Shift + 方向键）
-      if (event.shiftKey) {
+      // 支持更多键盘选择组合
+      const isSelectKey = (
+        event.shiftKey ||                                    // Shift + 方向键
+        (event.metaKey && event.shiftKey) ||                // Cmd + Shift + 方向键
+        (event.ctrlKey && event.shiftKey) ||                // Ctrl + Shift + 方向键
+        ((event.metaKey || event.ctrlKey) && event.key === 'a')  // Cmd/Ctrl + A 全选
+      );
+
+      const isNavigationKey = [
+        'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
+        'Home', 'End', 'PageUp', 'PageDown'
+      ].includes(event.key);
+
+      // 如果是选择相关的按键，检查选择
+      if (isSelectKey || (event.shiftKey && isNavigationKey)) {
         clearTimeout(selectionTimeout);
         selectionTimeout = setTimeout(checkSelection, 100);
       }
     };
 
+    // 输入法事件处理 - 当工具栏显示时阻止输入法修改选中文本
+    const handleCompositionStart = (e: CompositionEvent) => {
+      if (toolbarStateRef.current.showTextActionToolbar) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+
+    const handleCompositionUpdate = (e: CompositionEvent) => {
+      if (toolbarStateRef.current.showTextActionToolbar) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+
+    const handleCompositionEnd = (e: CompositionEvent) => {
+      if (toolbarStateRef.current.showTextActionToolbar) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+
+    // 事件监听
+    document.addEventListener('mousedown', handleMouseDown);
     document.addEventListener('mouseup', handleMouseUp);
     document.addEventListener('keyup', handleKeyUp);
 
+    // 在捕获阶段监听输入法事件，确保在编辑器处理之前拦截
+    document.addEventListener('compositionstart', handleCompositionStart, true);
+    document.addEventListener('compositionupdate', handleCompositionUpdate, true);
+    document.addEventListener('compositionend', handleCompositionEnd, true);
+
     return () => {
       clearTimeout(selectionTimeout);
+      document.removeEventListener('mousedown', handleMouseDown);
       document.removeEventListener('mouseup', handleMouseUp);
       document.removeEventListener('keyup', handleKeyUp);
+      document.removeEventListener('compositionstart', handleCompositionStart, true);
+      document.removeEventListener('compositionupdate', handleCompositionUpdate, true);
+      document.removeEventListener('compositionend', handleCompositionEnd, true);
     };
-  }, [agentId, aiAssistantEnabled]);
+  }, [agentId, aiAssistantEnabled, editor]);
 
   useEffect(() => {
     if (editor) {
@@ -959,6 +1141,14 @@ export function NotionEditor({ initialContent = '', onChange, agentId }: NotionE
       }
     }
   }, [editor, initialContent]);
+
+  // 当文本操作工具栏显示时，禁用编辑器以防止输入冲突
+  useEffect(() => {
+    if (editor) {
+      editor.setEditable(!showTextActionToolbar);
+      console.log('🔒 Editor editable:', !showTextActionToolbar);
+    }
+  }, [editor, showTextActionToolbar]);
 
   // 点击外部关闭斜杠菜单
   useEffect(() => {
@@ -999,7 +1189,7 @@ export function NotionEditor({ initialContent = '', onChange, agentId }: NotionE
   }
 
   return (
-    <div className={`w-full ${styles.notionEditor} relative ${showTextActionToolbar ? 'keep-selection-highlight' : ''}`}>
+    <div className={`w-full ${styles.notionEditor} relative`}>
       <ImageViewerContext.Provider value={{ openViewer }}>
         <EditorContent
           editor={editor}

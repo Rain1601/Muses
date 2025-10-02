@@ -503,8 +503,49 @@ summary: ""
     };
   }, [manualSave]);
 
+  // 保存文章函数
+  const handleSaveArticle = async () => {
+    if (!selectedArticle) return;
+
+    try {
+      // 更新现有文章
+      await api.put(`/api/articles/${selectedArticle.id}`, {
+        title: editingTitle || '无标题',
+        content: editingContent,
+        publishStatus: selectedArticle.publishStatus || 'draft'
+      });
+
+      // 更新本地状态
+      setSelectedArticle({
+        ...selectedArticle,
+        title: editingTitle || '无标题',
+        content: editingContent
+      });
+
+      // 刷新文章列表
+      setRefreshKey(prev => prev + 1);
+    } catch (error) {
+      console.error('保存文章失败:', error);
+      throw error; // 重新抛出错误以便调用方处理
+    }
+  };
+
   // 当选择文章时，直接进入编辑模式并加载内容
-  const handleArticleSelect = (article: Article) => {
+  const handleArticleSelect = async (article: Article) => {
+    // 如果当前有正在编辑的文章，先保存
+    if (selectedArticle && (editingTitle !== selectedArticle.title || editingContent !== selectedArticle.content)) {
+      try {
+        // 自动保存当前文章
+        await handleSaveArticle();
+        showToast('已自动保存当前文档', 'success');
+      } catch (error) {
+        console.error('自动保存失败:', error);
+        // 即使保存失败，也允许切换，但给出提示
+        showToast('当前文档保存失败，但已切换到新文档', 'warning');
+      }
+    }
+
+    // 切换到新文章
     setSelectedArticle(article);
     setIsEditing(true);
     setEditingTitle(article.title);
@@ -732,6 +773,19 @@ summary: ""
                           showToast('请先创建一个Agent', 'warning');
                           return;
                         }
+
+                        // 如果当前有正在编辑的文章，先保存
+                        if (selectedArticle && (editingTitle !== selectedArticle.title || editingContent !== selectedArticle.content)) {
+                          try {
+                            await handleSaveArticle();
+                            showToast('已自动保存当前文档', 'success');
+                          } catch (error) {
+                            console.error('自动保存失败:', error);
+                            // 提示但继续创建新文档
+                            showToast('当前文档保存失败', 'warning');
+                          }
+                        }
+
                         // 创建新的草稿文章
                         const response = await api.post('/api/articles', {
                           title: '无标题',

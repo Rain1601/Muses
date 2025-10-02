@@ -150,40 +150,64 @@ export const TextActionToolbar: React.FC<TextActionToolbarProps> = ({
   const toolbarRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // 当 selectedText 改变或组件不可见时，重置状态到初始工具栏
+  // 使用 useRef 跟踪状态，避免闭包问题
+  const prevSelectedTextRef = useRef<string>('');
+  const isFirstRenderRef = useRef(true);
+
+  // 每次工具栏显示时重置到初始状态
   useEffect(() => {
-    if (selectedText && isVisible) {
-      // 重置所有状态到初始值
-      setShowActionDialog(false);
-      setCurrentAction(null);
+    if (isVisible) {
+      // 每次显示时都重置状态
       setQuery('');
       setSelectedIndex(0);
       setShowModelSubmenu(false);
       setSelectedModelIndex(0);
-      setIsProcessing(false);
-    }
-  }, [selectedText, isVisible]);
+      setSelectedModel(null);
+      setShowActionDialog(false);
+      setCurrentAction(null);
 
-  // 外部点击关闭逻辑
+      prevSelectedTextRef.current = selectedText;
+    } else {
+      // 关闭时清理状态
+      prevSelectedTextRef.current = '';
+    }
+  }, [isVisible, selectedText]);
+
+  // 外部点击关闭逻辑 - 更精确的检测
   useEffect(() => {
     if (!isVisible) return;
 
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
 
-      // 如果点击的是工具栏内部，不关闭
+      // 检查是否点击了工具栏内部
       if (toolbarRef.current && toolbarRef.current.contains(target)) {
         return;
       }
 
-      // 立即关闭
-      onClose();
+      // 检查是否点击了 TextActionDialog
+      const actionDialog = document.querySelector('[data-text-action-dialog]');
+      if (actionDialog && actionDialog.contains(target)) {
+        return;
+      }
+
+      // 检查是否在选择文本（拖拽选择时不应该关闭）
+      const selection = window.getSelection();
+      if (selection && selection.toString().trim().length > 0) {
+        // 如果有选中文本，不立即关闭，等待下一次检测
+        return;
+      }
+
+      // 延迟一帧再关闭，避免与选择文本事件冲突
+      requestAnimationFrame(() => {
+        onClose();
+      });
     };
 
-    // 延迟500ms后开始监听外部点击，给用户足够时间
+    // 使用较长的延迟，确保选择文本的事件已经完成
     const delayedSetup = setTimeout(() => {
       document.addEventListener('mousedown', handleClickOutside);
-    }, 500);
+    }, 300);
 
     return () => {
       clearTimeout(delayedSetup);
@@ -208,93 +232,14 @@ export const TextActionToolbar: React.FC<TextActionToolbarProps> = ({
     command.description.toLowerCase().includes(queryLower);
   });
 
-  // 自动聚焦输入框
+  // 工具栏显示时的日志
   useEffect(() => {
-    if (isVisible && inputRef.current) {
-      setQuery('');
-      setSelectedIndex(0);
-      setShowModelSubmenu(false);
-      setSelectedModelIndex(0);
-
-      // 使用 requestAnimationFrame 确保 DOM 更新后再聚焦
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          if (inputRef.current) {
-            inputRef.current.focus({ preventScroll: true });
-            console.log('✅ 输入框已自动聚焦', document.activeElement === inputRef.current);
-          }
-        });
-      });
-    }
-  }, [isVisible]);
-
-  // 键盘事件处理
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (!isVisible) return;
-
-      switch (event.key) {
-        case 'Escape':
-          if (showModelSubmenu) {
-            setShowModelSubmenu(false);
-            setSelectedModelIndex(0);
-          } else {
-            onClose();
-          }
-          break;
-        case 'ArrowDown':
-          event.preventDefault();
-          if (showModelSubmenu) {
-            setSelectedModelIndex(prev => (prev + 1) % filteredModelCommands.length);
-          } else {
-            setSelectedIndex(prev => (prev + 1) % filteredCommands.length);
-          }
-          break;
-        case 'ArrowUp':
-          event.preventDefault();
-          if (showModelSubmenu) {
-            setSelectedModelIndex(prev => (prev - 1 + filteredModelCommands.length) % filteredModelCommands.length);
-          } else {
-            setSelectedIndex(prev => (prev - 1 + filteredCommands.length) % filteredCommands.length);
-          }
-          break;
-        case 'ArrowRight':
-          event.preventDefault();
-          if (!showModelSubmenu && filteredCommands[selectedIndex]?.id === 'model') {
-            setShowModelSubmenu(true);
-            setSelectedModelIndex(0);
-            setQuery(''); // 清空输入框
-          }
-          break;
-        case 'ArrowLeft':
-          event.preventDefault();
-          if (showModelSubmenu) {
-            setShowModelSubmenu(false);
-            setSelectedModelIndex(0);
-          }
-          break;
-        case 'Enter':
-          event.preventDefault();
-          if (showModelSubmenu && filteredModelCommands[selectedModelIndex]) {
-            handleModelSelection(filteredModelCommands[selectedModelIndex]);
-          } else if (filteredCommands[selectedIndex]) {
-            if (filteredCommands[selectedIndex].id === 'model') {
-              setShowModelSubmenu(true);
-              setSelectedModelIndex(0);
-              setQuery(''); // 清空输入框
-            } else {
-              handleAction(filteredCommands[selectedIndex].id as TextActionType);
-            }
-          }
-          break;
-      }
-    };
-
     if (isVisible) {
-      document.addEventListener('keydown', handleKeyDown);
-      return () => document.removeEventListener('keydown', handleKeyDown);
+      console.log('✅ 工具栏显示，文本：', selectedText.slice(0, 50));
     }
-  }, [isVisible, selectedIndex, selectedModelIndex, filteredCommands, filteredModelCommands, showModelSubmenu, onClose]);
+  }, [isVisible, selectedText]);
+
+  // 不再需要全局键盘事件处理 - 输入框自己处理所有输入
 
   const handleAction = async (actionType: TextActionType) => {
     if (isProcessing) return;
@@ -337,14 +282,23 @@ export const TextActionToolbar: React.FC<TextActionToolbarProps> = ({
   };
 
   const handleActionReject = () => {
-    // 重新显示工具栏
+    // 关闭对话框，重新显示工具栏
     setShowActionDialog(false);
     setCurrentAction(null);
+    // 重置输入状态
+    setQuery('');
+    setSelectedIndex(0);
   };
 
   const handleDialogClose = () => {
+    // 关闭整个工具栏
     setShowActionDialog(false);
     setCurrentAction(null);
+    setQuery('');
+    setSelectedIndex(0);
+    setShowModelSubmenu(false);
+    setSelectedModelIndex(0);
+    setSelectedModel(null);
     onClose();
   };
 
@@ -369,7 +323,7 @@ export const TextActionToolbar: React.FC<TextActionToolbarProps> = ({
         actionType={currentAction.type}
         actionName={currentAction.name}
         selectedText={selectedText}
-        selectedModel={selectedModel}
+        selectedModel={selectedModel || undefined}
         position={position}
         onConfirm={handleActionConfirm}
         onAccept={handleActionAccept}
@@ -383,6 +337,7 @@ export const TextActionToolbar: React.FC<TextActionToolbarProps> = ({
   return (
     <div
       ref={toolbarRef}
+      data-text-action-toolbar="true"
       className="fixed z-50 bg-background border border-border rounded-lg shadow-xl overflow-hidden"
       style={{
         left: `${position.x + 10}px`,
@@ -404,8 +359,59 @@ export const TextActionToolbar: React.FC<TextActionToolbarProps> = ({
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="输入 / 查看命令..."
-          className="w-full px-3 py-2 text-sm border border-input rounded focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground placeholder-muted-foreground"
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowDown') {
+              e.preventDefault();
+              if (showModelSubmenu) {
+                setSelectedModelIndex(prev => (prev + 1) % filteredModelCommands.length);
+              } else {
+                setSelectedIndex(prev => (prev + 1) % filteredCommands.length);
+              }
+            } else if (e.key === 'ArrowUp') {
+              e.preventDefault();
+              if (showModelSubmenu) {
+                setSelectedModelIndex(prev => (prev - 1 + filteredModelCommands.length) % filteredModelCommands.length);
+              } else {
+                setSelectedIndex(prev => (prev - 1 + filteredCommands.length) % filteredCommands.length);
+              }
+            } else if (e.key === 'ArrowRight') {
+              e.preventDefault();
+              if (!showModelSubmenu && filteredCommands[selectedIndex]?.id === 'model') {
+                setShowModelSubmenu(true);
+                setSelectedModelIndex(0);
+                setQuery('');
+              }
+            } else if (e.key === 'ArrowLeft') {
+              e.preventDefault();
+              if (showModelSubmenu) {
+                setShowModelSubmenu(false);
+                setSelectedModelIndex(0);
+              }
+            } else if (e.key === 'Enter') {
+              e.preventDefault();
+              if (showModelSubmenu && filteredModelCommands[selectedModelIndex]) {
+                handleModelSelection(filteredModelCommands[selectedModelIndex]);
+              } else if (filteredCommands[selectedIndex]) {
+                if (filteredCommands[selectedIndex].id === 'model') {
+                  setShowModelSubmenu(true);
+                  setSelectedModelIndex(0);
+                  setQuery('');
+                } else {
+                  handleAction(filteredCommands[selectedIndex].id as TextActionType);
+                }
+              }
+            } else if (e.key === 'Escape') {
+              if (showModelSubmenu) {
+                setShowModelSubmenu(false);
+                setSelectedModelIndex(0);
+              } else {
+                onClose();
+              }
+            }
+          }}
+          placeholder="直接输入命令..."
+          className="w-full px-3 py-2 text-sm border border-input rounded bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+          autoFocus
           disabled={isProcessing}
         />
       </div>
@@ -442,7 +448,7 @@ export const TextActionToolbar: React.FC<TextActionToolbarProps> = ({
                         ? 'bg-primary/10 border-l-2 border-l-primary'
                         : 'hover:bg-muted/50'
                     } ${isCurrentlyProcessing ? 'opacity-50' : ''}`}
-                    onClick={() => !isCurrentlyProcessing && handleModelSelection(model.id as ModelType)}
+                    onClick={() => !isCurrentlyProcessing && handleModelSelection(model)}
                   >
                     <div className="flex items-center gap-3">
                       <div className="flex items-center justify-center w-8 h-8 bg-muted rounded">

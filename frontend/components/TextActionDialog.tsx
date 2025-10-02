@@ -107,6 +107,7 @@ export const TextActionDialog: React.FC<TextActionDialogProps> = ({
   };
 
   const handleAccept = () => {
+    console.log('点击采纳按钮', result);
     if (result) {
       onAccept(result.processedText);
       onClose();
@@ -114,20 +115,152 @@ export const TextActionDialog: React.FC<TextActionDialogProps> = ({
   };
 
   const handleReject = () => {
+    console.log('点击重试按钮');
+    // 重置结果，让用户可以重新输入和处理
     setResult(null);
     setAdditionalInput('');
     setError(null);
-    if (inputRef.current) {
-      inputRef.current.focus();
+    setIsProcessing(false);
+    // 重新聚焦输入框
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
+    }, 100);
+  };
+
+  const handleCopy = async () => {
+    // 确保有内容可以复制
+    if (!result || !result.processedText) {
+      toast.error('没有可复制的内容');
+      return;
+    }
+
+    const textToCopy = String(result.processedText);
+    let copySuccess = false;
+
+    // 使用简单的复制方法
+    try {
+      // 方法1: 优先尝试 Clipboard API
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(textToCopy);
+        copySuccess = true;
+      }
+    } catch (err) {
+      // 静默失败，尝试下一个方法
+    }
+
+    // 方法2: 使用 execCommand
+    if (!copySuccess) {
+      const textarea = document.createElement('textarea');
+      textarea.value = textToCopy;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+
+      try {
+        copySuccess = document.execCommand('copy');
+      } catch (err) {
+        // 静默失败
+      } finally {
+        if (document.body.contains(textarea)) {
+          document.body.removeChild(textarea);
+        }
+      }
+    }
+
+    // 处理结果
+    if (copySuccess) {
+      // 使用 toast 提示成功，样式与系统协调
+      toast.success('已复制到剪贴板', {
+        duration: 2000,
+        position: 'bottom-center',
+        style: {
+          background: 'var(--background)',
+          color: 'var(--foreground)',
+          border: '1px solid var(--border)',
+          borderRadius: '0.5rem',
+          fontSize: '0.875rem',
+        },
+      });
+
+      // 关闭对话框和工具栏
+      setTimeout(() => {
+        onClose();
+      }, 100);
+    } else {
+      // 复制失败，提示手动复制
+      toast.error('复制失败，请手动选择文本复制', {
+        duration: 3000,
+        position: 'bottom-center',
+        style: {
+          background: 'var(--background)',
+          color: 'var(--foreground)',
+          border: '1px solid var(--border)',
+          borderRadius: '0.5rem',
+          fontSize: '0.875rem',
+        },
+      });
+
+      // 创建一个可见的文本框让用户手动复制
+      const input = document.createElement('input');
+      input.value = textToCopy;
+      input.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 10001;
+        padding: 10px;
+        border: 2px solid var(--border);
+        border-radius: 4px;
+        width: 90%;
+        max-width: 500px;
+        font-size: 14px;
+        background: var(--background);
+        color: var(--foreground);
+      `;
+
+      document.body.appendChild(input);
+      input.select();
+
+      // 监听键盘事件，检测用户手动复制
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
+          setTimeout(() => {
+            document.body.removeChild(input);
+            toast.success('已复制到剪贴板', {
+              duration: 2000,
+              position: 'bottom-center',
+              style: {
+                background: 'var(--background)',
+                color: 'var(--foreground)',
+                border: '1px solid var(--border)',
+                borderRadius: '0.5rem',
+                fontSize: '0.875rem',
+              },
+            });
+            onClose();
+          }, 100);
+          document.removeEventListener('keydown', handleKeyDown);
+        }
+      };
+
+      document.addEventListener('keydown', handleKeyDown);
+
+      // 5秒后自动移除
+      setTimeout(() => {
+        if (document.body.contains(input)) {
+          document.body.removeChild(input);
+          document.removeEventListener('keydown', handleKeyDown);
+        }
+      }, 5000);
     }
   };
 
-  const handleCopy = () => {
-    if (result) {
-      navigator.clipboard.writeText(result.processedText);
-      toast.success('已复制到剪贴板');
-    }
-  };
 
   // 获取操作提示文本
   const getActionHint = () => {
@@ -181,6 +314,7 @@ export const TextActionDialog: React.FC<TextActionDialogProps> = ({
   return (
     <div
       ref={dialogRef}
+      data-text-action-dialog="true"
       className="fixed z-50 bg-background border border-border rounded-lg shadow-2xl overflow-hidden flex flex-col"
       style={{
         left: `${dialogLeft}px`,

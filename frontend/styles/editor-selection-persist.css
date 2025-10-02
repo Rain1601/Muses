@@ -1,0 +1,21 @@
+/* 编辑器选择样式 */
+
+/* 默认选择样式 - 当编辑器有焦点时 */
+.ProseMirror ::selection {
+  background-color: rgba(59, 130, 246, 0.3);
+  color: inherit;
+}
+
+.ProseMirror ::-moz-selection {
+  background-color: rgba(59, 130, 246, 0.3);
+  color: inherit;
+}
+
+/* 暗色模式选择样式 */
+.dark .ProseMirror ::selection {
+  background-color: rgba(96, 165, 250, 0.35);
+}
+
+.dark .ProseMirror ::-moz-selection {
+  background-color: rgba(96, 165, 250, 0.35);
+}
