@@ -133,16 +133,16 @@ const CodeBlockComponent: React.FC<CodeBlockComponentProps> = ({
 
             {/* 语言选择下拉菜单 */}
             {showLanguageMenu && (
-              <div className="absolute top-full left-0 mt-1 bg-zinc-800 dark:bg-zinc-900 border border-zinc-700 dark:border-zinc-800 rounded-md shadow-lg z-10 min-w-[140px]">
+              <div className="absolute top-full left-0 mt-1 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-md shadow-xl z-50 min-w-[140px]">
                 <div className="py-1 max-h-60 overflow-y-auto">
                   {supportedLanguages.map((lang) => (
                     <button
                       key={lang.id}
                       onClick={() => changeLanguage(lang.id)}
-                      className={`w-full text-left px-3 py-1.5 text-xs font-mono transition-colors ${
+                      className={`w-full text-left px-3 py-2 text-xs font-mono transition-colors ${
                         language === lang.id
-                          ? 'bg-zinc-700 dark:bg-zinc-800 text-zinc-200'
-                          : 'text-zinc-400 hover:bg-zinc-700 dark:hover:bg-zinc-800 hover:text-zinc-200'
+                          ? 'bg-blue-500 text-white'
+                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-700'
                       }`}
                     >
                       {lang.label}
