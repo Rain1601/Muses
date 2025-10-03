@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { Upload, FileText, Image, FolderOpen, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Upload, FileText, Image, FolderOpen, CheckCircle, XCircle, Loader2, Link as LinkIcon } from 'lucide-react';
 import { api } from '@/lib/api';
 
 interface ImportedArticle {
@@ -28,6 +28,8 @@ export function FileImport({ onImportComplete, onClose }: FileImportProps) {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [importMode, setImportMode] = useState<'file' | 'url'>('file');
+  const [url, setUrl] = useState('');
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -236,10 +238,69 @@ export function FileImport({ onImportComplete, onClose }: FileImportProps) {
     }
   };
 
+  const handleURLFetch = async () => {
+    if (!url.trim()) {
+      setError('请输入有效的URL');
+      return;
+    }
+
+    setIsUploading(true);
+    setError(null);
+    setUploadProgress(0);
+
+    try {
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return 90;
+          }
+          return prev + 10;
+        });
+      }, 200);
+
+      const response = await api.post('/api/upload/fetch-url', { url });
+
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+
+      console.log('✅ URL fetch successful:', response.data);
+
+      // URL抓取成功后，显示成功信息
+      const articleData = response.data.article || {
+        id: response.data.file.id,
+        title: response.data.title,
+        status: 'imported',
+        created_at: new Date().toISOString()
+      };
+
+      setImportResult({
+        success: true,
+        imported_count: 1,
+        articles: [articleData]
+      });
+
+      if (onImportComplete) {
+        onImportComplete({
+          success: true,
+          imported_count: 1,
+          articles: [articleData]
+        });
+      }
+
+    } catch (error: any) {
+      console.error('❌ URL fetch failed:', error);
+      setError(error.response?.data?.detail || '无法获取URL内容，请检查链接是否有效');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const resetComponent = () => {
     setImportResult(null);
     setError(null);
     setUploadProgress(0);
+    setUrl('');
   };
 
   if (importResult) {
@@ -342,80 +403,150 @@ export function FileImport({ onImportComplete, onClose }: FileImportProps) {
           <div className="text-center mb-6">
             <Upload className="w-12 h-12 text-primary mx-auto mb-3" />
             <h3 className="text-lg font-semibold text-foreground mb-2">
-              导入文件
+              导入内容
             </h3>
             <p className="text-sm text-muted-foreground">
-              支持 Notion/Wolai 导出的 Markdown 文件和图片
+              支持文件上传或从URL导入
             </p>
           </div>
 
-          <div
-            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-              isDragging
-                ? 'border-primary bg-primary/5'
-                : 'border-border hover:border-primary/50'
-            }`}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-          >
-            <div className="space-y-4">
-              <div className="flex justify-center space-x-4">
-                <FileText className="w-8 h-8 text-muted-foreground" />
-                <Image className="w-8 h-8 text-muted-foreground" />
-                <FolderOpen className="w-8 h-8 text-muted-foreground" />
-              </div>
-
-              <div>
-                <p className="text-sm font-medium text-foreground mb-1">
-                  拖拽文件到这里
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  或点击下方按钮选择文件
-                </p>
-              </div>
-            </div>
+          {/* 导入方式切换 */}
+          <div className="flex gap-2 mb-6">
+            <button
+              onClick={() => setImportMode('file')}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md transition-colors ${
+                importMode === 'file'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+              }`}
+            >
+              <Upload className="w-4 h-4" />
+              文件上传
+            </button>
+            <button
+              onClick={() => setImportMode('url')}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md transition-colors ${
+                importMode === 'url'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+              }`}
+            >
+              <LinkIcon className="w-4 h-4" />
+              URL导入
+            </button>
           </div>
 
-          <div className="mt-4">
-            <label className="block">
-              <input
-                type="file"
-                multiple
-                accept=".md,.markdown,.png,.jpg,.jpeg,.gif,.svg"
-                onChange={handleFileSelect}
-                className="hidden"
-                webkitdirectory=""
-              />
-              <div className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors cursor-pointer text-center">
-                选择文件夹内的所有文件
-              </div>
-            </label>
-          </div>
+          {importMode === 'file' ? (
+            <>
+              <div
+                className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                  isDragging
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/50'
+                }`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              >
+                <div className="space-y-4">
+                  <div className="flex justify-center space-x-4">
+                    <FileText className="w-8 h-8 text-muted-foreground" />
+                    <Image className="w-8 h-8 text-muted-foreground" />
+                    <FolderOpen className="w-8 h-8 text-muted-foreground" />
+                  </div>
 
-          <div className="mt-2">
-            <label className="block">
-              <input
-                type="file"
-                multiple
-                accept=".md,.markdown,.png,.jpg,.jpeg,.gif,.svg"
-                onChange={handleFileSelect}
-                className="hidden"
-              />
-              <div className="w-full px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors cursor-pointer text-center">
-                选择 Markdown 和图片文件
+                  <div>
+                    <p className="text-sm font-medium text-foreground mb-1">
+                      拖拽文件到这里
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      或点击下方按钮选择文件
+                    </p>
+                  </div>
+                </div>
               </div>
-            </label>
-          </div>
 
-          <div className="mt-4 text-xs text-muted-foreground">
-            <p className="mb-1">支持的格式：</p>
-            <ul className="list-disc list-inside space-y-1">
-              <li>Markdown 文件 (.md)</li>
-              <li>图片文件 (.png, .jpg, .jpeg, .gif, .svg)</li>
-              <li>包含上述文件的文件夹</li>
-            </ul>
-          </div>
+              <div className="mt-4">
+                <label className="block">
+                  <input
+                    type="file"
+                    multiple
+                    accept=".md,.markdown,.png,.jpg,.jpeg,.gif,.svg"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    webkitdirectory=""
+                  />
+                  <div className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors cursor-pointer text-center">
+                    选择文件夹内的所有文件
+                  </div>
+                </label>
+              </div>
+
+              <div className="mt-2">
+                <label className="block">
+                  <input
+                    type="file"
+                    multiple
+                    accept=".md,.markdown,.png,.jpg,.jpeg,.gif,.svg"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                  <div className="w-full px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors cursor-pointer text-center">
+                    选择 Markdown 和图片文件
+                  </div>
+                </label>
+              </div>
+
+              <div className="mt-4 text-xs text-muted-foreground">
+                <p className="mb-1">支持的格式：</p>
+                <ul className="list-disc list-inside space-y-1">
+                  <li>Markdown 文件 (.md)</li>
+                  <li>图片文件 (.png, .jpg, .jpeg, .gif, .svg)</li>
+                  <li>包含上述文件的文件夹</li>
+                </ul>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">
+                    网页URL
+                  </label>
+                  <input
+                    type="url"
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    placeholder="https://www.anthropic.com/engineering/multi-agent-research-system"
+                    className="w-full px-4 py-2 border border-border rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleURLFetch();
+                      }
+                    }}
+                  />
+                </div>
+
+                <button
+                  onClick={handleURLFetch}
+                  disabled={!url.trim()}
+                  className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  获取内容
+                </button>
+
+                <div className="text-xs text-muted-foreground">
+                  <p className="mb-1">支持的网站：</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>技术博客和文章</li>
+                    <li>新闻网站</li>
+                    <li>在线文档</li>
+                    <li>其他公开访问的网页</li>
+                  </ul>
+                </div>
+              </div>
+            </>
+          )}
 
           {onClose && (
             <button
