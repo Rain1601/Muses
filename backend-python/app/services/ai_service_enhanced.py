@@ -178,6 +178,7 @@ class EnhancedAIService(AIService):
             # 构建响应
             result = {
                 "processedText": processed_text,
+                "originalText": text,  # 添加原始文本
                 "actionType": action_type,
                 "metadata": {
                     "model": model or "default",
