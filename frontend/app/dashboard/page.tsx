@@ -174,14 +174,9 @@ function DashboardContent() {
     console.log('Import completed:', result);
     setShowImportDialog(false);
 
-    showToast({
-      title: '导入成功',
-      description: `成功导入 ${result.imported_count} 篇文章`,
-      type: 'success'
-    });
+    showToast(`成功导入 ${result.imported_count} 篇文章`, 'success');
 
-    // 刷新文章列表（通过重新挂载 ArticleCompactList 组件）
-    window.location.reload();
+    // 不自动刷新，让用户可以继续查看导入的内容
   };
 
   // 发布文章功能
