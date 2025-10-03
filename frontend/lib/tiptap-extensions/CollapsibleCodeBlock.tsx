@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Node, mergeAttributes } from '@tiptap/core';
 import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewContent } from '@tiptap/react';
 import { textblockTypeInputRule } from '@tiptap/core';
@@ -36,9 +36,28 @@ const CodeBlockComponent: React.FC<CodeBlockComponentProps> = ({
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showLanguageMenu, setShowLanguageMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const language = node.attrs.language || 'plaintext';
   const content = node.textContent;
+
+  // 点击外部关闭菜单
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowLanguageMenu(false);
+      }
+    };
+
+    if (showLanguageMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showLanguageMenu]);
 
   // 判断是否应该显示折叠按钮（对于较长的代码块）
   const lines = content.split('\n');
@@ -59,20 +78,29 @@ const CodeBlockComponent: React.FC<CodeBlockComponentProps> = ({
     setIsCollapsed(!isCollapsed);
   };
 
+  // 支持的语言列表
+  const supportedLanguages = [
+    { id: 'plaintext', label: 'Plain Text' },
+    { id: 'javascript', label: 'JavaScript' },
+    { id: 'typescript', label: 'TypeScript' },
+    { id: 'python', label: 'Python' },
+    { id: 'json', label: 'JSON' },
+    { id: 'html', label: 'HTML' },
+    { id: 'xml', label: 'XML' },
+    { id: 'css', label: 'CSS' },
+    { id: 'markdown', label: 'Markdown' },
+  ];
+
   // 获取语言显示名称
   const getLanguageLabel = (lang: string) => {
-    const labels: Record<string, string> = {
-      javascript: 'JavaScript',
-      typescript: 'TypeScript',
-      python: 'Python',
-      json: 'JSON',
-      html: 'HTML',
-      xml: 'XML',
-      css: 'CSS',
-      markdown: 'Markdown',
-      plaintext: 'Plain Text'
-    };
-    return labels[lang] || lang.toUpperCase();
+    const found = supportedLanguages.find(l => l.id === lang);
+    return found ? found.label : lang.toUpperCase();
+  };
+
+  // 切换语言
+  const changeLanguage = (newLang: string) => {
+    updateAttributes({ language: newLang });
+    setShowLanguageMenu(false);
   };
 
   return (
@@ -93,11 +121,36 @@ const CodeBlockComponent: React.FC<CodeBlockComponentProps> = ({
               )}
             </button>
           )}
-          <div className="flex items-center gap-2">
+          <div ref={menuRef} className="relative flex items-center gap-2">
             <Code2 className="w-4 h-4 text-zinc-500" />
-            <span className="text-xs font-mono text-zinc-400">
+            <button
+              onClick={() => setShowLanguageMenu(!showLanguageMenu)}
+              className="text-xs font-mono text-zinc-400 hover:text-zinc-200 px-2 py-1 rounded hover:bg-zinc-700 dark:hover:bg-zinc-800 transition-colors"
+              title="切换语言"
+            >
               {getLanguageLabel(language)}
-            </span>
+            </button>
+
+            {/* 语言选择下拉菜单 */}
+            {showLanguageMenu && (
+              <div className="absolute top-full left-0 mt-1 bg-zinc-800 dark:bg-zinc-900 border border-zinc-700 dark:border-zinc-800 rounded-md shadow-lg z-10 min-w-[140px]">
+                <div className="py-1 max-h-60 overflow-y-auto">
+                  {supportedLanguages.map((lang) => (
+                    <button
+                      key={lang.id}
+                      onClick={() => changeLanguage(lang.id)}
+                      className={`w-full text-left px-3 py-1.5 text-xs font-mono transition-colors ${
+                        language === lang.id
+                          ? 'bg-zinc-700 dark:bg-zinc-800 text-zinc-200'
+                          : 'text-zinc-400 hover:bg-zinc-700 dark:hover:bg-zinc-800 hover:text-zinc-200'
+                      }`}
+                    >
+                      {lang.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           {isCollapsed && (
             <span className="text-xs text-zinc-500">
