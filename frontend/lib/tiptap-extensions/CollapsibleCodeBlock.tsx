@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Node, mergeAttributes } from '@tiptap/core';
 import { ReactNodeViewRenderer, NodeViewWrapper, NodeViewContent } from '@tiptap/react';
+import { textblockTypeInputRule } from '@tiptap/core';
 import { createLowlight } from 'lowlight';
 import javascript from 'highlight.js/lib/languages/javascript';
 import typescript from 'highlight.js/lib/languages/typescript';
@@ -312,7 +313,15 @@ export const CollapsibleCodeBlock = Node.create({
   },
 
   addInputRules() {
-    return [];
+    return [
+      textblockTypeInputRule({
+        find: /^```([a-z]+)?[\s\n]$/,
+        type: this.type,
+        getAttributes: match => ({
+          language: match[1],
+        }),
+      }),
+    ];
   },
 });
 
