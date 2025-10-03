@@ -4,7 +4,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Highlight from '@tiptap/extension-highlight';
-import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
+import CollapsibleCodeBlock from '@/lib/tiptap-extensions/CollapsibleCodeBlock';
 import Image from '@tiptap/extension-image';
 import Dropcursor from '@tiptap/extension-dropcursor';
 import { Table } from '@tiptap/extension-table';
@@ -21,11 +21,7 @@ import Superscript from '@tiptap/extension-superscript';
 import Subscript from '@tiptap/extension-subscript';
 import { Extension } from '@tiptap/core';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
-import { createLowlight } from 'lowlight';
-import javascript from 'highlight.js/lib/languages/javascript';
-import typescript from 'highlight.js/lib/languages/typescript';
-import css from 'highlight.js/lib/languages/css';
-import python from 'highlight.js/lib/languages/python';
+import '../styles/collapsible-code.css';
 
 import { Button } from './ui/button';
 import { Card } from './ui/card';
@@ -39,12 +35,6 @@ import {
 } from 'lucide-react';
 
 import { uploadToGitHub, getGitHubConfig } from '@/lib/github-upload';
-
-const lowlight = createLowlight();
-lowlight.register('javascript', javascript);
-lowlight.register('typescript', typescript);
-lowlight.register('css', css);
-lowlight.register('python', python);
 
 // 图片上传函数
 async function uploadImageToGitHub(file: File): Promise<string> {
@@ -226,7 +216,7 @@ export function ArticleNotionEditor({
         listItem: false,
       }),
       Highlight.configure({ multicolor: true }),
-      CodeBlockLowlight.configure({ lowlight, defaultLanguage: 'javascript' }),
+      CollapsibleCodeBlock,
       Image.configure({ inline: false, allowBase64: true }),
       Dropcursor.configure({ color: '#3b82f6', width: 2 }),
       
