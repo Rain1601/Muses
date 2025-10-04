@@ -138,6 +138,13 @@ class EnhancedAIService(AIService):
         try:
             # 记录API调用开始
             api_start = time.time()
+
+            # 翻译任务使用0.1温度以提高准确性
+            temp = 0.1 if action_type == "translate" else 0.7
+
+            # DEBUG: 检查provider参数
+            print(f"🔍 EnhancedAIService.perform_text_action: provider={provider}, model={model}, temp={temp}")
+
             agent_logger.log_agent_execution(
                 agent_id=agent.id,
                 action=actual_action,
@@ -145,7 +152,7 @@ class EnhancedAIService(AIService):
                 data={
                     "model": model or "default",
                     "provider": provider or "auto",
-                    "temperature": 0.7,
+                    "temperature": temp,
                     "max_tokens": 3000
                 }
             )
@@ -159,7 +166,7 @@ class EnhancedAIService(AIService):
                 ],
                 provider=provider,
                 model=model,
-                temperature=0.7,
+                temperature=temp,
                 max_tokens=3000
             )
 

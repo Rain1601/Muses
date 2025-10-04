@@ -90,8 +90,8 @@ class PromptBuilder:
         else:
             prompt_builder = prompt_class()
 
-        # 构建基础prompt
-        base_prompt = prompt_builder.build(**kwargs)
+        # 构建基础prompt (build方法不接受参数,参数已在初始化时传入)
+        base_prompt = prompt_builder.build()
 
         # 如果有Agent上下文，添加Agent特定的信息
         if agent_context:

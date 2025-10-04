@@ -152,6 +152,9 @@ class AIService:
         Returns:
             AI响应文本
         """
+        # DEBUG: 检查provider参数
+        print(f"🔍 AIService._call_ai: provider={provider}, model={model}, temperature={temperature}")
+
         # 使用统一的AI客户端
         return await UnifiedAIClient.call(
             user=user,
