@@ -1,7 +1,7 @@
 "use client";
 
 import { Badge } from "./ui/badge";
-import { FileText, Trash2, MoreHorizontal } from "lucide-react";
+import { FileText, Trash2, MoreHorizontal, Languages } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,13 +30,15 @@ interface ArticleListItemProps {
   onEdit?: () => void;
   onPublish?: () => void;
   onDelete?: () => void;
+  onTranslate?: () => void;
 }
 
 export function ArticleListItem({
   article,
   isSelected = false,
   onClick,
-  onDelete
+  onDelete,
+  onTranslate
 }: ArticleListItemProps) {
 
   const getStatusColor = (status: string) => {
@@ -106,6 +108,17 @@ export function ArticleListItem({
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
+                    {onTranslate && (
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onTranslate();
+                        }}
+                      >
+                        <Languages className="w-4 h-4 mr-2" />
+                        翻译
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem
                       onClick={(e) => {
                         e.stopPropagation();

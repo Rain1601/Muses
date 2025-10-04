@@ -35,6 +35,63 @@ export const TextActionDialog: React.FC<TextActionDialogProps> = ({
   const [error, setError] = useState<string | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [adjustedPosition, setAdjustedPosition] = useState<{ left: number; top: number; width: number; height: number }>({
+    left: position.x,
+    top: position.y + 20,
+    width: 500,
+    height: 450
+  });
+
+  // 智能调整对话框位置，确保不超出视口边界
+  useEffect(() => {
+    if (!isVisible) return;
+
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    // 对话框尺寸
+    const dialogWidth = Math.min(viewportWidth - 40, 500);
+    const dialogHeight = 450;
+
+    // 初始位置
+    let dialogLeft = position.x;
+    let dialogTop = position.y + 20;
+
+    // 检查右边界
+    if (dialogLeft + dialogWidth > viewportWidth - 20) {
+      dialogLeft = viewportWidth - dialogWidth - 20;
+    }
+
+    // 检查左边界
+    if (dialogLeft < 20) {
+      dialogLeft = 20;
+    }
+
+    // 检查底部边界
+    if (dialogTop + dialogHeight > viewportHeight - 20) {
+      // 尝试显示在选中文本上方
+      dialogTop = position.y - dialogHeight - 20;
+      // 如果上方也放不下，居中显示
+      if (dialogTop < 20) {
+        dialogTop = Math.max(20, (viewportHeight - dialogHeight) / 2);
+      }
+    }
+
+    // 检查顶部边界
+    if (dialogTop < 20) {
+      dialogTop = 20;
+    }
+
+    // 计算实际可用高度
+    const availableHeight = Math.min(dialogHeight, viewportHeight - dialogTop - 20);
+
+    setAdjustedPosition({
+      left: dialogLeft,
+      top: dialogTop,
+      width: dialogWidth,
+      height: availableHeight
+    });
+  }, [position, isVisible, result]);
 
   // 自动聚焦输入框
   useEffect(() => {
@@ -284,44 +341,17 @@ export const TextActionDialog: React.FC<TextActionDialogProps> = ({
 
   if (!isVisible) return null;
 
-  // 计算对话框位置，确保不超出屏幕
-  const dialogWidth = Math.min(window.innerWidth - 40, 500);
-  const dialogHeight = 450; // 增加对话框高度以确保按钮可见
-
-  // 计算位置
-  let dialogLeft = position.x;
-  let dialogTop = position.y + 20;
-
-  // 确保不超出右边界
-  if (dialogLeft + dialogWidth > window.innerWidth - 20) {
-    dialogLeft = window.innerWidth - dialogWidth - 20;
-  }
-
-  // 确保不超出左边界
-  if (dialogLeft < 20) {
-    dialogLeft = 20;
-  }
-
-  // 如果对话框会超出底部，则显示在选中文本上方
-  if (dialogTop + dialogHeight > window.innerHeight - 20) {
-    dialogTop = position.y - dialogHeight - 20;
-    // 如果上方也不够空间，则固定在屏幕中间
-    if (dialogTop < 20) {
-      dialogTop = Math.max(20, (window.innerHeight - dialogHeight) / 2);
-    }
-  }
-
   return (
     <div
       ref={dialogRef}
       data-text-action-dialog="true"
-      className="fixed z-50 bg-background border border-border rounded-lg shadow-2xl overflow-hidden flex flex-col"
+      className="fixed z-50 bg-background border border-border rounded-lg shadow-2xl overflow-hidden flex flex-col transition-all duration-150"
       style={{
-        left: `${dialogLeft}px`,
-        top: `${dialogTop}px`,
-        width: `${dialogWidth}px`,
-        height: `${Math.min(dialogHeight, window.innerHeight - dialogTop - 20)}px`,
-        maxHeight: `${Math.min(dialogHeight, window.innerHeight - dialogTop - 20)}px`
+        left: `${adjustedPosition.left}px`,
+        top: `${adjustedPosition.top}px`,
+        width: `${adjustedPosition.width}px`,
+        height: `${adjustedPosition.height}px`,
+        maxHeight: `${adjustedPosition.height}px`
       }}
     >
       {/* 标题栏 */}

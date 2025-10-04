@@ -84,49 +84,58 @@ const textActionCommands = [
 
 const modelCommands = [
   {
-    id: 'openai-gpt5',
-    name: 'GPT-5 (Latest)',
-    description: '最先进的模型，卓越的推理和创造力',
-    keywords: ['gpt5', 'gpt-5', 'latest', 'advanced'],
-    command: '/gpt5',
-    provider: 'openai',
-    modelId: 'gpt-5'
-  },
-  {
-    id: 'openai-gpt5-mini',
-    name: 'GPT-5 Mini',
-    description: '轻量级GPT-5，快速高效',
-    keywords: ['gpt5mini', 'gpt-5-mini', 'mini'],
-    command: '/gpt5mini',
-    provider: 'openai',
-    modelId: 'gpt-5-mini'
-  },
-  {
-    id: 'openai-gpt4.1',
-    name: 'GPT-4.1',
-    description: '增强版GPT-4，性能提升',
-    keywords: ['gpt4.1', 'gpt-4.1', 'enhanced'],
-    command: '/gpt4.1',
-    provider: 'openai',
-    modelId: 'gpt-4.1-2025-04-14'
+    id: 'claude-sonnet45',
+    name: 'Claude Sonnet 4.5',
+    description: '最新最强的 Claude 模型',
+    keywords: ['claude', 'sonnet', 'sonnet45', '4.5', 'anthropic', 'latest'],
+    command: '/sonnet45',
+    provider: 'claude',
+    modelId: 'claude-sonnet-4-5-20250929'
   },
   {
     id: 'claude-sonnet4',
     name: 'Claude Sonnet 4',
-    description: '最新Claude模型，能力增强',
-    keywords: ['claude', 'sonnet', 'sonnet4', 'anthropic'],
+    description: '强大的 Claude 4 模型',
+    keywords: ['claude', 'sonnet', 'sonnet4', '4', 'anthropic'],
     command: '/sonnet4',
     provider: 'claude',
     modelId: 'claude-sonnet-4-20250514'
   },
   {
-    id: 'claude-haiku',
-    name: 'Claude Haiku',
-    description: '快速高效的Claude模型',
-    keywords: ['claude', 'haiku', 'fast'],
-    command: '/haiku',
+    id: 'claude-opus41',
+    name: 'Claude Opus 4.1',
+    description: '最强大的 Claude 模型',
+    keywords: ['claude', 'opus', 'opus41', '4.1', 'anthropic', 'powerful'],
+    command: '/opus41',
     provider: 'claude',
-    modelId: 'claude-3-haiku-20240307'
+    modelId: 'claude-opus-4-1-20250805'
+  },
+  {
+    id: 'openai-gpt5',
+    name: 'GPT-5',
+    description: '最新最强的 OpenAI 模型',
+    keywords: ['gpt5', 'gpt-5', 'openai', 'latest'],
+    command: '/gpt5',
+    provider: 'openai',
+    modelId: 'gpt-5-2025-08-07'
+  },
+  {
+    id: 'openai-gpt5-mini',
+    name: 'GPT-5 Mini',
+    description: '轻量级 GPT-5，快速高效',
+    keywords: ['gpt5mini', 'gpt-5-mini', 'mini', 'openai'],
+    command: '/gpt5mini',
+    provider: 'openai',
+    modelId: 'gpt-5-mini-2025-08-07'
+  },
+  {
+    id: 'gemini-25-flash',
+    name: 'Gemini 2.5 Flash',
+    description: '最新的 Google Gemini 模型',
+    keywords: ['gemini', 'flash', '2.5', 'google'],
+    command: '/gemini',
+    provider: 'gemini',
+    modelId: 'gemini-2.5-flash'
   }
 ];
 
@@ -149,10 +158,54 @@ export const TextActionToolbar: React.FC<TextActionToolbarProps> = ({
   const [currentAction, setCurrentAction] = useState<{ type: TextActionType; name: string } | null>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [adjustedPosition, setAdjustedPosition] = useState<{ x: number; y: number }>(position);
 
   // 使用 useRef 跟踪状态，避免闭包问题
   const prevSelectedTextRef = useRef<string>('');
   const isFirstRenderRef = useRef(true);
+
+  // 智能调整工具栏位置，确保不超出视口边界
+  useEffect(() => {
+    if (!isVisible || !toolbarRef.current) return;
+
+    const toolbar = toolbarRef.current;
+    const rect = toolbar.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    let newX = position.x + 10;
+    let newY = position.y + 20;
+
+    // 工具栏宽度
+    const toolbarWidth = 320;
+    const toolbarHeight = rect.height || 400; // 预估高度
+
+    // 检查是否超出右边界
+    if (newX + toolbarWidth > viewportWidth - 20) {
+      // 显示在选中文本左侧
+      newX = position.x - toolbarWidth - 10;
+      // 如果左侧也放不下，贴近右边界
+      if (newX < 20) {
+        newX = viewportWidth - toolbarWidth - 20;
+      }
+    }
+
+    // 检查是否超出底部边界
+    if (newY + toolbarHeight > viewportHeight - 20) {
+      // 显示在选中文本上方
+      newY = position.y - toolbarHeight - 10;
+      // 如果上方也放不下，贴近底部
+      if (newY < 20) {
+        newY = viewportHeight - toolbarHeight - 20;
+      }
+    }
+
+    // 确保不超出左边界和顶部边界
+    newX = Math.max(20, newX);
+    newY = Math.max(20, newY);
+
+    setAdjustedPosition({ x: newX, y: newY });
+  }, [position, isVisible, showModelSubmenu]);
 
   // 每次工具栏显示时重置到初始状态
   useEffect(() => {
@@ -338,11 +391,12 @@ export const TextActionToolbar: React.FC<TextActionToolbarProps> = ({
     <div
       ref={toolbarRef}
       data-text-action-toolbar="true"
-      className="fixed z-50 bg-background border border-border rounded-lg shadow-xl overflow-hidden"
+      className="fixed z-50 bg-background border border-border rounded-lg shadow-xl overflow-hidden transition-all duration-150"
       style={{
-        left: `${position.x + 10}px`,
-        top: `${position.y + 20}px`,
-        width: '320px'
+        left: `${adjustedPosition.x}px`,
+        top: `${adjustedPosition.y}px`,
+        width: '320px',
+        maxHeight: 'calc(100vh - 100px)'
       }}
     >
       {/* 选中文本预览 */}
