@@ -48,6 +48,10 @@ export function ArticleCompactList({ onArticleSelect, selectedArticleId, onImpor
   const [articleToDelete, setArticleToDelete] = useState<Article | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [translateDialogOpen, setTranslateDialogOpen] = useState(false);
+  const [articleToTranslate, setArticleToTranslate] = useState<Article | null>(null);
+  const [translating, setTranslating] = useState(false);
+  const [targetLanguage, setTargetLanguage] = useState<string>('zh-CN');
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -115,6 +119,125 @@ export function ArticleCompactList({ onArticleSelect, selectedArticleId, onImpor
     setDeleteDialogOpen(false);
     setArticleToDelete(null);
     setDeleteError(null);
+  };
+
+  const handleTranslateClick = (article: Article) => {
+    setArticleToTranslate(article);
+    setTranslateDialogOpen(true);
+  };
+
+  const handleTranslateConfirm = async () => {
+    console.log('🚀 handleTranslateConfirm called - NEW VERSION');
+    if (!articleToTranslate) return;
+
+    setTranslating(true);
+
+    try {
+      // 启动翻译任务
+      console.log('📡 Sending translate request...');
+      const response = await api.post(`/api/articles/${articleToTranslate.id}/translate`, {
+        targetLanguage
+      });
+
+      const taskId = response.data.taskId;
+      console.log('✅ Translation task started:', taskId);
+
+      // 将任务保存到 localStorage，方便任务中心显示
+      const taskData = {
+        taskId,
+        status: 'pending',
+        progress: 0,
+        total: 0,
+        task_type: 'translate_article',
+        article_id: articleToTranslate.id,
+        target_language: targetLanguage,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      const storedTasks = localStorage.getItem('muses_tasks');
+      const tasks = storedTasks ? JSON.parse(storedTasks) : [];
+      tasks.unshift(taskData); // 添加到列表开头
+      localStorage.setItem('muses_tasks', JSON.stringify(tasks));
+
+      // 触发自定义事件通知任务中心更新
+      window.dispatchEvent(new Event('muses-task-update'));
+      console.log('✅ Task saved to localStorage:', taskData);
+
+      // 立即关闭对话框并显示提示
+      console.log('🔴 Closing dialog NOW...');
+      setTranslating(false);
+      setTranslateDialogOpen(false);
+      setArticleToTranslate(null);
+      console.log('🎉 Dialog should be closed, showing toast...');
+      showToast('翻译任务已启动，请在任务中心查看进度', 'success');
+
+      // 在后台轮询任务进度（不阻塞用户）
+      const pollInterval = setInterval(async () => {
+        try {
+          const taskResponse = await api.get(`/api/articles/tasks/${taskId}`);
+          const task = taskResponse.data;
+
+          console.log('Task status:', task.status, 'Progress:', task.progress, '/', task.total);
+
+          // 更新 localStorage 中的任务状态
+          const storedTasks = localStorage.getItem('muses_tasks');
+          if (storedTasks) {
+            const tasks = JSON.parse(storedTasks);
+            const updatedTasks = tasks.map((t: any) =>
+              t.taskId === taskId
+                ? { ...t, ...task, updatedAt: new Date().toISOString() }
+                : t
+            );
+            localStorage.setItem('muses_tasks', JSON.stringify(updatedTasks));
+
+            // 触发自定义事件通知任务中心更新
+            window.dispatchEvent(new Event('muses-task-update'));
+          }
+
+          if (task.status === 'completed') {
+            clearInterval(pollInterval);
+
+            // 任务完成，获取新文章ID
+            const articleId = task.result?.article_id;
+            if (articleId) {
+              // 获取新文章详情
+              const articleResponse = await api.get(`/api/articles/${articleId}`);
+              const translatedArticle = articleResponse.data.article;
+
+              // 添加到文章列表
+              setArticles([translatedArticle, ...articles]);
+
+              // 显示成功通知
+              showToast('翻译完成！已创建新文章', 'success');
+            }
+          } else if (task.status === 'failed') {
+            clearInterval(pollInterval);
+            showToast(task.error || '翻译失败，请重试', 'error');
+          }
+          // 如果状态是 pending 或 running，继续轮询
+        } catch (pollError: any) {
+          console.error('Failed to poll task status:', pollError);
+          clearInterval(pollInterval);
+          showToast('无法获取翻译进度', 'error');
+        }
+      }, 2000); // 每2秒轮询一次
+
+      // 设置超时保护（5分钟）
+      setTimeout(() => {
+        clearInterval(pollInterval);
+      }, 300000);
+
+    } catch (error: any) {
+      console.error('Failed to start translation:', error);
+      showToast(error.response?.data?.detail || '启动翻译失败，请重试', 'error');
+      setTranslating(false);
+    }
+  };
+
+  const handleTranslateCancel = () => {
+    setTranslateDialogOpen(false);
+    setArticleToTranslate(null);
   };
 
   if (loading) {
@@ -218,6 +341,7 @@ export function ArticleCompactList({ onArticleSelect, selectedArticleId, onImpor
                 isSelected={selectedArticleId === article.id}
                 onClick={() => onArticleSelect?.(article)}
                 onDelete={() => handleDeleteClick(article)}
+                onTranslate={() => handleTranslateClick(article)}
               />
             ))}
           </div>
@@ -259,6 +383,76 @@ export function ArticleCompactList({ onArticleSelect, selectedArticleId, onImpor
               disabled={deleting}
             >
               {deleting ? "删除中..." : "确认删除"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 翻译确认对话框 */}
+      <Dialog open={translateDialogOpen} onOpenChange={handleTranslateCancel}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>翻译文章</DialogTitle>
+            <DialogDescription>
+              将文章 <strong>"{articleToTranslate?.title}"</strong> 翻译为双语对照版本
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">目标语言</label>
+              <select
+                value={targetLanguage}
+                onChange={(e) => setTargetLanguage(e.target.value)}
+                className="w-full px-3 py-2 border border-border rounded-md bg-background"
+                disabled={translating}
+              >
+                <option value="zh-CN">简体中文</option>
+                <option value="en">English</option>
+                <option value="ja">日本語</option>
+                <option value="ko">한국어</option>
+                <option value="fr">Français</option>
+                <option value="de">Deutsch</option>
+                <option value="es">Español</option>
+              </select>
+            </div>
+
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md p-3">
+              <p className="text-sm text-blue-800 dark:text-blue-300">
+                💡 翻译后将生成新文章，格式为：原文段落 + 翻译段落，保留所有图片
+              </p>
+              <p className="text-xs text-blue-700 dark:text-blue-400 mt-2">
+                ⏱️ 翻译过程可能需要1-3分钟，请耐心等待...
+              </p>
+            </div>
+          </div>
+
+          {translating && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                  <div className="h-full bg-blue-500 animate-pulse" style={{ width: '100%' }} />
+                </div>
+              </div>
+              <p className="text-xs text-center text-muted-foreground">
+                正在翻译段落，请稍候...
+              </p>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={handleTranslateCancel}
+              disabled={translating}
+            >
+              取消
+            </Button>
+            <Button
+              onClick={handleTranslateConfirm}
+              disabled={translating}
+            >
+              {translating ? "翻译中..." : "开始翻译"}
             </Button>
           </DialogFooter>
         </DialogContent>
