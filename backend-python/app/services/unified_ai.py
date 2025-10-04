@@ -93,6 +93,9 @@ class UnifiedAIClient:
         if not model:
             model = get_model_for_provider(provider)
 
+        # DEBUG: Print what we're using
+        print(f"🔍 UnifiedAI Debug: provider={provider}, model={model}, temperature={temperature}")
+
         # 格式化消息
         formatted_messages, system_prompt = cls.format_messages_for_provider(messages, provider)
 
@@ -103,6 +106,7 @@ class UnifiedAIClient:
                 temperature, max_tokens, **kwargs
             )
         elif provider == "claude":
+            print(f"🔍 Calling _call_claude with model={model}, temperature={temperature}")
             return cls._call_claude(
                 user, model, formatted_messages, system_prompt,
                 temperature, max_tokens, **kwargs
@@ -132,8 +136,13 @@ class UnifiedAIClient:
         api_key = decrypt(user.openaiKey)
         client = openai.OpenAI(api_key=api_key)
 
+        # GPT-5系列只支持temperature=1.0
+        if model.startswith("gpt-5"):
+            print(f"🔍 GPT-5 detected, overriding temperature from {temperature} to 1.0")
+            temperature = 1.0
+
         # GPT-5系列的特殊处理
-        if model in ["gpt-5", "gpt-5-mini"]:
+        if model.startswith("gpt-5"):
             # 提取用户消息
             user_message = ""
             for msg in messages:
@@ -155,10 +164,12 @@ class UnifiedAIClient:
                 )
                 return response.output_text or ""
             except (AttributeError, Exception):
-                # 回退到标准API
+                # 回退到标准API - GPT-5 使用 max_completion_tokens
                 response = client.chat.completions.create(
                     model=model,
-                    messages=messages
+                    messages=messages,
+                    temperature=temperature,
+                    max_completion_tokens=max_tokens
                 )
                 return response.choices[0].message.content or ""
 
@@ -168,8 +179,13 @@ class UnifiedAIClient:
                 "model": model,
                 "messages": messages,
                 "temperature": temperature,
-                "max_tokens": max_tokens
             }
+
+            # GPT-4o 系列也使用 max_completion_tokens
+            if "gpt-4o" in model or model.startswith("gpt-4-"):
+                params["max_completion_tokens"] = max_tokens
+            else:
+                params["max_tokens"] = max_tokens
 
             # 添加额外参数
             for key in ["top_p", "frequency_penalty", "presence_penalty"]:
@@ -196,6 +212,14 @@ class UnifiedAIClient:
         api_key = decrypt(user.claudeKey)
         client = anthropic.Anthropic(api_key=api_key)
 
+        # Claude 4 系列模型只支持 temperature=1.0
+        # 检查是否为 Claude 4.x 模型 (sonnet-4, opus-4)
+        print(f"🔍 _call_claude: model={model}, temperature BEFORE check={temperature}")
+        if "sonnet-4" in model or "opus-4" in model:
+            print(f"✅ Detected Claude 4 model, overriding temperature to 1.0")
+            temperature = 1.0
+        print(f"🔍 _call_claude: temperature AFTER check={temperature}")
+
         # 构建参数
         params = {
             "model": model,
@@ -203,6 +227,7 @@ class UnifiedAIClient:
             "max_tokens": max_tokens,
             "temperature": temperature
         }
+        print(f"🔍 Final params to Claude API: {params}")
 
         # 添加system prompt（如果有）
         if system_prompt:

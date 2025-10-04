@@ -6,72 +6,60 @@ from typing import Dict, List, Any
 
 # OpenAI模型配置
 OPENAI_MODELS = {
-    "gpt-4": {
-        "name": "GPT-4",
-        "description": "最先进的模型，卓越的推理和创造力",
-        "max_tokens": 8192,
+    "gpt-5-2025-08-07": {
+        "name": "GPT-5",
+        "description": "最新最强的 OpenAI 模型，卓越的推理和创造力",
+        "max_tokens": 200000,
         "default": True,
-        "capabilities": ["text", "code", "analysis", "creative"]
+        "capabilities": ["text", "code", "analysis", "creative", "vision"]
     },
-    "gpt-4-turbo-preview": {
-        "name": "GPT-4 Turbo",
-        "description": "更快速的GPT-4，支持更长上下文",
+    "gpt-5-mini-2025-08-07": {
+        "name": "GPT-5 Mini",
+        "description": "轻量级 GPT-5，快速高效",
         "max_tokens": 128000,
         "capabilities": ["text", "code", "analysis", "creative"]
-    },
-    "gpt-3.5-turbo": {
-        "name": "GPT-3.5 Turbo",
-        "description": "快速高效的模型，适合大多数任务",
-        "max_tokens": 16385,
-        "capabilities": ["text", "code", "analysis"]
     }
 }
 
 # Claude模型配置
 CLAUDE_MODELS = {
-    "claude-3.5-sonnet-20241022": {
-        "name": "Claude 3.5 Sonnet",
-        "description": "最新最强的Claude模型，卓越的能力和性能",
+    "claude-sonnet-4-5-20250929": {
+        "name": "Claude Sonnet 4.5",
+        "description": "最新最强的 Claude 模型，卓越的能力和性能",
         "max_tokens": 200000,
         "default": True,
-        "capabilities": ["text", "code", "analysis", "creative"]
+        "capabilities": ["text", "code", "analysis", "creative", "vision"]
     },
-    "claude-3-opus-20240229": {
-        "name": "Claude 3 Opus",
-        "description": "最强大的Claude模型，适合复杂任务",
+    "claude-sonnet-4-20250514": {
+        "name": "Claude Sonnet 4",
+        "description": "强大的 Claude 4 模型，性能优异",
         "max_tokens": 200000,
         "capabilities": ["text", "code", "analysis", "creative"]
     },
-    "claude-3-sonnet-20240229": {
-        "name": "Claude 3 Sonnet",
-        "description": "平衡的Claude模型，性价比高",
+    "claude-opus-4-1-20250805": {
+        "name": "Claude Opus 4.1",
+        "description": "最强大的 Claude 模型，适合复杂任务",
         "max_tokens": 200000,
-        "capabilities": ["text", "code", "analysis", "creative"]
+        "capabilities": ["text", "code", "analysis", "creative", "vision"]
     }
 }
 
 # Gemini模型配置
 GEMINI_MODELS = {
-    "gemini-pro": {
-        "name": "Gemini Pro",
-        "description": "Google's advanced language model",
-        "max_tokens": 30720,
+    "gemini-2.5-flash": {
+        "name": "Gemini 2.5 Flash",
+        "description": "最新的 Google Gemini 模型，快速高效",
+        "max_tokens": 100000,
         "default": True,
-        "capabilities": ["text", "code", "analysis"]
-    },
-    "gemini-pro-vision": {
-        "name": "Gemini Pro Vision",
-        "description": "Multimodal Gemini model",
-        "max_tokens": 30720,
-        "capabilities": ["text", "code", "vision"]
+        "capabilities": ["text", "code", "analysis", "vision"]
     }
 }
 
 # 默认模型选择
 DEFAULT_MODELS = {
-    "openai": "gpt-4",
-    "claude": "claude-3.5-sonnet-20241022",
-    "gemini": "gemini-pro"
+    "openai": "gpt-5-2025-08-07",
+    "claude": "claude-sonnet-4-5-20250929",
+    "gemini": "gemini-2.5-flash"
 }
 
 def get_model_for_provider(provider: str, preferred_model: str = None) -> str:
