@@ -1,12 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, BackgroundTasks, Body
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, func, or_
 from typing import Optional
 from datetime import datetime
 import logging
+from bs4 import BeautifulSoup
+from pydantic import BaseModel
 
-from ..database import get_db
-from ..models import Article, Agent
+from ..database import get_db, SessionLocal
+from ..models import Article, Agent, User
 from ..schemas.article import (
     Article as ArticleSchema, ArticleCreate, ArticleUpdate,
     ArticleListResponse, ArticleResponse, ArticleAgent
@@ -14,6 +16,7 @@ from ..schemas.article import (
 from ..schemas.auth import SuccessResponse
 from ..dependencies import get_current_user_db
 from ..utils.exceptions import HTTPNotFoundError, HTTPValidationError
+from ..utils.task_tracker import task_tracker, TaskStatus
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -350,3 +353,304 @@ async def delete_article_from_github(article: Article, current_user):
     except Exception as e:
         logger.error(f"❌ Error deleting file from GitHub: {str(e)}")
         # 不抛出异常，因为本地删除仍然应该继续
+
+
+class TranslateRequest(BaseModel):
+    targetLanguage: str = "zh-CN"
+
+
+async def _translate_article_background(
+    task_id: str,
+    article_id: str,
+    user_id: str,
+    target_language: str
+):
+    """
+    后台翻译任务
+    在独立的数据库会话中运行
+    """
+    from ..services.ai_service_enhanced import EnhancedAIService
+
+    db = SessionLocal()
+
+    try:
+        # 更新任务状态
+        task_tracker.update_task(task_id, status=TaskStatus.RUNNING)
+
+        # 获取文章和用户
+        article = db.query(Article).filter(Article.id == article_id).first()
+        if not article:
+            task_tracker.update_task(
+                task_id,
+                status=TaskStatus.FAILED,
+                error="文章不存在"
+            )
+            return
+
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            task_tracker.update_task(
+                task_id,
+                status=TaskStatus.FAILED,
+                error="用户不存在"
+            )
+            return
+
+        # 获取Agent
+        agent = db.query(Agent).filter(Agent.id == article.agentId).first()
+        if not agent:
+            task_tracker.update_task(
+                task_id,
+                status=TaskStatus.FAILED,
+                error="Agent不存在"
+            )
+            return
+
+        # 语言映射
+        language_map = {
+            "zh-CN": "简体中文",
+            "en": "English",
+            "ja": "日本語",
+            "ko": "한국어",
+            "fr": "Français",
+            "de": "Deutsch",
+            "es": "Español"
+        }
+
+        language_name = language_map.get(target_language, "简体中文")
+
+        logger.info(f"🌍 [Task {task_id}] Translating article {article_id} to {language_name}")
+
+        # 解析HTML内容
+        soup = BeautifulSoup(article.content, 'html.parser')
+
+        # 提取所有段落和标题
+        elements = []
+        for tag in soup.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'blockquote']):
+            text = tag.get_text().strip()
+            if text:
+                elements.append({
+                    'tag': tag.name,
+                    'text': text,
+                    'html': str(tag)
+                })
+
+        # 提取所有图片
+        images = []
+        for img in soup.find_all('img'):
+            images.append(str(img))
+
+        total = len(elements)
+        logger.info(f"📝 [Task {task_id}] Found {total} text elements and {len(images)} images")
+
+        # 更新任务总数
+        task_tracker.update_task(task_id, total=total)
+
+        # 翻译每个段落
+        translated_elements = []
+
+        for i, element in enumerate(elements):
+            try:
+                # 更新当前步骤
+                task_tracker.update_task(
+                    task_id,
+                    progress=i,
+                    current_step=f"正在翻译第 {i+1}/{total} 段"
+                )
+
+                # 使用 translate action 翻译文本（强制使用Claude）
+                result = await EnhancedAIService.perform_text_action(
+                    user=user,
+                    agent=agent,
+                    text=element['text'],
+                    action_type='translate',
+                    language=language_name,
+                    provider='claude'  # 强制使用Claude
+                )
+
+                translated_text = result.get('processedText', element['text'])
+
+                translated_elements.append({
+                    'original': element,
+                    'translation': translated_text.strip()
+                })
+
+                # 记录进度
+                progress = int((i + 1) / total * 100)
+                logger.info(f"✅ [Task {task_id}] 翻译进度: {i+1}/{total} ({progress}%)")
+
+            except Exception as e:
+                logger.error(f"❌ [Task {task_id}] Error translating element {i+1}: {str(e)}")
+                # 翻译失败时使用原文
+                translated_elements.append({
+                    'original': element,
+                    'translation': element['text']
+                })
+
+        # 构建双语对照HTML
+        bilingual_html = []
+
+        # 添加标题说明
+        bilingual_html.append(f'<div style="background-color: #f0f9ff; border-left: 4px solid #0284c7; padding: 12px; margin-bottom: 24px;">')
+        bilingual_html.append(f'<p style="margin: 0; font-size: 14px; color: #0c4a6e;">💡 本文为双语对照版本 | This is a bilingual version</p>')
+        bilingual_html.append(f'</div>')
+
+        # 图片索引
+        img_index = 0
+
+        for item in translated_elements:
+            original = item['original']
+            translation = item['translation']
+            tag = original['tag']
+
+            # 原文（浅灰色背景）
+            bilingual_html.append(f'<div style="background-color: #f9fafb; padding: 12px; margin: 8px 0; border-radius: 4px;">')
+            bilingual_html.append(f'<{tag} style="margin: 0; color: #374151;">{original["text"]}</{tag}>')
+            bilingual_html.append(f'</div>')
+
+            # 译文（浅蓝色背景）
+            bilingual_html.append(f'<div style="background-color: #eff6ff; padding: 12px; margin: 8px 0 24px 0; border-radius: 4px;">')
+            bilingual_html.append(f'<{tag} style="margin: 0; color: #1e40af;">{translation}</{tag}>')
+            bilingual_html.append(f'</div>')
+
+            # 每隔几段插入一张图片
+            if img_index < len(images) and (len(translated_elements) < 5 or (item == translated_elements[len(translated_elements) // (len(images) + 1) * (img_index + 1)])):
+                bilingual_html.append(images[img_index])
+                img_index += 1
+
+        # 添加剩余的图片
+        while img_index < len(images):
+            bilingual_html.append(images[img_index])
+            img_index += 1
+
+        new_content = '\n'.join(bilingual_html)
+
+        # 创建新文章
+        new_article = Article(
+            userId=user.id,
+            agentId=article.agentId,
+            title=f"{article.title} ({language_name}双语版)",
+            content=new_content,
+            summary=f"双语对照翻译版本 - {article.summary or ''}",
+            publishStatus="draft",
+            sourceFiles=article.sourceFiles
+        )
+
+        db.add(new_article)
+        db.commit()
+        db.refresh(new_article)
+
+        logger.info(f"✅ [Task {task_id}] Created bilingual article: {new_article.id}")
+
+        # 更新任务状态为完成
+        task_tracker.update_task(
+            task_id,
+            status=TaskStatus.COMPLETED,
+            progress=total,
+            result={
+                "article_id": new_article.id,
+                "title": new_article.title
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"❌ [Task {task_id}] Translation failed: {str(e)}")
+        task_tracker.update_task(
+            task_id,
+            status=TaskStatus.FAILED,
+            error=str(e)
+        )
+    finally:
+        db.close()
+
+
+@router.post("/{article_id}/translate")
+async def translate_article(
+    background_tasks: BackgroundTasks,
+    article_id: str = Path(..., description="文章ID"),
+    request: TranslateRequest = Body(default=TranslateRequest()),
+    current_user = Depends(get_current_user_db),
+    db: Session = Depends(get_db)
+):
+    """
+    启动文章翻译任务（异步）
+    - 立即返回task_id
+    - 翻译在后台进行
+    - 通过 /tasks/{task_id} 查询进度
+    """
+    # 验证文章存在且属于用户
+    article = db.query(Article).filter(
+        Article.id == article_id,
+        Article.userId == current_user.id
+    ).first()
+
+    if not article:
+        raise HTTPNotFoundError("文章不存在")
+
+    target_language = request.targetLanguage if request else "zh-CN"
+
+    # 创建任务
+    task_id = task_tracker.create_task(
+        task_type="translate_article",
+        article_id=article_id,
+        user_id=current_user.id,
+        target_language=target_language
+    )
+
+    logger.info(f"🚀 Created translation task {task_id} for article {article_id}")
+
+    # 启动后台任务
+    background_tasks.add_task(
+        _translate_article_background,
+        task_id,
+        article_id,
+        current_user.id,
+        target_language
+    )
+
+    # 立即返回task_id
+    return {
+        "taskId": task_id,
+        "status": "pending",
+        "message": "翻译任务已启动，请稍后查询进度"
+    }
+
+
+@router.get("/tasks/{task_id}")
+async def get_task_status(
+    task_id: str = Path(..., description="任务ID"),
+    current_user = Depends(get_current_user_db)
+):
+    """
+    查询任务进度
+    返回任务状态、进度、结果或错误信息
+    """
+    task = task_tracker.get_task(task_id)
+
+    if not task:
+        raise HTTPNotFoundError("任务不存在")
+
+    # 验证任务属于当前用户
+    if task.get("user_id") != current_user.id:
+        raise HTTPValidationError("无权访问此任务")
+
+    # 返回任务信息
+    response = {
+        "taskId": task["id"],
+        "status": task["status"],
+        "progress": task["progress"],
+        "total": task["total"],
+        "currentStep": task["current_step"],
+        "createdAt": task["created_at"],
+        "updatedAt": task["updated_at"]
+    }
+
+    # 如果任务完成，返回结果
+    if task["status"] == TaskStatus.COMPLETED:
+        response["result"] = task["result"]
+
+    # 如果任务失败，返回错误信息
+    if task["status"] == TaskStatus.FAILED:
+        response["error"] = task["error"]
+
+    return response
