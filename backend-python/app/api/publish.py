@@ -387,6 +387,162 @@ async def publish_to_github(
         raise HTTPValidationError(f"Failed to publish to GitHub: {str(e)}")
 
 
+@router.delete("/github/{article_id}")
+async def unpublish_from_github(
+    article_id: str,
+    current_user = Depends(get_current_user_db),
+    db: Session = Depends(get_db)
+):
+    """从GitHub下架文章（删除文件）"""
+
+    start_time = time.time()
+
+    # 获取文章
+    article = db.query(Article).filter(
+        Article.id == article_id,
+        Article.userId == current_user.id
+    ).first()
+
+    if not article:
+        raise HTTPNotFoundError("Article not found")
+
+    if not article.githubUrl or not article.repoPath:
+        raise HTTPValidationError("Article has not been published to GitHub")
+
+    if not current_user.githubToken:
+        raise HTTPValidationError("GitHub token not found")
+
+    try:
+        # 解密GitHub token
+        github_token = decrypt(current_user.githubToken)
+
+        # 从 githubUrl 解析仓库信息
+        # githubUrl格式: https://github.com/owner/repo/blob/main/path/to/file
+        repo_url_parts = article.githubUrl.split('/blob/')[0]
+        repo_parts = repo_url_parts.rstrip('/').split('/')
+        owner = repo_parts[-2]
+        repo = repo_parts[-1]
+
+        async with httpx.AsyncClient() as client:
+            deleted_files = []
+            failed_files = []
+
+            # 删除主文件（index.md）
+            try:
+                # 首先获取文件信息以获取 SHA
+                check_response = await client.get(
+                    f"https://api.github.com/repos/{owner}/{repo}/contents/{article.repoPath}",
+                    headers={"Authorization": f"token {github_token}"}
+                )
+
+                if check_response.status_code == 200:
+                    file_info = check_response.json()
+                    file_sha = file_info["sha"]
+
+                    # 删除文件
+                    delete_response = await client.delete(
+                        f"https://api.github.com/repos/{owner}/{repo}/contents/{article.repoPath}",
+                        headers={"Authorization": f"token {github_token}"},
+                        json={
+                            "message": f"下架文章: {article.title}",
+                            "sha": file_sha,
+                            "branch": "main"
+                        }
+                    )
+
+                    if delete_response.status_code in [200, 204]:
+                        deleted_files.append(article.repoPath)
+                    else:
+                        failed_files.append({
+                            "path": article.repoPath,
+                            "error": f"HTTP {delete_response.status_code}: {delete_response.text}"
+                        })
+                else:
+                    failed_files.append({
+                        "path": article.repoPath,
+                        "error": "File not found on GitHub"
+                    })
+
+            except Exception as e:
+                failed_files.append({
+                    "path": article.repoPath,
+                    "error": str(e)
+                })
+
+            # 如果文章在文件夹中，尝试删除整个文件夹（包括图片）
+            # 提取文件夹路径（去掉 index.md）
+            if "/index.md" in article.repoPath:
+                folder_path = article.repoPath.replace("/index.md", "")
+
+                try:
+                    # 获取文件夹内容
+                    folder_response = await client.get(
+                        f"https://api.github.com/repos/{owner}/{repo}/contents/{folder_path}",
+                        headers={"Authorization": f"token {github_token}"}
+                    )
+
+                    if folder_response.status_code == 200:
+                        folder_contents = folder_response.json()
+
+                        # 删除文件夹中的其他文件（如图片）
+                        for item in folder_contents:
+                            if item["path"] != article.repoPath:  # 跳过已删除的主文件
+                                try:
+                                    delete_response = await client.delete(
+                                        f"https://api.github.com/repos/{owner}/{repo}/contents/{item['path']}",
+                                        headers={"Authorization": f"token {github_token}"},
+                                        json={
+                                            "message": f"下架文章: {article.title}",
+                                            "sha": item["sha"],
+                                            "branch": "main"
+                                        }
+                                    )
+
+                                    if delete_response.status_code in [200, 204]:
+                                        deleted_files.append(item["path"])
+
+                                except Exception as e:
+                                    # 忽略单个文件删除失败
+                                    pass
+
+                except Exception as e:
+                    # 文件夹可能不存在或已被删除，继续执行
+                    pass
+
+            # 更新文章状态为草稿
+            article.publishStatus = "draft"
+            article.syncStatus = "unsynced"
+            article.githubUrl = None
+            # repoPath 保留，以便重新发布时可以使用相同路径
+
+            # 创建同步历史记录
+            sync_record = SyncHistory(
+                articleId=article_id,
+                userId=current_user.id,
+                syncType="unpublish_from_github",
+                syncDirection="github_to_local",
+                syncStatus="success" if not failed_files else "partial_success",
+                hasChanges="true",
+                syncDuration=int((time.time() - start_time) * 1000),
+                repoPath=article.repoPath,
+                fileSize=len(deleted_files)
+            )
+            db.add(sync_record)
+
+            db.commit()
+
+            return {
+                "success": len(failed_files) == 0,
+                "message": f"下架完成：删除了 {len(deleted_files)} 个文件" + (f"，{len(failed_files)} 个文件失败" if failed_files else ""),
+                "deleted_files": deleted_files,
+                "failed_files": failed_files
+            }
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPValidationError(f"Failed to unpublish from GitHub: {str(e)}")
+
+
 @router.get("/history/{article_id}")
 async def get_publish_history(
     article_id: str,
@@ -394,15 +550,15 @@ async def get_publish_history(
     db: Session = Depends(get_db)
 ):
     """获取发布历史"""
-    
+
     article = db.query(Article).filter(
         Article.id == article_id,
         Article.userId == current_user.id
     ).first()
-    
+
     if not article:
         raise HTTPNotFoundError("Article not found")
-    
+
     return {
         "publishInfo": {
             "publishStatus": article.publishStatus,

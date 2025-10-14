@@ -52,6 +52,9 @@ export function ArticleCompactList({ onArticleSelect, selectedArticleId, onImpor
   const [articleToTranslate, setArticleToTranslate] = useState<Article | null>(null);
   const [translating, setTranslating] = useState(false);
   const [targetLanguage, setTargetLanguage] = useState<string>('zh-CN');
+  const [unpublishDialogOpen, setUnpublishDialogOpen] = useState(false);
+  const [articleToUnpublish, setArticleToUnpublish] = useState<Article | null>(null);
+  const [unpublishing, setUnpublishing] = useState(false);
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -240,6 +243,41 @@ export function ArticleCompactList({ onArticleSelect, selectedArticleId, onImpor
     setArticleToTranslate(null);
   };
 
+  const handleUnpublishClick = (article: Article) => {
+    setArticleToUnpublish(article);
+    setUnpublishDialogOpen(true);
+  };
+
+  const handleUnpublishConfirm = async () => {
+    if (!articleToUnpublish) return;
+
+    setUnpublishing(true);
+
+    try {
+      await api.delete(`/api/publish/github/${articleToUnpublish.id}`);
+
+      showToast('文章已从GitHub下架', 'success');
+
+      // 刷新文章列表
+      fetchArticles();
+
+      // 关闭对话框
+      setUnpublishDialogOpen(false);
+      setArticleToUnpublish(null);
+    } catch (error: any) {
+      console.error('Failed to unpublish article:', error);
+      const errorMessage = error.response?.data?.detail || '下架失败，请重试';
+      showToast(errorMessage, 'error');
+    } finally {
+      setUnpublishing(false);
+    }
+  };
+
+  const handleUnpublishCancel = () => {
+    setUnpublishDialogOpen(false);
+    setArticleToUnpublish(null);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -342,6 +380,7 @@ export function ArticleCompactList({ onArticleSelect, selectedArticleId, onImpor
                 onClick={() => onArticleSelect?.(article)}
                 onDelete={() => handleDeleteClick(article)}
                 onTranslate={() => handleTranslateClick(article)}
+                onUnpublish={() => handleUnpublishClick(article)}
               />
             ))}
           </div>
@@ -453,6 +492,46 @@ export function ArticleCompactList({ onArticleSelect, selectedArticleId, onImpor
               disabled={translating}
             >
               {translating ? "翻译中..." : "开始翻译"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 下架确认对话框 */}
+      <Dialog open={unpublishDialogOpen} onOpenChange={handleUnpublishCancel}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>确认下架文章</DialogTitle>
+            <DialogDescription>
+              确定要从 GitHub 下架文章 <strong>"{articleToUnpublish?.title}"</strong> 吗？
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-md p-3">
+            <p className="text-sm text-orange-800 dark:text-orange-300">
+              ⚠️ 此操作将：
+            </p>
+            <ul className="text-sm text-orange-700 dark:text-orange-400 mt-2 space-y-1 ml-4 list-disc">
+              <li>从 GitHub 仓库中删除文章文件（包括图片）</li>
+              <li>将文章状态改为"草稿"</li>
+              <li>保留本地文章，可以重新发布</li>
+            </ul>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={handleUnpublishCancel}
+              disabled={unpublishing}
+            >
+              取消
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleUnpublishConfirm}
+              disabled={unpublishing}
+            >
+              {unpublishing ? "下架中..." : "确认下架"}
             </Button>
           </DialogFooter>
         </DialogContent>

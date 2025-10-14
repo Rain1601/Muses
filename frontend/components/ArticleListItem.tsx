@@ -1,12 +1,13 @@
 "use client";
 
 import { Badge } from "./ui/badge";
-import { FileText, Trash2, MoreHorizontal, Languages } from "lucide-react";
+import { FileText, Trash2, MoreHorizontal, Languages, CloudOff } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "./ui/dropdown-menu";
 
 interface Article {
@@ -31,6 +32,7 @@ interface ArticleListItemProps {
   onPublish?: () => void;
   onDelete?: () => void;
   onTranslate?: () => void;
+  onUnpublish?: () => void;
 }
 
 export function ArticleListItem({
@@ -38,7 +40,8 @@ export function ArticleListItem({
   isSelected = false,
   onClick,
   onDelete,
-  onTranslate
+  onTranslate,
+  onUnpublish
 }: ArticleListItemProps) {
 
   const getStatusColor = (status: string) => {
@@ -119,6 +122,19 @@ export function ArticleListItem({
                         翻译
                       </DropdownMenuItem>
                     )}
+                    {onUnpublish && article.publishStatus === 'published' && (
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onUnpublish();
+                        }}
+                        className="text-orange-600 focus:text-orange-600"
+                      >
+                        <CloudOff className="w-4 h-4 mr-2" />
+                        下架
+                      </DropdownMenuItem>
+                    )}
+                    {(onTranslate || onUnpublish) && <DropdownMenuSeparator />}
                     <DropdownMenuItem
                       onClick={(e) => {
                         e.stopPropagation();
