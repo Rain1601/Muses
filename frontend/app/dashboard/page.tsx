@@ -176,7 +176,8 @@ function DashboardContent() {
 
     showToast(`成功导入 ${result.imported_count} 篇文章`, 'success');
 
-    // 不自动刷新，让用户可以继续查看导入的内容
+    // 刷新文章列表以显示新导入的文章
+    setRefreshKey(prev => prev + 1);
   };
 
   // 发布文章功能
