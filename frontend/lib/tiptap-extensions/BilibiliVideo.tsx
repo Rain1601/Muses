@@ -92,14 +92,51 @@ const BilibiliVideo = Node.create<BilibiliVideoOptions>({
       {
         tag: 'iframe[src*="player.bilibili.com"]',
       },
+      {
+        // 保留所有其他iframe标签（包括空src或其他视频平台）
+        tag: 'iframe',
+        getAttrs: (element) => {
+          const src = element.getAttribute('src');
+          // 如果是bilibili链接，使用BilibiliVideo扩展处理
+          if (src && src.includes('player.bilibili.com')) {
+            return false; // 让第一个规则处理
+          }
+          // 对于其他iframe（包括空src），保留所有属性
+          return {
+            src: src || '',
+            width: element.getAttribute('width') || '100%',
+            height: element.getAttribute('height') || '100%',
+          };
+        },
+      },
     ];
   },
 
   renderHTML({ HTMLAttributes }) {
-    // src 已经是 videoId (BV号或av号)，不需要再次提取
-    const videoId = HTMLAttributes.src;
-    const embedUrl = getBilibiliEmbedUrl(videoId);
+    // src 已经是 videoId (BV号或av号)，或者是完整的URL
+    const src = HTMLAttributes.src;
 
+    // 如果是B站视频ID，转换为嵌入URL
+    let embedUrl = src;
+    if (src && (src.startsWith('BV') || src.startsWith('av'))) {
+      embedUrl = getBilibiliEmbedUrl(src);
+    }
+
+    // 如果src为空或不是有效URL，保留原始iframe
+    if (!src || src === '') {
+      return [
+        'iframe',
+        mergeAttributes(
+          this.options.HTMLAttributes,
+          HTMLAttributes,
+          {
+            style: 'position: absolute; top: 0px; left: 0px; width: 100%; height: 100%; border: 0px; border-radius: 0.5rem;',
+          }
+        ),
+      ];
+    }
+
+    // 对于有效的视频链接，使用响应式容器
     return [
       'div',
       { class: 'video-wrapper', style: 'position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; margin: 1rem 0;' },

@@ -143,6 +143,18 @@ async def process_markdown_file(md_file: Path, image_files: dict, current_user: 
     # 上传图片并替换链接
     processed_content = await process_images_in_markdown(content, image_files, current_user)
 
+    # 在转换前保存所有iframe标签
+    iframe_placeholders = {}
+    iframe_pattern = r'<iframe[^>]*>.*?</iframe>'
+
+    def preserve_iframe(match):
+        placeholder = f"__IFRAME_PLACEHOLDER_{len(iframe_placeholders)}__"
+        iframe_placeholders[placeholder] = match.group(0)
+        logger.info(f"🎬 Preserving iframe: {match.group(0)[:100]}...")
+        return placeholder
+
+    processed_content = re.sub(iframe_pattern, preserve_iframe, processed_content, flags=re.DOTALL)
+
     # 将Markdown转换为HTML（TipTap编辑器需要HTML格式）
     try:
         import markdown
@@ -157,6 +169,11 @@ async def process_markdown_file(md_file: Path, image_files: dict, current_user: 
         # 如果没有markdown库，保持原格式
         logger.warning("⚠️ Markdown library not found, saving as raw markdown")
         pass
+
+    # 恢复所有iframe标签
+    for placeholder, iframe_html in iframe_placeholders.items():
+        processed_content = processed_content.replace(placeholder, iframe_html)
+        logger.info(f"✅ Restored iframe from placeholder")
 
     # 创建文章记录
     db = SessionLocal()
