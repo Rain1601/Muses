@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, Suspense, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useUserStore } from "@/store/user";
+import { useViewModeStore } from "@/store/viewMode";
 import { auth } from "@/lib/auth";
 import Navigation from "@/components/Navigation";
 import { ArticleCompactList } from "@/components/ArticleCompactList";
@@ -10,6 +11,8 @@ import { ArticleDetailView } from "@/components/ArticleDetailView";
 import { NotionEditor } from '@/components/NotionEditor';
 import { SyncPanel } from '@/components/SyncPanel';
 import { FileImport } from '@/components/FileImport';
+import { CoCreateMode } from '@/components/CoCreateMode';
+import { CoReadMode } from '@/components/CoReadMode';
 // import '@/app/editor-demo/mermaid-styles.css'; // 移除这个导入，避免表格样式冲突
 import { api } from "@/lib/api";
 import { List, Info, GitBranch, ChevronLeft, ChevronRight, Send, Save, Eye, Clock, PenTool } from "lucide-react";
@@ -36,6 +39,7 @@ function DashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, checkAuth, logout } = useUserStore();
+  const { mode: viewMode } = useViewModeStore();
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [isEditing, setIsEditing] = useState(true);
   const [editingTitle, setEditingTitle] = useState("");
@@ -599,9 +603,9 @@ summary: ""
       <ToastContainer />
       <NotificationContainer />
 
-      {/* 主内容区 - 三栏布局 */}
+      {/* 主内容区 */}
       <main className="flex h-[calc(100vh-80px)]">
-        {/* 左侧栏 - 文章列表 */}
+        {/* 左侧栏 - 文章列表（所有模式共享） */}
         <aside className={`bg-card border-r border-border flex-shrink-0 transition-all duration-300 ${
           leftPanelCollapsed ? 'w-0 opacity-0 overflow-hidden' : 'w-80 opacity-100'
         }`}>
@@ -613,8 +617,59 @@ summary: ""
           />
         </aside>
 
-        {/* 中间区域 - 编辑器 */}
-        <section className="flex-1 bg-background relative">
+        {/* 主工作区 */}
+        {viewMode === 'co-create' ? (
+          /* 共创模式 */
+          <div className="flex-1 relative">
+            {/* 左侧栏收缩展开按钮 */}
+            <button
+              onClick={() => setLeftPanelCollapsed(!leftPanelCollapsed)}
+              className="absolute top-1/2 left-0 transform -translate-y-1/2 -translate-x-1/2 z-10 w-6 h-12 bg-card border border-border rounded-r-lg shadow-sm hover:shadow-md transition-all duration-200 flex items-center justify-center text-muted-foreground hover:text-foreground"
+              title={leftPanelCollapsed ? "展开文章列表" : "收缩文章列表"}
+            >
+              {leftPanelCollapsed ? (
+                <ChevronRight className="w-3 h-3" />
+              ) : (
+                <ChevronLeft className="w-3 h-3" />
+              )}
+            </button>
+            <CoCreateMode
+              articleId={selectedArticle?.id}
+              agentId={selectedArticle?.agentId || defaultAgent?.id}
+              initialContent={editingContent}
+              onContentChange={setEditingContent}
+            />
+          </div>
+        ) : viewMode === 'co-read' ? (
+          /* 共读模式 */
+          <div className="flex-1 relative">
+            {/* 左侧栏收缩展开按钮 */}
+            <button
+              onClick={() => setLeftPanelCollapsed(!leftPanelCollapsed)}
+              className="absolute top-1/2 left-0 transform -translate-y-1/2 -translate-x-1/2 z-10 w-6 h-12 bg-card border border-border rounded-r-lg shadow-sm hover:shadow-md transition-all duration-200 flex items-center justify-center text-muted-foreground hover:text-foreground"
+              title={leftPanelCollapsed ? "展开文章列表" : "收缩文章列表"}
+            >
+              {leftPanelCollapsed ? (
+                <ChevronRight className="w-3 h-3" />
+              ) : (
+                <ChevronLeft className="w-3 h-3" />
+              )}
+            </button>
+            <CoReadMode
+              articleId={selectedArticle?.id}
+              agentId={selectedArticle?.agentId || defaultAgent?.id}
+              articleContent={selectedArticle?.content || editingContent}
+              initialNotes=""
+              onNotesChange={(notes) => {
+                // 可以选择将笔记保存到某个地方
+                console.log('Notes updated:', notes);
+              }}
+            />
+          </div>
+        ) : (
+          /* 正常三栏布局模式 */
+          <>
+          <section className="flex-1 bg-background relative">
           {/* 左侧栏收缩展开按钮 */}
           <button
             onClick={() => setLeftPanelCollapsed(!leftPanelCollapsed)}
@@ -1042,6 +1097,8 @@ summary: ""
             </div>
           </div>
         </aside>
+        </>
+        )}
       </main>
 
       {/* 文件导入对话框 */}

@@ -11,7 +11,7 @@ from ..schemas.agent import (
     AgentListResponse, AgentResponse, AgentTemplatesResponse, AgentTemplate,
     StyleAnalysisRequest, StyleAnalysisResponse, TextActionRequest, TextActionResponse,
     ModelsListResponse, ModelInfo, GenerateContentRequest, GenerateContentResponse,
-    ValidateModelResponse
+    ValidateModelResponse, ChatRequest, ChatResponse
 )
 from ..schemas.auth import SuccessResponse
 from ..dependencies import get_current_user_db
@@ -420,3 +420,61 @@ async def validate_agent_model(
             valid=False,
             message=f"Validation failed: {str(e)}"
         )
+
+
+@router.post("/chat", response_model=ChatResponse)
+async def chat_with_agent(
+    request: ChatRequest,
+    current_user = Depends(get_current_user_db),
+    db: Session = Depends(get_db)
+):
+    """与Agent进行对话"""
+
+    # 获取Agent
+    agent = db.query(Agent).filter(
+        Agent.id == request.agentId,
+        Agent.userId == current_user.id
+    ).first()
+
+    if not agent:
+        raise HTTPNotFoundError("Agent not found")
+
+    try:
+        # 构建系统提示
+        system_prompt = f"""你是一个AI写作助手。你的任务是帮助用户创作文章。
+
+Agent配置：
+- 名称：{agent.name}
+- 描述：{agent.description}
+- 语言：{agent.language}
+- 风格：{agent.tone}
+- 目标受众：{agent.targetAudience}
+
+{agent.customPrompt if agent.customPrompt else ''}
+
+当前上下文：
+{request.context if request.context else '用户正在开始新的创作'}
+
+请根据用户的问题提供有帮助的回答，帮助他们完善文章内容。"""
+
+        # 转换消息格式
+        messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
+
+        # 调用AI服务
+        result = await agent_service.generate_content(
+            agent_id=request.agentId,
+            prompt=messages[-1]["content"] if messages else "",
+            user_id=current_user.id,
+            db=db,
+            system=system_prompt,
+            max_tokens=2000,
+            temperature=0.7
+        )
+
+        return ChatResponse(
+            message=result.content,
+            model_used=result.model_used
+        )
+
+    except Exception as e:
+        raise HTTPValidationError(f"Chat failed: {str(e)}")

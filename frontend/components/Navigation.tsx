@@ -2,9 +2,10 @@ import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useUserStore } from '@/store/user';
 import { useAIAssistantStore } from '@/store/aiAssistant';
+import { useViewModeStore } from '@/store/viewMode';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { TaskCenter } from '@/components/TaskCenter';
-import { Sparkles, ClipboardList } from 'lucide-react';
+import { Sparkles, ClipboardList, MessageSquarePlus, BookOpen } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 export default function Navigation() {
@@ -12,6 +13,7 @@ export default function Navigation() {
   const pathname = usePathname();
   const { user, logout } = useUserStore();
   const { isEnabled: aiAssistantEnabled, toggleEnabled: toggleAIAssistant } = useAIAssistantStore();
+  const { mode: viewMode, setMode: setViewMode } = useViewModeStore();
   const [isTaskCenterOpen, setIsTaskCenterOpen] = useState(false);
   const [hasRunningTasks, setHasRunningTasks] = useState(false);
 
@@ -113,6 +115,37 @@ export default function Navigation() {
                   : 'hover:scale-110'
               }`} />
             </button>
+
+            {/* 仅在 dashboard 页面显示模式切换按钮 */}
+            {pathname === '/dashboard' && (
+              <>
+                {/* 共创模式按钮 */}
+                <button
+                  onClick={() => setViewMode(viewMode === 'co-create' ? 'normal' : 'co-create')}
+                  className={`flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-300 ${
+                    viewMode === 'co-create'
+                      ? 'bg-primary text-primary-foreground shadow-md hover:shadow-lg hover:bg-primary/90 border border-primary'
+                      : 'bg-muted/50 hover:bg-muted border border-border text-muted-foreground hover:text-foreground hover:border-primary/50'
+                  }`}
+                  title="共创模式"
+                >
+                  <MessageSquarePlus className="w-4 h-4" />
+                </button>
+
+                {/* 共读模式按钮 */}
+                <button
+                  onClick={() => setViewMode(viewMode === 'co-read' ? 'normal' : 'co-read')}
+                  className={`flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-300 ${
+                    viewMode === 'co-read'
+                      ? 'bg-primary text-primary-foreground shadow-md hover:shadow-lg hover:bg-primary/90 border border-primary'
+                      : 'bg-muted/50 hover:bg-muted border border-border text-muted-foreground hover:text-foreground hover:border-primary/50'
+                  }`}
+                  title="共读模式"
+                >
+                  <BookOpen className="w-4 h-4" />
+                </button>
+              </>
+            )}
 
             {/* 任务中心按钮 */}
             <button

@@ -161,3 +161,22 @@ class ActionsListResponse(BaseModel):
     """文本操作列表响应"""
     actions: List[ActionInfo]
     total: int = Field(..., description="总数")
+
+
+class ChatMessage(BaseModel):
+    """聊天消息"""
+    role: str = Field(..., description="消息角色: user 或 assistant")
+    content: str = Field(..., description="消息内容")
+
+
+class ChatRequest(BaseModel):
+    """聊天请求"""
+    agentId: str = Field(..., description="Agent ID")
+    messages: List[ChatMessage] = Field(..., description="对话历史")
+    context: Optional[str] = Field(None, description="上下文信息（如当前编辑器内容）")
+
+
+class ChatResponse(BaseModel):
+    """聊天响应"""
+    message: str = Field(..., description="AI 回复内容")
+    model_used: Optional[str] = Field(None, description="使用的模型")

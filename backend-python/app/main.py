@@ -7,7 +7,7 @@ from .database import create_tables
 from .config import settings
 
 # Import routers
-from .api import auth, users, agents, articles, generate, upload, publish, process, proxy, image_upload, sync, import_files, knowledge, muses_config
+from .api import auth, users, agents, articles, generate, upload, publish, process, proxy, image_upload, sync, import_files, knowledge, muses_config, chat_history
 
 
 @asynccontextmanager
@@ -59,6 +59,7 @@ app.include_router(sync.router, prefix="/api/sync", tags=["sync"])
 app.include_router(import_files.router, prefix="/api/import", tags=["import"])
 app.include_router(knowledge.router, tags=["knowledge"])  # prefix已在router中定义
 app.include_router(muses_config.router, prefix="/api", tags=["muses-config"])
+app.include_router(chat_history.router, prefix="/api/chat-history", tags=["chat-history"])
 
 
 @app.get("/")
