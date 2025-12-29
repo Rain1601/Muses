@@ -88,6 +88,25 @@ python3 start.py     # Start FastAPI server
 - Draft/published status tracking
 - Markdown content with metadata
 
+### Collaborative Writing Modes
+- **Co-Create Mode**: Split-screen interface for AI-assisted writing
+  * Left panel: Chat with AI for brainstorming and content generation
+  * Right panel: Notion-style article editor
+  * Text adoption: Select AI responses and add them to the editor
+  * Chat history persistence: Conversations tied to specific articles
+  * Layout swap: Switch left/right panel positions
+
+- **Co-Read Mode**: Split-screen interface for reading and note-taking
+  * Left panel: Article reading view (read-only)
+  * Right panel: Notes editor
+  * Text quoting: Select text from article and add to notes
+  * Layout swap: Switch left/right panel positions
+
+- **View Mode Management**:
+  * Three modes: normal (3-column), co-create, co-read
+  * Zustand-based state management with persistence
+  * Shared article list sidebar across all modes
+
 ### GitHub Integration
 - One-click publishing to GitHub repositories
 - OAuth-based GitHub authentication
@@ -100,6 +119,7 @@ Key entities:
 - **User**: GitHub OAuth users with encrypted API keys
 - **Agent**: Customizable AI writing assistants
 - **Article**: Generated articles with metadata and publishing info
+- **ChatHistory**: AI conversation history tied to articles (for co-create mode)
 - **UserSettings**: User preferences and configuration
 
 All sensitive data (OpenAI API keys, GitHub tokens) is encrypted before storage.
@@ -160,8 +180,11 @@ cd frontend && npx tsc --noEmit
 
 - `/api/auth/github/callback` - GitHub OAuth callback
 - `/api/agents/` - AI agent CRUD operations
+- `/api/agents/chat` - AI chat conversation for co-create mode
 - `/api/agents/text-action` - Text processing actions (improve, expand, summarize, etc.)
 - `/api/articles/` - Article management
+- `/api/chat-history/{article_id}` - Get chat history for an article
+- `/api/chat-history/save` - Save chat history for an article
 - `/api/generate/` - AI article generation
 - `/api/upload/` - File upload processing
 - `/api/image-upload/upload-image` - GitHub image hosting
