@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
@@ -56,6 +56,8 @@ export function ArticleCompactList({ onArticleSelect, selectedArticleId, onImpor
   const [articleToUnpublish, setArticleToUnpublish] = useState<Article | null>(null);
   const [unpublishing, setUnpublishing] = useState(false);
   const { showToast } = useToast();
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const scrollPositionRef = useRef<number>(0);
 
   useEffect(() => {
     fetchArticles();
@@ -64,9 +66,25 @@ export function ArticleCompactList({ onArticleSelect, selectedArticleId, onImpor
   // 当 refreshTrigger 改变时重新获取文章列表
   useEffect(() => {
     if (refreshTrigger !== undefined) {
+      // 保存当前滚动位置
+      if (scrollContainerRef.current) {
+        scrollPositionRef.current = scrollContainerRef.current.scrollTop;
+      }
       fetchArticles();
     }
   }, [refreshTrigger]);
+
+  // 恢复滚动位置
+  useEffect(() => {
+    if (scrollContainerRef.current && scrollPositionRef.current > 0) {
+      // 使用 requestAnimationFrame 确保 DOM 更新完成后再恢复滚动
+      requestAnimationFrame(() => {
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTop = scrollPositionRef.current;
+        }
+      });
+    }
+  }, [articles]);
 
   useEffect(() => {
     if (searchTerm.trim()) {
@@ -362,7 +380,7 @@ export function ArticleCompactList({ onArticleSelect, selectedArticleId, onImpor
       </div>
 
       {/* 文章列表 */}
-      <div className="flex-1 overflow-y-auto">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
         {filteredArticles.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 px-4">
             <div className="text-4xl mb-3">📝</div>
