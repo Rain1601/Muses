@@ -368,7 +368,9 @@ export function NotionEditor({ initialContent = '', onChange, agentId }: NotionE
       const currentLine = state.doc.textBetween($from.start(), $from.pos);
       if (currentLine === '') {
         setTimeout(() => {
-          const coords = view.coordsAtPos($from.pos + 1);
+          // 确保位置不超出文档范围
+          const pos = Math.min($from.pos + 1, view.state.doc.content.size);
+          const coords = view.coordsAtPos(pos);
           const editorContent = view.dom.closest('.notion-editor-content') as HTMLElement;
           const editorContentRect = editorContent?.getBoundingClientRect();
 

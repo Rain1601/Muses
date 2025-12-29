@@ -42,7 +42,7 @@ export default function HomePage() {
           Muses
         </h1>
         <p className="text-xl text-muted-foreground mb-12 leading-relaxed">
-          灵感与智能的完美融合
+          Read to Inspire, Create to Shine
         </p>
         <div className="space-y-6">
           <Button 
