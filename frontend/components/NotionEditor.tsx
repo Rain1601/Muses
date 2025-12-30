@@ -691,6 +691,9 @@ export function NotionEditor({ initialContent = '', onChange, agentId }: NotionE
         },
         // 禁用 CodeBlock，因为我们使用自定义的 CollapsibleCodeBlock
         codeBlock: false,
+        // 禁用 Link 和 Dropcursor，因为我们单独配置它们
+        link: false,
+        dropCursor: false,
       }),
       Highlight,
       CollapsibleCodeBlock,
