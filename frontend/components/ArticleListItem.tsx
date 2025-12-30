@@ -69,6 +69,7 @@ export function ArticleListItem({
 
   return (
     <div
+      data-article-id={article.id}
       className={`
         group relative px-4 py-3 border-b border-border/40 cursor-pointer transition-all duration-200
         ${isSelected

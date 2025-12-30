@@ -59,12 +59,36 @@ function ArticleCompactListComponent({ onArticleSelect, selectedArticleId, onImp
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const scrollPositionRef = useRef<number>(0);
   const isInitialLoadRef = useRef<boolean>(true);
+  const topVisibleArticleIdRef = useRef<string | null>(null); // 保存顶部可见文章ID
+  const topVisibleArticleOffsetRef = useRef<number>(0); // 保存相对偏移量
 
-  // 保存滚动位置的辅助函数
+  // 保存滚动位置的辅助函数 - 基于可见文章ID而不是像素位置
   const saveScrollPosition = () => {
-    if (scrollContainerRef.current) {
-      scrollPositionRef.current = scrollContainerRef.current.scrollTop;
+    if (!scrollContainerRef.current) return;
+
+    const container = scrollContainerRef.current;
+    const containerTop = container.getBoundingClientRect().top;
+
+    // 找到第一个可见的文章元素
+    const articleElements = container.querySelectorAll('[data-article-id]');
+    for (let i = 0; i < articleElements.length; i++) {
+      const element = articleElements[i] as HTMLElement;
+      const rect = element.getBoundingClientRect();
+
+      // 找到第一个在可视区域内的文章
+      if (rect.bottom > containerTop) {
+        topVisibleArticleIdRef.current = element.getAttribute('data-article-id');
+        topVisibleArticleOffsetRef.current = rect.top - containerTop;
+        console.log('💾 Saved scroll anchor:', {
+          articleId: topVisibleArticleIdRef.current,
+          offset: topVisibleArticleOffsetRef.current
+        });
+        return;
+      }
     }
+
+    // 如果没找到，回退到像素位置
+    scrollPositionRef.current = container.scrollTop;
   };
 
   useEffect(() => {
@@ -76,12 +100,20 @@ function ArticleCompactListComponent({ onArticleSelect, selectedArticleId, onImp
     const container = scrollContainerRef.current;
     if (!container) return;
 
+    // 使用节流的方式保存滚动锚点，避免过于频繁
+    let timeoutId: NodeJS.Timeout;
     const handleScroll = () => {
-      scrollPositionRef.current = container.scrollTop;
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        saveScrollPosition();
+      }, 100); // 100ms 节流
     };
 
     container.addEventListener('scroll', handleScroll, { passive: true });
-    return () => container.removeEventListener('scroll', handleScroll);
+    return () => {
+      clearTimeout(timeoutId);
+      container.removeEventListener('scroll', handleScroll);
+    };
   }, []);
 
   // 当 refreshTrigger 改变时重新获取文章列表
@@ -95,18 +127,52 @@ function ArticleCompactListComponent({ onArticleSelect, selectedArticleId, onImp
   // 使用 useLayoutEffect 恢复滚动位置
   // 除了初始加载，其他时候都恢复保存的滚动位置
   useLayoutEffect(() => {
-    if (scrollContainerRef.current) {
-      if (isInitialLoadRef.current) {
-        // 初始加载，不恢复滚动位置
-        isInitialLoadRef.current = false;
-      } else if (scrollPositionRef.current > 0) {
-        // 非初始加载，恢复滚动位置
-        scrollContainerRef.current.scrollTop = scrollPositionRef.current;
+    if (isInitialLoadRef.current) {
+      // 初始加载，不恢复滚动位置
+      console.log('🎯 Initial load - skipping restore');
+      isInitialLoadRef.current = false;
+      return;
+    }
+
+    if (!scrollContainerRef.current) return;
+
+    const container = scrollContainerRef.current;
+
+    // 尝试使用文章ID恢复位置
+    if (topVisibleArticleIdRef.current) {
+      console.log('🔄 Attempting to restore scroll using article ID:', topVisibleArticleIdRef.current);
+
+      const targetElement = container.querySelector(`[data-article-id="${topVisibleArticleIdRef.current}"]`) as HTMLElement;
+
+      if (targetElement) {
+        const containerTop = container.getBoundingClientRect().top;
+        const targetTop = targetElement.getBoundingClientRect().top;
+        const currentOffset = targetTop - containerTop;
+
+        // 计算需要滚动的距离，考虑原始偏移量
+        const scrollAdjustment = currentOffset - topVisibleArticleOffsetRef.current;
+        container.scrollTop += scrollAdjustment;
+
+        console.log('✅ Restored scroll to article:', {
+          articleId: topVisibleArticleIdRef.current,
+          adjustment: scrollAdjustment,
+          newScrollTop: container.scrollTop
+        });
+        return;
+      } else {
+        console.log('⚠️ Target article not found, falling back to pixel position');
       }
+    }
+
+    // 回退到像素位置恢复
+    if (scrollPositionRef.current > 0) {
+      console.log('🔄 Restoring scroll using pixel position:', scrollPositionRef.current);
+      container.scrollTop = scrollPositionRef.current;
     }
   }, [filteredArticles]);
 
   useEffect(() => {
+    console.log('📝 Filter effect running - articles count:', articles.length, 'searchTerm:', searchTerm);
     if (searchTerm.trim()) {
       const filtered = articles.filter(article =>
         article.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -588,11 +654,22 @@ function ArticleCompactListComponent({ onArticleSelect, selectedArticleId, onImp
 
 // 使用 memo 优化，只在 props 真正改变时才重新渲染
 export const ArticleCompactList = memo(ArticleCompactListComponent, (prevProps, nextProps) => {
-  // 返回 true 表示不需要重新渲染，返回 false 表示需要重新渲染
-  return (
+  // 返回 true 表示 props 相同（不重新渲染），返回 false 表示 props 不同（需要重新渲染）
+  const shouldSkipRender = (
     prevProps.selectedArticleId === nextProps.selectedArticleId &&
     prevProps.refreshTrigger === nextProps.refreshTrigger
-    // onArticleSelect 和 onImportClick 是函数，通常会在每次渲染时变化，
-    // 但我们不比较它们，因为它们的功能是相同的
   );
+
+  if (!shouldSkipRender) {
+    console.log('🔄 ArticleCompactList will re-render because:', {
+      selectedArticleIdChanged: prevProps.selectedArticleId !== nextProps.selectedArticleId,
+      refreshTriggerChanged: prevProps.refreshTrigger !== nextProps.refreshTrigger,
+      prevSelectedId: prevProps.selectedArticleId,
+      nextSelectedId: nextProps.selectedArticleId,
+      prevRefreshTrigger: prevProps.refreshTrigger,
+      nextRefreshTrigger: nextProps.refreshTrigger
+    });
+  }
+
+  return shouldSkipRender;
 });
