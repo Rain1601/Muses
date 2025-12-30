@@ -58,7 +58,7 @@ export function ArticleCompactList({ onArticleSelect, selectedArticleId, onImpor
   const { showToast } = useToast();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const scrollPositionRef = useRef<number>(0);
-  const shouldRestoreScrollRef = useRef<boolean>(false);
+  const isInitialLoadRef = useRef<boolean>(true);
 
   // 保存滚动位置的辅助函数
   const saveScrollPosition = () => {
@@ -89,17 +89,22 @@ export function ArticleCompactList({ onArticleSelect, selectedArticleId, onImpor
   useEffect(() => {
     if (refreshTrigger !== undefined) {
       saveScrollPosition();
-      shouldRestoreScrollRef.current = true;
       fetchArticles();
     }
   }, [refreshTrigger]);
 
-  // 使用 useLayoutEffect 同步恢复滚动位置，避免闪烁
+  // 使用 useLayoutEffect 恢复滚动位置
+  // 除了初始加载，其他时候都恢复保存的滚动位置
   useLayoutEffect(() => {
-    if (shouldRestoreScrollRef.current && scrollContainerRef.current) {
-      console.log('🔄 Restoring scroll position to:', scrollPositionRef.current);
-      scrollContainerRef.current.scrollTop = scrollPositionRef.current;
-      shouldRestoreScrollRef.current = false;
+    if (scrollContainerRef.current) {
+      if (isInitialLoadRef.current) {
+        // 初始加载，不恢复滚动位置
+        isInitialLoadRef.current = false;
+      } else if (scrollPositionRef.current > 0) {
+        // 非初始加载，恢复滚动位置
+        console.log('🔄 Restoring scroll position to:', scrollPositionRef.current);
+        scrollContainerRef.current.scrollTop = scrollPositionRef.current;
+      }
     }
   }, [filteredArticles]);
 
@@ -142,9 +147,8 @@ export function ArticleCompactList({ onArticleSelect, selectedArticleId, onImpor
 
     try {
       await api.delete(`/api/articles/${articleToDelete.id}`);
-      // 保存滚动位置并标记需要恢复
+      // 保存滚动位置
       saveScrollPosition();
-      shouldRestoreScrollRef.current = true;
       setArticles(articles.filter(a => a.id !== articleToDelete.id));
       setDeleteDialogOpen(false);
       setArticleToDelete(null);
@@ -246,9 +250,8 @@ export function ArticleCompactList({ onArticleSelect, selectedArticleId, onImpor
               const articleResponse = await api.get(`/api/articles/${articleId}`);
               const translatedArticle = articleResponse.data.article;
 
-              // 保存滚动位置并标记需要恢复
+              // 保存滚动位置
               saveScrollPosition();
-              shouldRestoreScrollRef.current = true;
 
               // 添加到文章列表
               setArticles([translatedArticle, ...articles]);
@@ -300,9 +303,8 @@ export function ArticleCompactList({ onArticleSelect, selectedArticleId, onImpor
 
       showToast('文章已从GitHub下架', 'success');
 
-      // 保存滚动位置并标记需要恢复
+      // 保存滚动位置
       saveScrollPosition();
-      shouldRestoreScrollRef.current = true;
 
       // 刷新文章列表
       fetchArticles();
