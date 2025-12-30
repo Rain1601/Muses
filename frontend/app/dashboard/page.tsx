@@ -57,8 +57,14 @@ function DashboardContent() {
   const [refreshKey, setRefreshKey] = useState(0); // 添加刷新key，用于强制刷新文章列表
   const [recentArticles, setRecentArticles] = useState<Article[]>([]); // 存储最近的文章列表
   const titleInputRef = useRef<HTMLInputElement>(null); // 标题输入框引用
+  const selectedArticleRef = useRef(selectedArticle); // 用于自动保存的引用
   const { showToast, ToastContainer } = useToast();
   const { showNotifications, NotificationContainer } = usePublishNotification();
+
+  // 更新 selectedArticleRef
+  useEffect(() => {
+    selectedArticleRef.current = selectedArticle;
+  }, [selectedArticle]);
 
   // 获取默认agent和最近文章
   useEffect(() => {
@@ -392,12 +398,17 @@ summary: ""
 
   // 每10秒自动保存
   useEffect(() => {
-    // 只在编辑模式（非共创/共读模式）且有已选择的文章时才自动保存
-    if (!isEditing || viewMode !== 'edit' || !selectedArticle) return;
+    // 只在编辑模式（非共创/共读模式）时才设置自动保存
+    if (!isEditing || viewMode !== 'edit') return;
 
-    const interval = setInterval(autoSave, 10000);
+    const interval = setInterval(() => {
+      // 在定时器内检查是否有文章（使用ref避免闭包问题）
+      if (selectedArticleRef.current) {
+        autoSave();
+      }
+    }, 10000);
     return () => clearInterval(interval);
-  }, [autoSave, isEditing, viewMode, selectedArticle]);
+  }, [autoSave, isEditing, viewMode]);
 
   // 监听编辑器滚动，更新当前活跃的标题
   useEffect(() => {
