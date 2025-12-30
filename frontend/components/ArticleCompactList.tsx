@@ -32,13 +32,22 @@ interface Article {
 }
 
 interface ArticleCompactListProps {
+  articles?: Article[]; // 外部传入的文章列表
   onArticleSelect?: (article: Article) => void;
   selectedArticleId?: string;
   onImportClick?: () => void;
+  onArticlesChange?: (articles: Article[]) => void; // 文章列表改变时的回调
   refreshTrigger?: number; // 用于触发列表刷新的标志
 }
 
-function ArticleCompactListComponent({ onArticleSelect, selectedArticleId, onImportClick, refreshTrigger }: ArticleCompactListProps) {
+function ArticleCompactListComponent({
+  articles: externalArticles,
+  onArticleSelect,
+  selectedArticleId,
+  onImportClick,
+  onArticlesChange,
+  refreshTrigger
+}: ArticleCompactListProps) {
   const router = useRouter();
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(false);
@@ -59,40 +68,33 @@ function ArticleCompactListComponent({ onArticleSelect, selectedArticleId, onImp
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const scrollPositionRef = useRef<number>(0);
   const isInitialLoadRef = useRef<boolean>(true);
-  const topVisibleArticleIdRef = useRef<string | null>(null); // 保存顶部可见文章ID
-  const topVisibleArticleOffsetRef = useRef<number>(0); // 保存相对偏移量
 
-  // 保存滚动位置的辅助函数 - 基于可见文章ID而不是像素位置
+  // 保存滚动位置的辅助函数
   const saveScrollPosition = () => {
-    if (!scrollContainerRef.current) return;
-
-    const container = scrollContainerRef.current;
-    const containerTop = container.getBoundingClientRect().top;
-
-    // 找到第一个可见的文章元素
-    const articleElements = container.querySelectorAll('[data-article-id]');
-    for (let i = 0; i < articleElements.length; i++) {
-      const element = articleElements[i] as HTMLElement;
-      const rect = element.getBoundingClientRect();
-
-      // 找到第一个在可视区域内的文章
-      if (rect.bottom > containerTop) {
-        topVisibleArticleIdRef.current = element.getAttribute('data-article-id');
-        topVisibleArticleOffsetRef.current = rect.top - containerTop;
-        console.log('💾 Saved scroll anchor:', {
-          articleId: topVisibleArticleIdRef.current,
-          offset: topVisibleArticleOffsetRef.current
-        });
-        return;
-      }
+    if (scrollContainerRef.current) {
+      scrollPositionRef.current = scrollContainerRef.current.scrollTop;
     }
-
-    // 如果没找到，回退到像素位置
-    scrollPositionRef.current = container.scrollTop;
   };
 
+  // 辅助函数：更新文章列表
+  const updateArticles = useCallback((newArticles: Article[]) => {
+    setArticles(newArticles);
+    onArticlesChange?.(newArticles);
+  }, [onArticlesChange]);
+
+  // 同步外部文章列表
   useEffect(() => {
-    fetchArticles();
+    if (externalArticles) {
+      setArticles(externalArticles);
+    } else {
+      fetchArticles();
+    }
+  }, [externalArticles]);
+
+  useEffect(() => {
+    if (!externalArticles) {
+      fetchArticles();
+    }
   }, []);
 
   // 监听滚动容器的滚动事件，持续保存滚动位置
@@ -100,20 +102,12 @@ function ArticleCompactListComponent({ onArticleSelect, selectedArticleId, onImp
     const container = scrollContainerRef.current;
     if (!container) return;
 
-    // 使用节流的方式保存滚动锚点，避免过于频繁
-    let timeoutId: NodeJS.Timeout;
     const handleScroll = () => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        saveScrollPosition();
-      }, 100); // 100ms 节流
+      scrollPositionRef.current = container.scrollTop;
     };
 
     container.addEventListener('scroll', handleScroll, { passive: true });
-    return () => {
-      clearTimeout(timeoutId);
-      container.removeEventListener('scroll', handleScroll);
-    };
+    return () => container.removeEventListener('scroll', handleScroll);
   }, []);
 
   // 当 refreshTrigger 改变时重新获取文章列表
@@ -129,45 +123,12 @@ function ArticleCompactListComponent({ onArticleSelect, selectedArticleId, onImp
   useLayoutEffect(() => {
     if (isInitialLoadRef.current) {
       // 初始加载，不恢复滚动位置
-      console.log('🎯 Initial load - skipping restore');
       isInitialLoadRef.current = false;
       return;
     }
 
-    if (!scrollContainerRef.current) return;
-
-    const container = scrollContainerRef.current;
-
-    // 尝试使用文章ID恢复位置
-    if (topVisibleArticleIdRef.current) {
-      console.log('🔄 Attempting to restore scroll using article ID:', topVisibleArticleIdRef.current);
-
-      const targetElement = container.querySelector(`[data-article-id="${topVisibleArticleIdRef.current}"]`) as HTMLElement;
-
-      if (targetElement) {
-        const containerTop = container.getBoundingClientRect().top;
-        const targetTop = targetElement.getBoundingClientRect().top;
-        const currentOffset = targetTop - containerTop;
-
-        // 计算需要滚动的距离，考虑原始偏移量
-        const scrollAdjustment = currentOffset - topVisibleArticleOffsetRef.current;
-        container.scrollTop += scrollAdjustment;
-
-        console.log('✅ Restored scroll to article:', {
-          articleId: topVisibleArticleIdRef.current,
-          adjustment: scrollAdjustment,
-          newScrollTop: container.scrollTop
-        });
-        return;
-      } else {
-        console.log('⚠️ Target article not found, falling back to pixel position');
-      }
-    }
-
-    // 回退到像素位置恢复
-    if (scrollPositionRef.current > 0) {
-      console.log('🔄 Restoring scroll using pixel position:', scrollPositionRef.current);
-      container.scrollTop = scrollPositionRef.current;
+    if (scrollContainerRef.current && scrollPositionRef.current > 0) {
+      scrollContainerRef.current.scrollTop = scrollPositionRef.current;
     }
   }, [filteredArticles]);
 
@@ -189,7 +150,7 @@ function ArticleCompactListComponent({ onArticleSelect, selectedArticleId, onImp
       const response = await api.get("/api/articles", {
         params: { page: 1, limit: 50 }
       });
-      setArticles(response.data.articles || []);
+      updateArticles(response.data.articles || []);
     } catch (error) {
       console.error("Failed to fetch articles:", error);
     } finally {
@@ -213,7 +174,7 @@ function ArticleCompactListComponent({ onArticleSelect, selectedArticleId, onImp
       await api.delete(`/api/articles/${articleToDelete.id}`);
       // 保存滚动位置
       saveScrollPosition();
-      setArticles(articles.filter(a => a.id !== articleToDelete.id));
+      updateArticles(articles.filter(a => a.id !== articleToDelete.id));
       setDeleteDialogOpen(false);
       setArticleToDelete(null);
     } catch (error: any) {
@@ -318,7 +279,7 @@ function ArticleCompactListComponent({ onArticleSelect, selectedArticleId, onImp
               saveScrollPosition();
 
               // 添加到文章列表
-              setArticles([translatedArticle, ...articles]);
+              updateArticles([translatedArticle, ...articles]);
 
               // 显示成功通知
               showToast('翻译完成！已创建新文章', 'success');
@@ -440,7 +401,7 @@ function ArticleCompactListComponent({ onArticleSelect, selectedArticleId, onImp
                   const newArticle = response.data.article || response.data;
 
                   // 添加到文章列表并选中
-                  setArticles([newArticle, ...articles]);
+                  updateArticles([newArticle, ...articles]);
                   onArticleSelect?.(newArticle);
 
                   showToast('新文章已创建', 'success');
@@ -657,13 +618,15 @@ export const ArticleCompactList = memo(ArticleCompactListComponent, (prevProps, 
   // 返回 true 表示 props 相同（不重新渲染），返回 false 表示 props 不同（需要重新渲染）
   const shouldSkipRender = (
     prevProps.selectedArticleId === nextProps.selectedArticleId &&
-    prevProps.refreshTrigger === nextProps.refreshTrigger
+    prevProps.refreshTrigger === nextProps.refreshTrigger &&
+    prevProps.articles === nextProps.articles // 使用引用相等性检查
   );
 
   if (!shouldSkipRender) {
     console.log('🔄 ArticleCompactList will re-render because:', {
       selectedArticleIdChanged: prevProps.selectedArticleId !== nextProps.selectedArticleId,
       refreshTriggerChanged: prevProps.refreshTrigger !== nextProps.refreshTrigger,
+      articlesChanged: prevProps.articles !== nextProps.articles,
       prevSelectedId: prevProps.selectedArticleId,
       nextSelectedId: nextProps.selectedArticleId,
       prevRefreshTrigger: prevProps.refreshTrigger,

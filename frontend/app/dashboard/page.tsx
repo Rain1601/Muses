@@ -55,6 +55,7 @@ function DashboardContent() {
   const [defaultAgent, setDefaultAgent] = useState<any>(null);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0); // 添加刷新key，用于强制刷新文章列表
+  const [articles, setArticles] = useState<Article[]>([]); // 文章列表（统一管理）
   const [recentArticles, setRecentArticles] = useState<Article[]>([]); // 存储最近的文章列表
   const titleInputRef = useRef<HTMLInputElement>(null); // 标题输入框引用
   const { showToast, ToastContainer } = useToast();
@@ -70,11 +71,13 @@ function DashboardContent() {
         const defaultAgentFound = agents.find((a: any) => a.isDefault) || agents[0];
         setDefaultAgent(defaultAgentFound);
 
-        // 获取最近的文章列表
+        // 获取文章列表
         const articlesResponse = await api.get('/api/articles', {
-          params: { page: 1, page_size: 10, sort_by: 'updatedAt', sort_order: 'desc' }
+          params: { page: 1, limit: 50 }
         });
-        setRecentArticles(articlesResponse.data.articles || []);
+        const fetchedArticles = articlesResponse.data.articles || [];
+        setArticles(fetchedArticles);
+        setRecentArticles(fetchedArticles.slice(0, 10));
       } catch (error) {
         console.error('Failed to fetch initial data:', error);
       }
@@ -107,6 +110,18 @@ function DashboardContent() {
           content: editingContent,
           publishStatus: selectedArticle.publishStatus
         });
+
+        // 本地更新文章数据，不改变列表顺序
+        setArticles(prevArticles =>
+          prevArticles.map(article =>
+            article.id === selectedArticle.id
+              ? { ...article, title: editingTitle || '无标题', content: editingContent }
+              : article
+          )
+        );
+
+        // 更新 selectedArticle
+        setSelectedArticle(prev => prev ? { ...prev, title: editingTitle || '无标题', content: editingContent } : null);
       } else {
         // 创建新文章
         if (!defaultAgent?.id) {
@@ -120,7 +135,11 @@ function DashboardContent() {
           publishStatus: 'draft',
           agentId: defaultAgent.id
         });
-        setSelectedArticle(response.data.article || response.data);
+        const newArticle = response.data.article || response.data;
+        setSelectedArticle(newArticle);
+
+        // 添加到文章列表
+        setArticles(prevArticles => [newArticle, ...prevArticles]);
       }
       setLastSaved(new Date());
     } catch (error) {
@@ -615,9 +634,11 @@ summary: ""
           leftPanelCollapsed ? 'w-0 opacity-0 overflow-hidden' : 'w-80 opacity-100'
         }`}>
           <ArticleCompactList
+            articles={articles}
             onArticleSelect={handleArticleSelect}
             selectedArticleId={selectedArticle?.id}
             onImportClick={handleImportClick}
+            onArticlesChange={setArticles}
             refreshTrigger={refreshKey}
           />
         </aside>
