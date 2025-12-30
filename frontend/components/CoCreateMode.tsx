@@ -31,6 +31,7 @@ export function CoCreateMode({
   const [isLoading, setIsLoading] = useState(false);
   const [editorContent, setEditorContent] = useState(initialContent);
   const [selectedText, setSelectedText] = useState<{ text: string; messageId: string } | null>(null);
+  const [selectionPosition, setSelectionPosition] = useState<{ x: number; y: number } | null>(null);
   const [isSwapped, setIsSwapped] = useState(false); // 是否交换左右位置
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -148,10 +149,21 @@ export function CoCreateMode({
     const selection = window.getSelection();
     const text = selection?.toString().trim();
 
-    if (text && text.length > 0) {
+    if (text && text.length > 0 && selection && selection.rangeCount > 0) {
       setSelectedText({ text, messageId });
+
+      // 获取选中文本的位置
+      const range = selection.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+
+      // 将按钮放在选中文本上方
+      setSelectionPosition({
+        x: rect.left + rect.width / 2,
+        y: rect.top - 10 // 在选中文本上方10px
+      });
     } else {
       setSelectedText(null);
+      setSelectionPosition(null);
     }
   };
 
@@ -171,6 +183,7 @@ export function CoCreateMode({
 
     showToast('文本已采纳到编辑器', 'success');
     setSelectedText(null);
+    setSelectionPosition(null);
 
     // 清除选择
     window.getSelection()?.removeAllRanges();
@@ -260,19 +273,6 @@ export function CoCreateMode({
           )}
         </div>
 
-        {/* 采纳按钮（浮动显示） */}
-        {selectedText && (
-          <div className="absolute bottom-28 left-1/2 transform -translate-x-1/2 z-10">
-            <button
-              onClick={handleAdoptText}
-              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg shadow-lg hover:bg-primary/90 transition-all duration-200 animate-in fade-in slide-in-from-bottom-2"
-            >
-              <Check className="w-4 h-4" />
-              <span className="text-sm font-medium">采纳到编辑器</span>
-            </button>
-          </div>
-        )}
-
         {/* 输入区域 */}
         <div className="border-t border-border p-4 bg-background">
           <div className="flex items-end gap-2">
@@ -332,6 +332,26 @@ export function CoCreateMode({
           <ChatSection />
           <EditorSection />
         </>
+      )}
+
+      {/* 文本采纳按钮（跟随选中文本显示） */}
+      {selectedText && selectionPosition && (
+        <div
+          className="fixed z-30 animate-in fade-in slide-in-from-top-2 duration-200"
+          style={{
+            left: `${selectionPosition.x}px`,
+            top: `${selectionPosition.y}px`,
+            transform: 'translate(-50%, -100%)'
+          }}
+        >
+          <button
+            onClick={handleAdoptText}
+            className="flex items-center gap-2 px-3 py-1.5 bg-primary text-primary-foreground rounded-md shadow-lg hover:bg-primary/90 transition-all duration-200 text-sm font-medium whitespace-nowrap"
+          >
+            <Check className="w-3.5 h-3.5" />
+            采纳到编辑器
+          </button>
+        </div>
       )}
 
       {/* 切换左右位置的按钮 */}
