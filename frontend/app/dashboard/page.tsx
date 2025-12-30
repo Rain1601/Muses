@@ -531,7 +531,7 @@ summary: ""
   };
 
   // 当选择文章时，直接进入编辑模式并加载内容
-  const handleArticleSelect = async (article: Article) => {
+  const handleArticleSelect = useCallback(async (article: Article) => {
     // 如果当前有正在编辑的文章，先保存
     if (selectedArticle && (editingTitle !== selectedArticle.title || editingContent !== selectedArticle.content)) {
       try {
@@ -552,7 +552,7 @@ summary: ""
     setEditingContent(article.content);
     // 更新页面标题
     document.title = article.title || '无标题 - Muses';
-  };
+  }, [selectedArticle, editingTitle, editingContent, handleSaveArticle, showToast]);
 
   // 自动聚焦标题输入框
   useEffect(() => {

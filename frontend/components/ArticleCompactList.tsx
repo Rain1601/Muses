@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useLayoutEffect } from "react";
+import { useState, useEffect, useRef, useLayoutEffect, memo } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
@@ -38,7 +38,7 @@ interface ArticleCompactListProps {
   refreshTrigger?: number; // 用于触发列表刷新的标志
 }
 
-export function ArticleCompactList({ onArticleSelect, selectedArticleId, onImportClick, refreshTrigger }: ArticleCompactListProps) {
+function ArticleCompactListComponent({ onArticleSelect, selectedArticleId, onImportClick, refreshTrigger }: ArticleCompactListProps) {
   const router = useRouter();
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(false);
@@ -59,22 +59,11 @@ export function ArticleCompactList({ onArticleSelect, selectedArticleId, onImpor
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const scrollPositionRef = useRef<number>(0);
   const isInitialLoadRef = useRef<boolean>(true);
-  const mountCountRef = useRef<number>(0);
-
-  // 追踪组件挂载
-  useEffect(() => {
-    mountCountRef.current += 1;
-    console.log(`🔵 ArticleCompactList mounted (count: ${mountCountRef.current})`);
-    return () => {
-      console.log(`🔴 ArticleCompactList unmounted (count: ${mountCountRef.current})`);
-    };
-  }, []);
 
   // 保存滚动位置的辅助函数
   const saveScrollPosition = () => {
     if (scrollContainerRef.current) {
       scrollPositionRef.current = scrollContainerRef.current.scrollTop;
-      console.log('💾 Saved scroll position:', scrollPositionRef.current);
     }
   };
 
@@ -97,7 +86,6 @@ export function ArticleCompactList({ onArticleSelect, selectedArticleId, onImpor
 
   // 当 refreshTrigger 改变时重新获取文章列表
   useEffect(() => {
-    console.log(`🔄 refreshTrigger changed to: ${refreshTrigger}`);
     if (refreshTrigger !== undefined) {
       saveScrollPosition();
       fetchArticles();
@@ -107,48 +95,34 @@ export function ArticleCompactList({ onArticleSelect, selectedArticleId, onImpor
   // 使用 useLayoutEffect 恢复滚动位置
   // 除了初始加载，其他时候都恢复保存的滚动位置
   useLayoutEffect(() => {
-    console.log(`📍 useLayoutEffect triggered - filteredArticles: ${filteredArticles.length}, isInitial: ${isInitialLoadRef.current}, savedPosition: ${scrollPositionRef.current}`);
     if (scrollContainerRef.current) {
-      console.log(`📍 Scroll container exists, current scrollTop: ${scrollContainerRef.current.scrollTop}`);
       if (isInitialLoadRef.current) {
         // 初始加载，不恢复滚动位置
-        console.log('📍 Initial load - NOT restoring scroll position');
         isInitialLoadRef.current = false;
       } else if (scrollPositionRef.current > 0) {
         // 非初始加载，恢复滚动位置
-        console.log('🔄 Restoring scroll position to:', scrollPositionRef.current);
         scrollContainerRef.current.scrollTop = scrollPositionRef.current;
-        console.log(`🔄 After restore, scrollTop is: ${scrollContainerRef.current.scrollTop}`);
-      } else {
-        console.log('📍 Saved position is 0, not restoring');
       }
-    } else {
-      console.log('⚠️ Scroll container ref is null!');
     }
   }, [filteredArticles]);
 
   useEffect(() => {
-    console.log(`🔍 Filter effect triggered - articles: ${articles.length}, searchTerm: "${searchTerm}"`);
     if (searchTerm.trim()) {
       const filtered = articles.filter(article =>
         article.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         article.content.toLowerCase().includes(searchTerm.toLowerCase())
       );
-      console.log(`🔍 Setting filtered articles: ${filtered.length} (filtered)`);
       setFilteredArticles(filtered);
     } else {
-      console.log(`🔍 Setting filtered articles: ${articles.length} (all)`);
       setFilteredArticles(articles);
     }
   }, [articles, searchTerm]);
 
   const fetchArticles = async () => {
-    console.log('📡 fetchArticles called');
     try {
       const response = await api.get("/api/articles", {
         params: { page: 1, limit: 50 }
       });
-      console.log(`📡 fetchArticles received ${response.data.articles?.length || 0} articles`);
       setArticles(response.data.articles || []);
     } catch (error) {
       console.error("Failed to fetch articles:", error);
@@ -611,3 +585,14 @@ export function ArticleCompactList({ onArticleSelect, selectedArticleId, onImpor
     </div>
   );
 }
+
+// 使用 memo 优化，只在 props 真正改变时才重新渲染
+export const ArticleCompactList = memo(ArticleCompactListComponent, (prevProps, nextProps) => {
+  // 返回 true 表示不需要重新渲染，返回 false 表示需要重新渲染
+  return (
+    prevProps.selectedArticleId === nextProps.selectedArticleId &&
+    prevProps.refreshTrigger === nextProps.refreshTrigger
+    // onArticleSelect 和 onImportClick 是函数，通常会在每次渲染时变化，
+    // 但我们不比较它们，因为它们的功能是相同的
+  );
+});

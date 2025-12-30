@@ -1,0 +1,13 @@
+"""
+配置模块
+"""
+# 导入原有的settings配置
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from app.config import Settings, settings
+
+# 导入新的调试配置
+from .debug_config import debug_config, DebugConfig
+
+__all__ = ['settings', 'Settings', 'debug_config', 'DebugConfig']
