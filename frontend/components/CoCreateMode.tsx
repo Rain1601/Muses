@@ -36,14 +36,19 @@ export function CoCreateMode({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const { showToast } = useToast();
+  const shouldAutoScrollRef = useRef<boolean>(false); // 是否应该自动滚动
 
   // 自动滚动到最新消息
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // 只在需要时才自动滚动（发送新消息时）
   useEffect(() => {
-    scrollToBottom();
+    if (shouldAutoScrollRef.current) {
+      scrollToBottom();
+      shouldAutoScrollRef.current = false;
+    }
   }, [messages]);
 
   // 加载对话历史
@@ -110,6 +115,8 @@ export function CoCreateMode({
       timestamp: new Date()
     };
 
+    // 标记需要自动滚动（因为是发送新消息）
+    shouldAutoScrollRef.current = true;
     setMessages(prev => [...prev, userMessage]);
     setInputValue('');
     setIsLoading(true);
@@ -132,6 +139,8 @@ export function CoCreateMode({
         timestamp: new Date()
       };
 
+      // 标记需要自动滚动（因为收到新回复）
+      shouldAutoScrollRef.current = true;
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error: any) {
       console.error('AI 回复失败:', error);
