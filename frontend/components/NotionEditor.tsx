@@ -15,7 +15,7 @@ import CollapsibleCodeBlock from '@/lib/tiptap-extensions/CollapsibleCodeBlock';
 import ResizableImage from '@/lib/tiptap-extensions/ResizableImage';
 import BilibiliVideo from '@/lib/tiptap-extensions/BilibiliVideo';
 import Youtube from '@tiptap/extension-youtube';
-import Dropcursor from '@tiptap/extension-dropcursor';
+// Dropcursor 已包含在 StarterKit 中，无需单独导入
 import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
 import { TableHeader } from '@tiptap/extension-table-header';
@@ -691,9 +691,8 @@ export function NotionEditor({ initialContent = '', onChange, agentId }: NotionE
         },
         // 禁用 CodeBlock，因为我们使用自定义的 CollapsibleCodeBlock
         codeBlock: false,
-        // 禁用 Link 和 Dropcursor，因为我们单独配置它们
+        // 禁用 Link，因为我们单独配置它
         link: false,
-        dropCursor: false,
       }),
       Highlight,
       CollapsibleCodeBlock,
@@ -714,7 +713,6 @@ export function NotionEditor({ initialContent = '', onChange, agentId }: NotionE
         height: 480,
         allowFullscreen: true,
       }),
-      Dropcursor,
       Table.configure({
         resizable: true,
       }),
