@@ -12,23 +12,38 @@ export default function Navigation() {
   const router = useRouter();
   const pathname = usePathname();
   const { user, logout } = useUserStore();
-  const { isEnabled: aiAssistantEnabled, toggleEnabled: toggleAIAssistant } = useAIAssistantStore();
+  const { isEnabled: aiAssistantEnabled, toggleEnabled: toggleAIAssistant, setEnabled: setAIAssistantEnabled } = useAIAssistantStore();
   const { mode: viewMode, setMode: setViewMode } = useViewModeStore();
   const [isTaskCenterOpen, setIsTaskCenterOpen] = useState(false);
   const [hasRunningTasks, setHasRunningTasks] = useState(false);
+
+  // 检查是否在共读/共创模式
+  const isCollaborativeMode = viewMode === 'co-create' || viewMode === 'co-read';
+  // AI辅助在共读/共创模式下不可用
+  const isAIAssistantDisabled = isCollaborativeMode;
+
+  // 当进入共读/共创模式时，自动禁用AI助手
+  useEffect(() => {
+    if (isCollaborativeMode && aiAssistantEnabled) {
+      setAIAssistantEnabled(false);
+    }
+  }, [isCollaborativeMode, aiAssistantEnabled, setAIAssistantEnabled]);
 
   // 添加 Cmd+O 快捷键支持
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key === 'o') {
         event.preventDefault();
-        toggleAIAssistant();
+        // 在共读/共创模式下禁用快捷键
+        if (!isAIAssistantDisabled) {
+          toggleAIAssistant();
+        }
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [toggleAIAssistant]);
+  }, [toggleAIAssistant, isAIAssistantDisabled]);
 
   // 检查是否有运行中的任务
   useEffect(() => {
@@ -101,16 +116,31 @@ export default function Navigation() {
           
           <div className="flex items-center space-x-4">
             <button
-              onClick={toggleAIAssistant}
+              onClick={() => {
+                if (!isAIAssistantDisabled) {
+                  toggleAIAssistant();
+                }
+              }}
+              disabled={isAIAssistantDisabled}
               className={`flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-300 ${
-                aiAssistantEnabled
+                isAIAssistantDisabled
+                  ? 'bg-muted/30 border border-border text-muted-foreground/40 cursor-not-allowed'
+                  : aiAssistantEnabled
                   ? 'bg-primary text-primary-foreground shadow-md hover:shadow-lg hover:bg-primary/90 border border-primary'
                   : 'bg-muted/50 hover:bg-muted border border-border text-muted-foreground hover:text-foreground hover:border-primary/50'
               }`}
-              title={aiAssistantEnabled ? 'AI辅助：开启 (Cmd+O 切换)' : 'AI辅助：关闭 (Cmd+O 开启)'}
+              title={
+                isAIAssistantDisabled
+                  ? 'AI辅助在共读/共创模式下不可用'
+                  : aiAssistantEnabled
+                  ? 'AI辅助：开启 (Cmd+O 切换)'
+                  : 'AI辅助：关闭 (Cmd+O 开启)'
+              }
             >
               <Sparkles className={`w-4 h-4 transition-all duration-300 ${
-                aiAssistantEnabled
+                isAIAssistantDisabled
+                  ? 'opacity-40'
+                  : aiAssistantEnabled
                   ? ''
                   : 'hover:scale-110'
               }`} />
