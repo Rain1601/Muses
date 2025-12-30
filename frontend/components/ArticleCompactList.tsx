@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useLayoutEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
@@ -58,33 +58,50 @@ export function ArticleCompactList({ onArticleSelect, selectedArticleId, onImpor
   const { showToast } = useToast();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const scrollPositionRef = useRef<number>(0);
+  const shouldRestoreScrollRef = useRef<boolean>(false);
+
+  // 保存滚动位置的辅助函数
+  const saveScrollPosition = () => {
+    if (scrollContainerRef.current) {
+      scrollPositionRef.current = scrollContainerRef.current.scrollTop;
+      console.log('💾 Saved scroll position:', scrollPositionRef.current);
+    }
+  };
 
   useEffect(() => {
     fetchArticles();
   }, []);
 
+  // 监听滚动容器的滚动事件，持续保存滚动位置
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      scrollPositionRef.current = container.scrollTop;
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, []);
+
   // 当 refreshTrigger 改变时重新获取文章列表
   useEffect(() => {
     if (refreshTrigger !== undefined) {
-      // 保存当前滚动位置
-      if (scrollContainerRef.current) {
-        scrollPositionRef.current = scrollContainerRef.current.scrollTop;
-      }
+      saveScrollPosition();
+      shouldRestoreScrollRef.current = true;
       fetchArticles();
     }
   }, [refreshTrigger]);
 
-  // 恢复滚动位置
-  useEffect(() => {
-    if (scrollContainerRef.current && scrollPositionRef.current > 0) {
-      // 使用 requestAnimationFrame 确保 DOM 更新完成后再恢复滚动
-      requestAnimationFrame(() => {
-        if (scrollContainerRef.current) {
-          scrollContainerRef.current.scrollTop = scrollPositionRef.current;
-        }
-      });
+  // 使用 useLayoutEffect 同步恢复滚动位置，避免闪烁
+  useLayoutEffect(() => {
+    if (shouldRestoreScrollRef.current && scrollContainerRef.current) {
+      console.log('🔄 Restoring scroll position to:', scrollPositionRef.current);
+      scrollContainerRef.current.scrollTop = scrollPositionRef.current;
+      shouldRestoreScrollRef.current = false;
     }
-  }, [articles]);
+  }, [filteredArticles]);
 
   useEffect(() => {
     if (searchTerm.trim()) {
@@ -125,6 +142,9 @@ export function ArticleCompactList({ onArticleSelect, selectedArticleId, onImpor
 
     try {
       await api.delete(`/api/articles/${articleToDelete.id}`);
+      // 保存滚动位置并标记需要恢复
+      saveScrollPosition();
+      shouldRestoreScrollRef.current = true;
       setArticles(articles.filter(a => a.id !== articleToDelete.id));
       setDeleteDialogOpen(false);
       setArticleToDelete(null);
@@ -226,6 +246,10 @@ export function ArticleCompactList({ onArticleSelect, selectedArticleId, onImpor
               const articleResponse = await api.get(`/api/articles/${articleId}`);
               const translatedArticle = articleResponse.data.article;
 
+              // 保存滚动位置并标记需要恢复
+              saveScrollPosition();
+              shouldRestoreScrollRef.current = true;
+
               // 添加到文章列表
               setArticles([translatedArticle, ...articles]);
 
@@ -275,6 +299,10 @@ export function ArticleCompactList({ onArticleSelect, selectedArticleId, onImpor
       await api.delete(`/api/publish/github/${articleToUnpublish.id}`);
 
       showToast('文章已从GitHub下架', 'success');
+
+      // 保存滚动位置并标记需要恢复
+      saveScrollPosition();
+      shouldRestoreScrollRef.current = true;
 
       // 刷新文章列表
       fetchArticles();
