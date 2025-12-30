@@ -554,6 +554,11 @@ summary: ""
     document.title = article.title || '无标题 - Muses';
   }, [selectedArticle, editingTitle, editingContent, handleSaveArticle, showToast]);
 
+  // 处理导入对话框打开
+  const handleImportClick = useCallback(() => {
+    setShowImportDialog(true);
+  }, []);
+
   // 自动聚焦标题输入框
   useEffect(() => {
     if (isEditing && titleInputRef.current) {
@@ -612,7 +617,7 @@ summary: ""
           <ArticleCompactList
             onArticleSelect={handleArticleSelect}
             selectedArticleId={selectedArticle?.id}
-            onImportClick={() => setShowImportDialog(true)}
+            onImportClick={handleImportClick}
             refreshTrigger={refreshKey}
           />
         </aside>
