@@ -82,10 +82,19 @@ function ArticleCompactListComponent({
     onArticlesChange?.(newArticles);
   }, [onArticlesChange]);
 
-  // 同步外部文章列表
+  // 同步外部文章列表 - 只在真正变化时更新
   useEffect(() => {
+    console.log('🔄 externalArticles effect triggered', {
+      hasExternal: !!externalArticles,
+      externalLength: externalArticles?.length,
+      currentLength: articles.length
+    });
+
     if (externalArticles) {
-      setArticles(externalArticles);
+      // 只在内容真正变化时更新
+      if (externalArticles !== articles) {
+        setArticles(externalArticles);
+      }
     } else {
       fetchArticles();
     }
@@ -113,36 +122,38 @@ function ArticleCompactListComponent({
   // 当 refreshTrigger 改变时重新获取文章列表
   useEffect(() => {
     if (refreshTrigger !== undefined) {
-      saveScrollPosition();
       fetchArticles();
     }
   }, [refreshTrigger]);
 
-  // 使用 useLayoutEffect 恢复滚动位置
-  // 除了初始加载，其他时候都恢复保存的滚动位置
-  useLayoutEffect(() => {
-    if (isInitialLoadRef.current) {
-      // 初始加载，不恢复滚动位置
-      isInitialLoadRef.current = false;
-      return;
-    }
-
-    if (scrollContainerRef.current && scrollPositionRef.current > 0) {
-      scrollContainerRef.current.scrollTop = scrollPositionRef.current;
-    }
-  }, [filteredArticles]);
+  // 移除基于 filteredArticles 的滚动恢复
+  // 滚动位置应该由用户控制，不应该自动恢复
 
   useEffect(() => {
     console.log('📝 Filter effect running - articles count:', articles.length, 'searchTerm:', searchTerm);
-    if (searchTerm.trim()) {
-      const filtered = articles.filter(article =>
-        article.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        article.content.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      setFilteredArticles(filtered);
-    } else {
-      setFilteredArticles(articles);
-    }
+
+    setFilteredArticles(prevFiltered => {
+      if (searchTerm.trim()) {
+        const filtered = articles.filter(article =>
+          article.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          article.content.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+        // 只在结果真正改变时更新
+        if (prevFiltered.length === filtered.length &&
+            prevFiltered.every((item, index) => item.id === filtered[index]?.id)) {
+          console.log('📝 Filter result unchanged, skipping update');
+          return prevFiltered;
+        }
+        return filtered;
+      } else {
+        // 如果没有搜索词，直接使用 articles
+        if (prevFiltered === articles) {
+          console.log('📝 Already using articles array, skipping update');
+          return prevFiltered;
+        }
+        return articles;
+      }
+    });
   }, [articles, searchTerm]);
 
   const fetchArticles = async () => {
@@ -435,7 +446,18 @@ function ArticleCompactListComponent({
       </div>
 
       {/* 文章列表 */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
+      <div
+        ref={(el) => {
+          if (el && scrollContainerRef.current !== el) {
+            console.log('📦 ScrollContainer ref changed', {
+              oldRef: scrollContainerRef.current,
+              newRef: el,
+              scrollTop: el?.scrollTop
+            });
+          }
+          scrollContainerRef.current = el;
+        }}
+        className="flex-1 overflow-y-auto">
         {filteredArticles.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 px-4">
             <div className="text-4xl mb-3">📝</div>
@@ -619,7 +641,10 @@ export const ArticleCompactList = memo(ArticleCompactListComponent, (prevProps, 
   const shouldSkipRender = (
     prevProps.selectedArticleId === nextProps.selectedArticleId &&
     prevProps.refreshTrigger === nextProps.refreshTrigger &&
-    prevProps.articles === nextProps.articles // 使用引用相等性检查
+    prevProps.articles === nextProps.articles && // 使用引用相等性检查
+    prevProps.onArticleSelect === nextProps.onArticleSelect &&
+    prevProps.onImportClick === nextProps.onImportClick &&
+    prevProps.onArticlesChange === nextProps.onArticlesChange
   );
 
   if (!shouldSkipRender) {
@@ -627,11 +652,16 @@ export const ArticleCompactList = memo(ArticleCompactListComponent, (prevProps, 
       selectedArticleIdChanged: prevProps.selectedArticleId !== nextProps.selectedArticleId,
       refreshTriggerChanged: prevProps.refreshTrigger !== nextProps.refreshTrigger,
       articlesChanged: prevProps.articles !== nextProps.articles,
+      onArticleSelectChanged: prevProps.onArticleSelect !== nextProps.onArticleSelect,
+      onImportClickChanged: prevProps.onImportClick !== nextProps.onImportClick,
+      onArticlesChangeChanged: prevProps.onArticlesChange !== nextProps.onArticlesChange,
       prevSelectedId: prevProps.selectedArticleId,
       nextSelectedId: nextProps.selectedArticleId,
       prevRefreshTrigger: prevProps.refreshTrigger,
       nextRefreshTrigger: nextProps.refreshTrigger
     });
+  } else {
+    console.log('✅ ArticleCompactList memo prevented re-render');
   }
 
   return shouldSkipRender;
