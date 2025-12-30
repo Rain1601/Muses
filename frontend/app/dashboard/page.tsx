@@ -97,46 +97,35 @@ function DashboardContent() {
 
   // 自动保存功能 - 静默保存，不更新任何UI
   const autoSave = useCallback(async () => {
+    // 只在编辑模式下自动保存，避免在共创模式创建新文章
     if (!editingContent.trim() && !editingTitle.trim()) return;
+    if (viewMode !== 'edit') return;
+    if (!selectedArticle) return; // 没有选中文章时不自动保存
 
     try {
-      if (selectedArticle) {
-        // 静默保存到后端
-        await api.put(`/api/articles/${selectedArticle.id}`, {
-          title: editingTitle || '无标题',
-          content: editingContent,
-          publishStatus: selectedArticle.publishStatus
-        });
+      // 静默保存到后端
+      await api.put(`/api/articles/${selectedArticle.id}`, {
+        title: editingTitle || '无标题',
+        content: editingContent,
+        publishStatus: selectedArticle.publishStatus
+      });
 
-        // 仅更新保存时间显示
-        setLastSaved(new Date());
-      } else {
-        // 如果是新文章，创建后更新selectedArticle
-        if (!defaultAgent?.id) {
-          console.error('没有找到默认agent');
-          return;
-        }
-        const response = await api.post('/api/articles', {
-          title: editingTitle || '无标题',
-          content: editingContent,
-          publishStatus: 'draft',
-          agentId: defaultAgent.id
-        });
-        const newArticle = response.data.article || response.data;
-        setSelectedArticle(newArticle);
-        setLastSaved(new Date());
-
-        // 触发列表刷新
-        setRefreshKey(prev => prev + 1);
-      }
+      // 仅更新保存时间显示
+      setLastSaved(new Date());
     } catch (error) {
       console.error('自动保存失败:', error);
     }
-  }, [editingTitle, editingContent, selectedArticle, defaultAgent]);
+  }, [editingTitle, editingContent, selectedArticle, viewMode]);
 
   // 手动保存功能（Cmd+S）
   const manualSave = useCallback(async () => {
     if (!editingContent.trim() && !editingTitle.trim()) return;
+
+    // 在共创模式下，只保存已存在的文章
+    if (viewMode !== 'edit' && !selectedArticle) {
+      showToast('请先选择或创建一篇文章', 'warning');
+      return;
+    }
 
     setIsSaving(true);
     try {
@@ -147,8 +136,8 @@ function DashboardContent() {
           content: editingContent,
           publishStatus: selectedArticle.publishStatus
         });
-      } else {
-        // 创建新文章
+      } else if (viewMode === 'edit') {
+        // 只在编辑模式下创建新文章
         if (!defaultAgent?.id) {
           console.error('没有找到默认agent');
           showToast('请先创建一个Agent', 'warning');
@@ -162,6 +151,8 @@ function DashboardContent() {
           agentId: defaultAgent.id
         });
         setSelectedArticle(response.data.article || response.data);
+        // 触发列表刷新
+        setRefreshKey(prev => prev + 1);
       }
       setLastSaved(new Date());
 
@@ -177,7 +168,7 @@ function DashboardContent() {
       console.error('手动保存失败:', error);
       setIsSaving(false);
     }
-  }, [editingTitle, editingContent, selectedArticle, defaultAgent, showToast]);
+  }, [editingTitle, editingContent, selectedArticle, defaultAgent, viewMode, showToast]);
 
   // 处理文件导入完成
   const handleImportComplete = (result: any) => {
@@ -401,11 +392,12 @@ summary: ""
 
   // 每10秒自动保存
   useEffect(() => {
-    if (!isEditing) return;
+    // 只在编辑模式（非共创/共读模式）且有已选择的文章时才自动保存
+    if (!isEditing || viewMode !== 'edit' || !selectedArticle) return;
 
     const interval = setInterval(autoSave, 10000);
     return () => clearInterval(interval);
-  }, [autoSave, isEditing]);
+  }, [autoSave, isEditing, viewMode, selectedArticle]);
 
   // 监听编辑器滚动，更新当前活跃的标题
   useEffect(() => {

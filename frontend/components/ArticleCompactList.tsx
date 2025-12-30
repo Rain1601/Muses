@@ -83,7 +83,7 @@ export const ArticleCompactList = memo(function ArticleCompactList({
   const fetchArticles = async () => {
     try {
       const response = await api.get("/api/articles", {
-        params: { page: 1, limit: 50 }
+        params: { page: 1, limit: 200 }  // 增加到200个
       });
       setArticles(response.data.articles || []);
     } catch (error) {
