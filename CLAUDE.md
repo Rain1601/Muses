@@ -145,6 +145,42 @@ All sensitive data (OpenAI API keys, GitHub tokens) is encrypted before storage.
 - **Client State**: Zustand stores (user.ts for user data)
 - **Forms**: React Hook Form with Zod validation
 
+### Git Commit Guidelines
+**IMPORTANT**: After completing any code changes, you MUST commit them with descriptive messages.
+
+- Commit frequently after completing each logical unit of work
+- Use conventional commit format: `type: description`
+  - `feat:` - New features
+  - `fix:` - Bug fixes
+  - `docs:` - Documentation changes
+  - `refactor:` - Code refactoring
+  - `style:` - Formatting changes
+  - `test:` - Adding tests
+  - `chore:` - Maintenance tasks
+
+- Include detailed information about what changed and why
+- For large changes, split into multiple smaller commits by functionality
+- Always add Claude Code attribution footer:
+  ```
+  🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+  Co-Authored-By: Claude <noreply@anthropic.com>
+  ```
+
+Example:
+```bash
+git add <files>
+git commit -m "feat: implement co-create mode with AI chat
+
+- Add CoCreateMode component with split-screen layout
+- Implement chat history persistence
+- Add text adoption functionality
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>"
+```
+
 ## Environment Configuration
 
 ### Required Environment Variables (backend-python/.env)
