@@ -55,7 +55,6 @@ function DashboardContent() {
   const [defaultAgent, setDefaultAgent] = useState<any>(null);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0); // 添加刷新key，用于强制刷新文章列表
-  const [articles, setArticles] = useState<Article[]>([]); // 文章列表（统一管理）
   const [recentArticles, setRecentArticles] = useState<Article[]>([]); // 存储最近的文章列表
   const titleInputRef = useRef<HTMLInputElement>(null); // 标题输入框引用
   const { showToast, ToastContainer } = useToast();
@@ -71,13 +70,11 @@ function DashboardContent() {
         const defaultAgentFound = agents.find((a: any) => a.isDefault) || agents[0];
         setDefaultAgent(defaultAgentFound);
 
-        // 获取文章列表
+        // 获取最近的文章列表（仅用于显示"最近文章"按钮）
         const articlesResponse = await api.get('/api/articles', {
-          params: { page: 1, limit: 50 }
+          params: { page: 1, page_size: 10, sort_by: 'updatedAt', sort_order: 'desc' }
         });
-        const fetchedArticles = articlesResponse.data.articles || [];
-        setArticles(fetchedArticles);
-        setRecentArticles(fetchedArticles.slice(0, 10));
+        setRecentArticles(articlesResponse.data.articles || []);
       } catch (error) {
         console.error('Failed to fetch initial data:', error);
       }
@@ -98,31 +95,25 @@ function DashboardContent() {
     }
   }, [searchParams, user, checkAuth, router]);
 
-  // 自动保存功能
+  // 自动保存功能 - 静默保存，不更新任何UI
   const autoSave = useCallback(async () => {
     if (!editingContent.trim() && !editingTitle.trim()) return;
 
-    console.log('🔄 自动保存开始...', {
-      hasSelectedArticle: !!selectedArticle,
-      articlesLength: articles.length
-    });
     try {
       if (selectedArticle) {
-        // 更新现有文章
+        // 静默保存到后端
         await api.put(`/api/articles/${selectedArticle.id}`, {
           title: editingTitle || '无标题',
           content: editingContent,
           publishStatus: selectedArticle.publishStatus
         });
 
-        console.log('✅ 自动保存成功，不更新任何本地状态');
-        // 只更新最后保存时间（这个不会影响编辑器）
+        // 仅更新保存时间显示
         setLastSaved(new Date());
       } else {
-        // 创建新文章
+        // 如果是新文章，创建后更新selectedArticle
         if (!defaultAgent?.id) {
           console.error('没有找到默认agent');
-          showToast('请先创建一个Agent', 'warning');
           return;
         }
         const response = await api.post('/api/articles', {
@@ -133,15 +124,15 @@ function DashboardContent() {
         });
         const newArticle = response.data.article || response.data;
         setSelectedArticle(newArticle);
-
-        // 添加到文章列表
-        setArticles(prevArticles => [newArticle, ...prevArticles]);
         setLastSaved(new Date());
+
+        // 触发列表刷新
+        setRefreshKey(prev => prev + 1);
       }
     } catch (error) {
       console.error('自动保存失败:', error);
     }
-  }, [editingTitle, editingContent, selectedArticle, defaultAgent, showToast]);
+  }, [editingTitle, editingContent, selectedArticle, defaultAgent]);
 
   // 手动保存功能（Cmd+S）
   const manualSave = useCallback(async () => {
@@ -630,11 +621,9 @@ summary: ""
           leftPanelCollapsed ? 'w-0 opacity-0 overflow-hidden' : 'w-80 opacity-100'
         }`}>
           <ArticleCompactList
-            articles={articles}
             onArticleSelect={handleArticleSelect}
             selectedArticleId={selectedArticle?.id}
             onImportClick={handleImportClick}
-            onArticlesChange={setArticles}
             refreshTrigger={refreshKey}
           />
         </aside>
