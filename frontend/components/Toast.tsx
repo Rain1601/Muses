@@ -38,22 +38,22 @@ export function Toast({ message, type = "info", duration = 3000, onClose }: Toas
   };
 
   const colors = {
-    success: "bg-green-50 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800",
-    error: "bg-red-50 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800",
-    info: "bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800",
-    warning: "bg-yellow-50 text-yellow-800 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400 dark:border-yellow-800"
+    success: "bg-green-600 text-white border-green-700 dark:bg-green-700 dark:text-white dark:border-green-800",
+    error: "bg-red-600 text-white border-red-700 dark:bg-red-700 dark:text-white dark:border-red-800",
+    info: "bg-blue-600 text-white border-blue-700 dark:bg-blue-700 dark:text-white dark:border-blue-800",
+    warning: "bg-yellow-600 text-white border-yellow-700 dark:bg-yellow-700 dark:text-white dark:border-yellow-800"
   };
 
   return (
     <div
       className={`
-        fixed top-4 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-lg border shadow-lg
+        fixed top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-5 py-3 rounded-lg border shadow-xl backdrop-blur-sm
         ${colors[type]}
-        ${isLeaving ? 'animate-slide-out-right' : 'animate-slide-in-right'}
+        ${isLeaving ? 'animate-out fade-out slide-out-to-top-2 duration-300' : 'animate-in fade-in slide-in-from-top-2 duration-300'}
       `}
     >
       {icons[type]}
-      <span className="text-sm font-medium">{message}</span>
+      <span className="text-sm font-medium whitespace-nowrap">{message}</span>
     </div>
   );
 }
@@ -71,11 +71,11 @@ export function useToast() {
   };
 
   const ToastContainer = () => (
-    <div className="fixed top-4 right-4 z-50 flex flex-col gap-2">
+    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 items-center">
       {toasts.map((toast, index) => (
         <div
           key={toast.id}
-          style={{ transform: `translateY(${index * 10}px)` }}
+          style={{ transform: `translateY(${index * 8}px)` }}
         >
           <Toast
             message={toast.message}
