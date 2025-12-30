@@ -102,7 +102,10 @@ function DashboardContent() {
   const autoSave = useCallback(async () => {
     if (!editingContent.trim() && !editingTitle.trim()) return;
 
-    console.log('🔄 自动保存开始...');
+    console.log('🔄 自动保存开始...', {
+      hasSelectedArticle: !!selectedArticle,
+      articlesLength: articles.length
+    });
     try {
       if (selectedArticle) {
         // 更新现有文章
