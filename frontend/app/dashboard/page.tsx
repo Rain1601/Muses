@@ -102,6 +102,7 @@ function DashboardContent() {
   const autoSave = useCallback(async () => {
     if (!editingContent.trim() && !editingTitle.trim()) return;
 
+    console.log('🔄 自动保存开始...');
     try {
       if (selectedArticle) {
         // 更新现有文章
@@ -111,17 +112,9 @@ function DashboardContent() {
           publishStatus: selectedArticle.publishStatus
         });
 
-        // 本地更新文章数据，不改变列表顺序
-        setArticles(prevArticles =>
-          prevArticles.map(article =>
-            article.id === selectedArticle.id
-              ? { ...article, title: editingTitle || '无标题', content: editingContent }
-              : article
-          )
-        );
-
-        // 更新 selectedArticle
-        setSelectedArticle(prev => prev ? { ...prev, title: editingTitle || '无标题', content: editingContent } : null);
+        console.log('✅ 自动保存成功，不更新任何本地状态');
+        // 只更新最后保存时间（这个不会影响编辑器）
+        setLastSaved(new Date());
       } else {
         // 创建新文章
         if (!defaultAgent?.id) {
@@ -140,8 +133,8 @@ function DashboardContent() {
 
         // 添加到文章列表
         setArticles(prevArticles => [newArticle, ...prevArticles]);
+        setLastSaved(new Date());
       }
-      setLastSaved(new Date());
     } catch (error) {
       console.error('自动保存失败:', error);
     }
