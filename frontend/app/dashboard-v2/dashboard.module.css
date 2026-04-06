@@ -1,0 +1,788 @@
+/* Dashboard V2 — Warm Minimalist Design System
+ *
+ * Color tokens (inline, CSS Modules don't support :root):
+ *   bg:         #1C1917  (Stone 900)
+ *   bg2:        #292524  (Stone 800)
+ *   border:     #3F3A36
+ *   border-sub: #292524
+ *   border-med: #57534E
+ *   text:       #FAFAF9  (Stone 50)
+ *   text2:      #E7E5E4  (Stone 200)
+ *   text3:      #A8A29E  (Stone 400)
+ *   text4:      #78716C  (Stone 500)
+ *   text5:      #57534E  (Stone 600)
+ *   accent:     #D97149
+ *   accent-hov: #C45A33
+ */
+
+/* ===== Shell ===== */
+.shell {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #1C1917;
+  color: #FAFAF9;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ===== Top bar ===== */
+.topbar {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1rem;
+  border-bottom: 1px solid #292524;
+  flex-shrink: 0;
+}
+
+.topbarLeft {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.logoIcon {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.logo {
+  font-family: 'Times New Roman', serif;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #FAFAF9;
+}
+
+.breadcrumbSep {
+  font-size: 0.75rem;
+  color: #57534E;
+}
+
+.breadcrumbFile {
+  font-size: 0.75rem;
+  color: #78716C;
+  letter-spacing: 0.01em;
+}
+
+.unsavedDot {
+  font-size: 0.75rem;
+  color: #D97149;
+}
+
+.topbarActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btnGhost {
+  font-size: 0.6875rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 4px;
+  border: 1px solid #3F3A36;
+  background: transparent;
+  color: #A8A29E;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+  font-family: inherit;
+}
+
+.btnGhost:hover {
+  color: #FAFAF9;
+  border-color: #57534E;
+}
+
+.btnPrimary {
+  font-size: 0.6875rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  border: 1px solid #D97149;
+  background: #D97149;
+  color: white;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+  font-family: inherit;
+}
+
+.btnPrimary:hover {
+  background: #C45A33;
+  transform: translateY(-1px);
+}
+
+/* ===== Main layout ===== */
+.main {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+/* ===== Sidebar ===== */
+.sidebar {
+  width: 260px;
+  flex-shrink: 0;
+  border-right: 1px solid #292524;
+  display: flex;
+  flex-direction: column;
+  background: #1C1917;
+  transition: width 0.2s ease;
+}
+
+.sidebarCollapsed {
+  width: 44px;
+  flex-shrink: 0;
+  border-right: 1px solid #292524;
+  display: flex;
+  flex-direction: column;
+  background: #1C1917;
+  transition: width 0.2s ease;
+}
+
+.collapsedIcons {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.5rem 0;
+  gap: 0.25rem;
+}
+
+.collapsedIconBtn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: #78716C;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.collapsedIconBtn:hover {
+  color: #A8A29E;
+  background: #292524;
+}
+
+.collapsedIconBtnActive {
+  composes: collapsedIconBtn;
+  color: #D97149;
+}
+
+/* Tabs */
+.sidebarTabs {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.375rem 0.5rem;
+  border-bottom: 1px solid #292524;
+  gap: 0.25rem;
+}
+
+.tabGroup {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: #292524;
+  border-radius: 4px;
+  padding: 2px;
+}
+
+.tab {
+  font-size: 0.6875rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 3px;
+  border: none;
+  background: none;
+  color: #78716C;
+  cursor: pointer;
+  font-family: inherit;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.tab:hover {
+  color: #A8A29E;
+}
+
+.tabActive {
+  composes: tab;
+  background: #3F3A36;
+  color: #FAFAF9;
+}
+
+.sidebarContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebarSubHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.375rem 0.75rem;
+  border-bottom: 1px solid #292524;
+}
+
+.sidebarHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid #292524;
+}
+
+/* Tab placeholders */
+.tabPlaceholder {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: #57534E;
+  font-size: 0.8125rem;
+}
+
+.tabPlaceholderSub {
+  font-size: 0.6875rem;
+  color: #3F3A36;
+}
+
+/* Footer */
+.sidebarFooter {
+  border-top: 1px solid #292524;
+  padding: 0.5rem 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.userBlock {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #3D2A22;
+  color: #D97149;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.userName {
+  font-size: 0.75rem;
+  color: #A8A29E;
+}
+
+.themeToggle {
+  display: flex;
+  align-items: center;
+  background: #292524;
+  border-radius: 4px;
+  padding: 2px;
+}
+
+.themeBtn {
+  width: 26px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: #57534E;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.themeBtn:hover {
+  color: #A8A29E;
+}
+
+.themeActive {
+  composes: themeBtn;
+  background: #3F3A36;
+  color: #FAFAF9;
+}
+
+.sidebarLabel {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #78716C;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.sidebarActions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.sidebarAddBtn {
+  background: none;
+  border: none;
+  color: #78716C;
+  cursor: pointer;
+  padding: 3px;
+  display: flex;
+  border-radius: 3px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.sidebarAddBtn:hover {
+  color: #A8A29E;
+  background: #292524;
+}
+
+.sidebarList {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.25rem 0;
+}
+
+.sidebarList::-webkit-scrollbar { width: 6px; }
+.sidebarList::-webkit-scrollbar-track { background: transparent; }
+.sidebarList::-webkit-scrollbar-thumb { background: #3F3A36; border-radius: 6px; }
+.sidebarList::-webkit-scrollbar-thumb:hover { background: #D97149; }
+
+.createInput {
+  width: 100%;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  background: #292524;
+  border: 1px solid #3F3A36;
+  border-radius: 4px;
+  color: #E7E5E4;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.15s ease;
+}
+
+.createInput::placeholder {
+  color: #57534E;
+}
+
+.createInput:focus {
+  border-color: #D97149;
+}
+
+.fileItem {
+  width: 100%;
+  text-align: left;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: none;
+  border: none;
+  color: #A8A29E;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  font-family: inherit;
+}
+
+.fileItem:hover {
+  background: #292524;
+}
+
+.fileItemActive {
+  composes: fileItem;
+  background: #292524;
+  color: #FAFAF9;
+}
+
+.fileDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #57534E;
+  flex-shrink: 0;
+}
+
+.fileItemActive .fileDot {
+  background: #D97149;
+}
+
+.emptyState {
+  padding: 1.5rem 0.75rem;
+  font-size: 0.75rem;
+  color: #57534E;
+  text-align: center;
+  line-height: 1.6;
+}
+
+.emptyLink {
+  background: none;
+  border: none;
+  color: #D97149;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+  transition: opacity 0.15s ease;
+}
+
+.emptyLink:hover {
+  opacity: 0.8;
+}
+
+/* ===== Folder tree ===== */
+.folderItem {
+  width: 100%;
+  text-align: left;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  background: none;
+  border: none;
+  color: #A8A29E;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  font-family: inherit;
+}
+
+.folderItem:hover {
+  background: #292524;
+  color: #E7E5E4;
+}
+
+.folderName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.folderCount {
+  font-size: 0.625rem;
+  color: #57534E;
+  flex-shrink: 0;
+}
+
+.folderChildren {
+  /* no extra styling needed, indent is via paddingLeft on children */
+}
+
+.fileName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ===== Editor area ===== */
+.editorArea {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.editorScroll {
+  flex: 1;
+  overflow: auto;
+}
+
+.editorScroll::-webkit-scrollbar { width: 8px; }
+.editorScroll::-webkit-scrollbar-track { background: #1C1917; }
+.editorScroll::-webkit-scrollbar-thumb { background: #3F3A36; border-radius: 8px; }
+.editorScroll::-webkit-scrollbar-thumb:hover { background: #D97149; }
+
+.editorInner {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 2.5rem 2rem;
+}
+
+.welcomeScreen {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #57534E;
+}
+
+.welcomeTitle {
+  font-family: 'Times New Roman', serif;
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.25rem;
+  color: #78716C;
+}
+
+.welcomeSubtitle {
+  font-size: 0.8125rem;
+  color: #57534E;
+}
+
+/* ===== Accept banner ===== */
+.acceptBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 1rem;
+  background: #292524;
+  border-bottom: 1px solid #3F3A36;
+  flex-shrink: 0;
+}
+
+.acceptBannerLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  color: #E7E5E4;
+}
+
+.acceptPulse {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #D97149;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.acceptActions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btnReject {
+  font-size: 0.6875rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  background: transparent;
+  color: #f87171;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  font-family: inherit;
+}
+
+.btnReject:hover {
+  background: rgba(127, 29, 29, 0.2);
+}
+
+.btnAccept {
+  font-size: 0.6875rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  border: 1px solid rgba(74, 222, 128, 0.25);
+  background: transparent;
+  color: #4ade80;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  font-family: inherit;
+}
+
+.btnAccept:hover {
+  background: rgba(22, 101, 52, 0.2);
+}
+
+.kbd {
+  margin-left: 0.25rem;
+  font-size: 0.625rem;
+  padding: 0.125rem 0.25rem;
+  border-radius: 3px;
+  background: #1C1917;
+  border: 1px solid #3F3A36;
+  font-family: inherit;
+  color: #78716C;
+}
+
+/* ===== Resize handle ===== */
+.resizeHandle {
+  width: 6px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 10;
+  transition: background 0.15s ease;
+}
+
+.resizeHandle:hover,
+.resizeHandle:active {
+  background: rgba(217, 113, 73, 0.08);
+}
+
+.resizeHandleLine {
+  width: 1px;
+  height: 100%;
+  background: #292524;
+  transition: background 0.15s ease;
+}
+
+.resizeHandle:hover .resizeHandleLine,
+.resizeHandle:active .resizeHandleLine {
+  background: #D97149;
+}
+
+/* ===== Chat panel ===== */
+.chatPanel {
+  width: 360px;
+  flex-shrink: 0;
+}
+
+/* ===== Status bar ===== */
+.statusbar {
+  height: 28px;
+  border-top: 1px solid #292524;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1rem;
+  font-size: 0.6875rem;
+  color: #57534E;
+  flex-shrink: 0;
+}
+
+.statusLeft {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.statusRight {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.statusKbd {
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: #292524;
+  border: 1px solid #3F3A36;
+  color: #78716C;
+  font-size: 0.625rem;
+  font-family: inherit;
+}
+
+.statusSelection {
+  color: #D97149;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.statusSelectionClear {
+  background: none;
+  border: none;
+  color: #57534E;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 0.25rem;
+  font-size: 0.75rem;
+  transition: color 0.15s ease;
+}
+
+.statusSelectionClear:hover {
+  color: #A8A29E;
+}
+
+/* ===== Edit stats ===== */
+.editStatsBtn {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #3F3A36;
+  background: none;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.6875rem;
+  font-family: inherit;
+  transition: border-color 0.15s ease;
+}
+
+.editStatsBtn:hover {
+  border-color: #57534E;
+}
+
+.editStatsAdded {
+  color: #4ade80;
+}
+
+.editStatsRemoved {
+  color: #f87171;
+}
+
+.historyDropdown {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  margin-bottom: 0.5rem;
+  width: 280px;
+  background: #292524;
+  border: 1px solid #3F3A36;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  z-index: 50;
+}
+
+.historyHeader {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #78716C;
+  border-bottom: 1px solid #3F3A36;
+}
+
+.historyList {
+  max-height: 192px;
+  overflow-y: auto;
+}
+
+.historyItem {
+  padding: 0.5rem 0.75rem;
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.6875rem;
+  border-bottom: 1px solid #292524;
+  transition: background 0.15s ease;
+}
+
+.historyItem:hover {
+  background: rgba(28, 25, 23, 0.5);
+}
+
+.historyItemLabel {
+  color: #A8A29E;
+}
+
+.modelLabel {
+  color: #78716C;
+  font-size: 0.6875rem;
+  letter-spacing: 0.01em;
+}
