@@ -189,10 +189,35 @@ async def studio_chat(req: ChatRequest):
             file_content = filepath.read_text(encoding="utf-8")
             system_parts.append(f"\n当前编辑的文件: {req.filename}\n文件内容:\n```markdown\n{file_content}\n```")
 
-    if req.selection:
+    has_selection = bool(req.selection and req.selection.strip())
+    if has_selection:
         system_parts.append(f"\n用户选中的文本:\n> {req.selection}")
 
-    system_parts.append("""
+    if has_selection:
+        system_parts.append("""
+## 回复格式
+
+根据用户意图选择回复模式：
+
+**模式 1：对话**（用户在提问、讨论、头脑风暴）
+直接用文本回复。不包含 <article_edit> 标签。
+
+**模式 2：编辑选中部分**（用户要求修改、改写、优化选中的文本）
+先用一两句话说明修改要点，然后只输出修改后的选中部分：
+
+<article_edit>
+修改后的选中部分内容（Markdown 格式）
+</article_edit>
+
+规则：
+- <article_edit> 内只包含选中部分修改后的内容，不要输出完整文章
+- 系统会自动将修改后的内容替换到原文对应位置
+- 保持用户原有的写作风格和术语习惯
+- 只有用户明确要求编辑操作时才使用模式 2
+- 默认使用中文回复，除非用户用英文提问
+""")
+    else:
+        system_parts.append("""
 ## 回复格式
 
 根据用户意图选择回复模式：

@@ -95,6 +95,8 @@ export default function SettingsPanel({ onClose }: Props) {
   };
 
   const fetchStats = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
     try {
       const [articlesRes, agentsRes] = await Promise.all([
         api.get("/api/articles"),

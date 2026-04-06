@@ -49,7 +49,7 @@ interface NotionEditorProps {
   initialContent?: string;
   onChange?: (content: string) => void;
   agentId?: string; // 当前使用的Agent ID
-  onSelectionChange?: (selectedText: string) => void;
+  onSelectionChange?: (selectedText: string, from?: number, to?: number) => void;
   onEditorReady?: (editor: any) => void;
 }
 
@@ -735,10 +735,10 @@ export function NotionEditor({ initialContent = '', onChange, agentId, onSelecti
       SelectionPersistence.configure({
         className: 'selection-decoration',
         onSelectionPersist: (info) => {
-          onSelectionChange?.(info.text);
+          onSelectionChange?.(info.text, info.from, info.to);
         },
         onSelectionClear: () => {
-          onSelectionChange?.('');
+          onSelectionChange?.('', undefined, undefined);
         },
       }),
       LineNumbers,

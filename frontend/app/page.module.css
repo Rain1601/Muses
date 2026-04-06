@@ -1,0 +1,182 @@
+/* Login — Warm Minimalist, Anthropic-style */
+
+.scene {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #1a1816;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Subtle radial glow behind illustration */
+.glow {
+  position: absolute;
+  width: 600px;
+  height: 600px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(217, 119, 87, 0.06) 0%, transparent 70%);
+  pointer-events: none;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -55%);
+}
+
+.card {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  max-width: 420px;
+  width: 100%;
+  padding: 0 1.5rem;
+}
+
+/* Hero illustration */
+.illustration {
+  width: 200px;
+  height: 240px;
+  margin-bottom: 2rem;
+  animation: heroFloat 7s ease-in-out infinite;
+}
+
+@keyframes heroFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+/* Title */
+.title {
+  font-family: 'Times New Roman', Georgia, 'Noto Serif SC', serif;
+  font-size: 3.25rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  color: #FAFAF9;
+  margin: 0 0 0.625rem;
+  line-height: 1;
+}
+
+/* Tagline */
+.tagline {
+  font-family: 'Times New Roman', Georgia, serif;
+  font-size: 1.0625rem;
+  font-style: italic;
+  color: #78716C;
+  margin: 0 0 3rem;
+  letter-spacing: 0.01em;
+}
+
+/* GitHub button */
+.loginBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.75rem 2rem;
+  border-radius: 10px;
+  border: 1px solid #3F3A36;
+  background: #292524;
+  color: #E7E5E4;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, sans-serif;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  letter-spacing: -0.01em;
+  margin-bottom: 1.25rem;
+}
+
+.loginBtn:hover {
+  background: #3F3A36;
+  border-color: #57534E;
+  color: #FAFAF9;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+.loginBtn:active {
+  transform: translateY(0);
+}
+
+.githubIcon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+/* Subtitle */
+.subtitle {
+  font-size: 0.8125rem;
+  color: #57534E;
+  margin: 0;
+  letter-spacing: 0.01em;
+}
+
+/* Guest link */
+.guestRow {
+  margin-top: 2.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.guestLink {
+  background: none;
+  border: none;
+  color: #78716C;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 0;
+  transition: color 0.15s ease;
+}
+
+.guestLink:hover {
+  color: #D97149;
+}
+
+.guestSep {
+  color: #3F3A36;
+  font-size: 0.75rem;
+}
+
+/* Loading state */
+.loadingScene {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #1a1816;
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #292524;
+  border-top-color: #D97149;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Footer attribution */
+.footer {
+  position: absolute;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.6875rem;
+  color: #3F3A36;
+  letter-spacing: 0.02em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .illustration {
+    animation: none;
+  }
+}

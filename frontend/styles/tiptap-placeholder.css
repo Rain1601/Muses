@@ -7,6 +7,7 @@
   pointer-events: none;
   position: absolute;
   left: 0;
+  white-space: nowrap;
 }
 
 /* 标题占位符 */
@@ -21,9 +22,14 @@
   pointer-events: none;
   position: absolute;
   left: 0;
+  white-space: nowrap;
 }
 
-/* 确保父容器有相对定位 */
+/* 确保父容器有相对定位且撑满宽度 */
+.ProseMirror {
+  width: 100%;
+}
+
 .ProseMirror p,
 .ProseMirror h1,
 .ProseMirror h2,
@@ -32,4 +38,5 @@
 .ProseMirror h5,
 .ProseMirror h6 {
   position: relative;
+  width: 100%;
 }

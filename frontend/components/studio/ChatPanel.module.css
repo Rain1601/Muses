@@ -4,9 +4,10 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: #0C0A09;
+  background: #1C1917;
   font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
+  border-left: 1px solid #292524;
 }
 
 /* ── Header ── */
@@ -302,15 +303,15 @@
 
 /* ── Input box ── */
 .inputBox {
-  background: #1C1917;
-  border: 1px solid #292524;
+  background: #292524;
+  border: 1px solid #3F3A36;
   border-radius: 10px;
   overflow: hidden;
   transition: border-color 0.15s ease;
 }
 
 .inputBox:focus-within {
-  border-color: #3F3A36;
+  border-color: #57534E;
 }
 
 .textarea {
