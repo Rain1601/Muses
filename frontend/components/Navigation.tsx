@@ -90,7 +90,7 @@ export default function Navigation() {
             <Link href="/dashboard" className="flex items-center space-x-3 group">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-accent/30 dark:from-primary/30 dark:to-accent/40 flex items-center justify-center transition-all duration-200 group-hover:from-primary/30 group-hover:to-accent/40 dark:group-hover:from-primary/40 dark:group-hover:to-accent/50 shadow-sm">
                 <img
-                  src="/materials/images/icons/feather-brown.svg"
+                  src="/materials/images/icons/logo-muses.svg"
                   alt="Muses"
                   className="w-5 h-5"
                 />

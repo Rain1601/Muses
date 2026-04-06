@@ -492,7 +492,7 @@ export default function Dashboard() {
       {/* Top bar */}
       <div className={s.topbar}>
         <div className={s.topbarLeft}>
-          <img src="/materials/images/icons/muses-mic.svg" alt="Muses" className={s.logoIcon} />
+          <img src="/materials/images/icons/logo-muses.svg" alt="Muses" className={s.logoIcon} />
           <span className={s.logo}>Muses</span>
           {sidebarTab === "article" && (
             <>
