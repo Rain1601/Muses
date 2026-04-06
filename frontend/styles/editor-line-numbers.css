@@ -1,0 +1,60 @@
+/* Editor Line Numbers — subtle gutter */
+
+.ProseMirror {
+  padding-left: 3rem !important;
+  position: relative;
+}
+
+/* Every block node gets a line number position */
+.editor-line {
+  position: relative;
+  min-height: 1.5em;
+}
+
+/* All line numbers — subtle */
+.show-line-num::before {
+  content: attr(data-line);
+  position: absolute;
+  left: -2.5rem;
+  top: 0.15em;
+  width: 1.75rem;
+  text-align: right;
+  color: rgba(120, 113, 108, 0.2);
+  font-size: 0.6875rem;
+  font-family: "SF Mono", Monaco, "Cascadia Code", monospace;
+  pointer-events: none;
+  user-select: none;
+  line-height: 1.7;
+}
+
+/* Key lines (1, 5, 10, 15...) — slightly brighter */
+.line-num-key::before {
+  color: rgba(120, 113, 108, 0.45);
+}
+
+/* Gutter separator line */
+.ProseMirror::before {
+  content: "";
+  position: absolute;
+  left: 2rem;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.04);
+  pointer-events: none;
+}
+
+/* Light mode overrides */
+@media (prefers-color-scheme: light) {
+  .show-line-num::before {
+    color: rgba(0, 0, 0, 0.12);
+  }
+
+  .line-num-key::before {
+    color: rgba(0, 0, 0, 0.25);
+  }
+
+  .ProseMirror::before {
+    background: rgba(0, 0, 0, 0.05);
+  }
+}

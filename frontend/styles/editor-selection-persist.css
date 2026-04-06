@@ -19,3 +19,9 @@
 .dark .ProseMirror ::-moz-selection {
   background-color: rgba(96, 165, 250, 0.35);
 }
+
+/* Selection decoration — persisted highlight when editor loses focus */
+.selection-decoration {
+  background: rgba(59, 130, 246, 0.25);
+  border-radius: 2px;
+}
