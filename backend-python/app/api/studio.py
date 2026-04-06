@@ -4,8 +4,9 @@ Studio API — Claude Chat + file management + diff engine.
 Endpoints:
   POST /api/studio/chat         — Stream chat with Claude (AIHubMix)
   WS /api/studio/filewatcher    — Pushes file diffs when workspace files change
-  GET /api/studio/files          — List workspace article files
-  GET/PUT/POST/DELETE /api/studio/files/{filename} — File CRUD
+  GET /api/studio/files          — List workspace article files (recursive, with folders)
+  GET/PUT/POST/DELETE /api/studio/files/{filepath:path} — File CRUD (supports nested paths)
+  POST /api/studio/folders/{folderpath:path} — Create folder
 """
 
 import asyncio
@@ -33,56 +34,89 @@ class FileContent(BaseModel):
     content: str
 
 
+def _safe_resolve(relative_path: str) -> Path:
+    """Resolve a relative path within WORKSPACE_DIR, preventing path traversal."""
+    resolved = (WORKSPACE_DIR / relative_path).resolve()
+    if not str(resolved).startswith(str(WORKSPACE_DIR.resolve())):
+        raise HTTPException(status_code=403, detail="Path traversal not allowed")
+    return resolved
+
+
 @router.get("/files")
 async def list_files():
-    """List all markdown files in workspace."""
+    """List all markdown files in workspace recursively, plus folder list."""
     files = []
-    for f in sorted(WORKSPACE_DIR.glob("*.md")):
+    folders_set: set[str] = set()
+
+    for f in sorted(WORKSPACE_DIR.rglob("*.md")):
+        rel = f.relative_to(WORKSPACE_DIR)
         stat = f.stat()
         files.append({
             "name": f.name,
             "size": stat.st_size,
             "modified": stat.st_mtime,
+            "path": str(rel).replace(os.sep, "/"),
         })
-    return {"files": files}
+
+    # Collect all directories (recursively, as flat relative paths)
+    for d in sorted(WORKSPACE_DIR.rglob("*")):
+        if d.is_dir():
+            rel = str(d.relative_to(WORKSPACE_DIR)).replace(os.sep, "/")
+            folders_set.add(rel)
+
+    return {"files": files, "folders": sorted(folders_set)}
 
 
-@router.get("/files/{filename}")
-async def read_file(filename: str):
+@router.post("/folders/{folderpath:path}")
+async def create_folder(folderpath: str):
+    """Create a new folder (supports nested paths like agents/research)."""
+    resolved = _safe_resolve(folderpath)
+    if resolved.exists():
+        raise HTTPException(status_code=409, detail="Folder already exists")
+    resolved.mkdir(parents=True, exist_ok=True)
+    return {"folder": folderpath, "created": True}
+
+
+@router.get("/files/{filepath:path}")
+async def read_file(filepath: str):
     """Read a workspace file."""
-    filepath = WORKSPACE_DIR / filename
-    if not filepath.exists() or not filepath.is_file():
+    resolved = _safe_resolve(filepath)
+    if not resolved.exists() or not resolved.is_file():
         raise HTTPException(status_code=404, detail="File not found")
-    content = filepath.read_text(encoding="utf-8")
-    return {"name": filename, "content": content}
+    content = resolved.read_text(encoding="utf-8")
+    return {"name": resolved.name, "path": filepath, "content": content}
 
 
-@router.put("/files/{filename}")
-async def write_file(filename: str, body: FileContent):
+@router.put("/files/{filepath:path}")
+async def write_file(filepath: str, body: FileContent):
     """Write/update a workspace file (editor save)."""
-    filepath = WORKSPACE_DIR / filename
-    filepath.write_text(body.content, encoding="utf-8")
-    return {"name": filename, "saved": True}
+    resolved = _safe_resolve(filepath)
+    # Auto-create parent directories if needed
+    resolved.parent.mkdir(parents=True, exist_ok=True)
+    resolved.write_text(body.content, encoding="utf-8")
+    return {"name": resolved.name, "path": filepath, "saved": True}
 
 
-@router.post("/files/{filename}")
-async def create_file(filename: str):
+@router.post("/files/{filepath:path}")
+async def create_file(filepath: str):
     """Create a new empty file."""
-    filepath = WORKSPACE_DIR / filename
-    if filepath.exists():
+    resolved = _safe_resolve(filepath)
+    if resolved.exists():
         raise HTTPException(status_code=409, detail="File already exists")
-    filepath.write_text("", encoding="utf-8")
-    return {"name": filename, "created": True}
+    # Auto-create parent directories if needed
+    resolved.parent.mkdir(parents=True, exist_ok=True)
+    resolved.write_text("", encoding="utf-8")
+    return {"name": resolved.name, "path": filepath, "created": True}
 
 
-@router.delete("/files/{filename}")
-async def delete_file(filename: str):
+@router.delete("/files/{filepath:path}")
+async def delete_file(filepath: str):
     """Delete a workspace file."""
-    filepath = WORKSPACE_DIR / filename
-    if not filepath.exists():
+    resolved = _safe_resolve(filepath)
+    if not resolved.exists():
         raise HTTPException(status_code=404, detail="File not found")
-    filepath.unlink()
-    return {"name": filename, "deleted": True}
+    resolved.unlink()
+    return {"name": resolved.name, "path": filepath, "deleted": True}
 
 
 # ============================================================
@@ -114,9 +148,39 @@ async def studio_chat(req: ChatRequest):
     """
     # Build system prompt with file context
     system_parts = [
-        "你是一个专业的写作助手，帮助用户创作和改进文章。",
-        "用户正在使用 Muses Studio 编辑器写作。",
-        f"工作目录: {WORKSPACE_DIR}",
+        """你是一位资深的技术写作助手。你的职责是帮助用户创作和改进技术文章，保持与用户一致的写作风格。
+
+## 写作风格
+
+你必须严格遵循以下风格特征，这是用户的写作习惯：
+
+### 结构与逻辑
+- 开头直接切入问题或提出反直觉的现象，不用个人感慨、反问句或故事开场
+- 典型开头结构："在X的过程中，有一个Y问题"或"X是一个容易被Z的环节"
+- 逻辑链：问题定义→原因分析→权威引用→工程方案→可操作的结论
+- 每句话都在推进论证，不绕弯，不重复已经说过的观点
+
+### 语言风格
+- 客观理性，像一个资深工程师在写技术分享，不学术也不口水
+- 简洁不废话，能一句说清的不用两句
+- 不煽情、不自嘲、不用"大家有没有体验过""不知道大家怎么看"这类口语化套话
+- 类比克制使用，只在辅助理解时用，不为修辞效果而用
+
+### 中英文混合
+- 技术术语保留英文原文：Agent、Prompt、Context、Tool Use、Function Calling、SDK、API、JSON
+- 行文使用中文，不刻意翻译已被广泛接受的英文术语
+- 首次出现的专业概念可以附上中文解释，后续直接用英文
+
+### 引用与论证
+- 适度引用 Anthropic、OpenAI、Google 等一手技术来源，给出具体出处
+- 引用后用自己的话解释和延伸，不堆砌引用
+- 优先引用官方文档和工程博客，而非二手解读文章
+
+### 内容深度
+- 技术内容要具体到 API 名、方法名、工程概念，不停留在抽象层面
+- 每个论点都应该有实践基础或权威来源支撑
+- 给出可操作的工程建议和结论，不空谈理论""",
+        f"\n工作目录: {WORKSPACE_DIR}",
     ]
 
     if req.filename:
@@ -129,24 +193,25 @@ async def studio_chat(req: ChatRequest):
         system_parts.append(f"\n用户选中的文本:\n> {req.selection}")
 
     system_parts.append("""
-## 重要：回复格式规则
+## 回复格式
 
-你有两种回复模式，根据用户意图自动判断：
+根据用户意图选择回复模式：
 
-**模式 1：对话回答**（用户在问问题、讨论、头脑风暴）
-直接用普通文本回复，不要包含 <article_edit> 标签。
+**模式 1：对话**（用户在提问、讨论、头脑风暴）
+直接用文本回复。不包含 <article_edit> 标签。回复风格与上述写作风格一致。
 
-**模式 2：编辑文章**（用户要求修改、改写、添加、删除文章内容）
-先简短说明你做了什么修改，然后输出完整的修改后文章，用以下标签包裹：
+**模式 2：编辑文章**（用户要求修改、改写、添加、删除、优化文章内容）
+先用一两句话说明修改要点，然后输出完整的修改后文章：
 
 <article_edit>
-修改后的完整文章内容
+修改后的完整文章内容（Markdown 格式）
 </article_edit>
 
-注意：
-- <article_edit> 内必须是完整的文章内容（不是片段），因为会直接替换编辑器中的全部内容
-- 只有用户明确要求"修改""改写""添加""删除""优化"等编辑操作时才使用模式 2
-- 回复使用中文，除非用户用英文提问
+规则：
+- <article_edit> 内必须是完整文章（不是片段），会直接替换编辑器全部内容
+- 修改时保持用户原有的写作风格和术语习惯，不要"改善"用户的风格
+- 只有用户明确要求编辑操作时才使用模式 2
+- 默认使用中文回复，除非用户用英文提问
 """)
 
     system = "\n".join(system_parts)
@@ -223,11 +288,12 @@ def compute_diff(old_text: str, new_text: str, filename: str) -> Optional[dict]:
 
 
 def snapshot_workspace():
-    """Take a snapshot of all workspace files."""
+    """Take a snapshot of all workspace files (recursive)."""
     snapshots = {}
-    for f in WORKSPACE_DIR.glob("*.md"):
+    for f in WORKSPACE_DIR.rglob("*.md"):
         try:
-            snapshots[f.name] = f.read_text(encoding="utf-8")
+            rel = str(f.relative_to(WORKSPACE_DIR)).replace(os.sep, "/")
+            snapshots[rel] = f.read_text(encoding="utf-8")
         except Exception:
             pass
     return snapshots
@@ -280,8 +346,8 @@ async def filewatcher_websocket(ws: WebSocket):
         pass
 
 
-@router.post("/snapshot/{filename}")
-async def update_snapshot(filename: str, body: FileContent):
+@router.post("/snapshot/{filepath:path}")
+async def update_snapshot(filepath: str, body: FileContent):
     """Update the file snapshot after user accepts changes (prevents re-diffing)."""
-    _file_snapshots[filename] = body.content
+    _file_snapshots[filepath] = body.content
     return {"updated": True}
