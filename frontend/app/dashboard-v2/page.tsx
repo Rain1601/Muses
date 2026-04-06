@@ -2,9 +2,11 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { marked } from "marked";
+import { useUserStore } from "@/store/user";
 import { NotionEditor } from "@/components/NotionEditor";
 import ChatPanel, { ChatPanelHandle } from "@/components/studio/ChatPanel";
 import DiffView from "@/components/studio/DiffView";
+import SettingsPanel from "@/components/studio/SettingsPanel";
 import { persistSelection, clearPersistedSelection } from "@/lib/tiptap-extensions/SelectionPersistence";
 import { getLineContent } from "@/lib/tiptap-extensions/LineNumbers";
 import s from "./dashboard.module.css";
@@ -27,6 +29,9 @@ interface EditRecord { desc: string; added: number; removed: number; time: Date;
 interface FolderNode { name: string; path: string; files: FileItem[]; folders: FolderNode[]; expanded: boolean; }
 
 export default function DashboardV2() {
+  const { user, checkAuth } = useUserStore();
+  useEffect(() => { checkAuth(); }, [checkAuth]);
+
   const [files, setFiles] = useState<FileItem[]>([]);
   const [folders, setFolders] = useState<string[]>([]);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() => {
@@ -101,9 +106,12 @@ export default function DashboardV2() {
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [creatingInFolder, setCreatingInFolder] = useState<string | null>(null);
   const [newFileName, setNewFileName] = useState("");
+  const [fileMenuOpen, setFileMenuOpen] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [sidebarTab, setSidebarTab] = useState<"article" | "agent" | "skill">("article");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [darkMode, setDarkMode] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
   const chatRef = useRef<ChatPanelHandle>(null);
   const createInputRef = useRef<HTMLInputElement>(null);
 
@@ -144,6 +152,7 @@ export default function DashboardV2() {
       setSavedContent(htmlContent); // track HTML version for dirty checking
       setPendingChange(null);
       setSelection("");
+      setShowSettings(false);
     } catch (e) { console.error("Open file failed:", e); }
   }, []);
 
@@ -187,6 +196,20 @@ export default function DashboardV2() {
     } catch (e) { console.error("Create folder failed:", e); }
   }, [loadFiles]);
 
+  const deleteFile = useCallback(async (filePath: string) => {
+    try {
+      await fetch(`${API_BASE}/api/studio/files/${filePath}`, { method: "DELETE" });
+      if (activeFile === filePath) {
+        setActiveFile(null);
+        setContent("");
+        setSavedContent("");
+      }
+      await loadFiles();
+      setConfirmDelete(null);
+      setFileMenuOpen(null);
+    } catch (e) { console.error("Delete failed:", e); }
+  }, [activeFile, loadFiles]);
+
   // ===== Auto-save =====
   useEffect(() => {
     if (!activeFile) return;
@@ -217,6 +240,14 @@ export default function DashboardV2() {
   const handleArticleEdit = useCallback((newContent: string) => {
     setPendingChange(newContent);
   }, []);
+
+  // Close file menu on outside click
+  useEffect(() => {
+    if (!fileMenuOpen) return;
+    const handler = () => setFileMenuOpen(null);
+    window.addEventListener("click", handler);
+    return () => window.removeEventListener("click", handler);
+  }, [fileMenuOpen]);
 
   // ===== Keyboard shortcuts =====
   useEffect(() => {
@@ -384,10 +415,42 @@ export default function DashboardV2() {
                                   </div>
                                 )}
                                 {folderFiles.map(f => (
-                                  <button key={f.path} onClick={() => openFile(f.path)} className={activeFile === f.path ? s.fileItemActive : s.fileItem} style={{ paddingLeft: "2.25rem" }}>
-                                    <span className={s.fileDot} />
-                                    <span className={s.fileName}>{f.name}</span>
-                                  </button>
+                                  <div key={f.path} className={s.fileRow} style={{ paddingLeft: "2.25rem" }}>
+                                    <button onClick={() => openFile(f.path)} className={activeFile === f.path ? s.fileItemActive : s.fileItem}>
+                                      <svg className={s.fileIcon} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                                      <span className={s.fileInfo}>
+                                        <span className={s.fileTitle}>{f.name.replace(/\.md$/, "")}</span>
+                                        <span className={s.badgeDraft}>草稿</span>
+                                      </span>
+                                    </button>
+                                    <div className={s.fileActions}>
+                                      <button onClick={(e) => { e.stopPropagation(); setFileMenuOpen(fileMenuOpen === f.path ? null : f.path); }} className={s.fileActionBtn} title="More">⋯</button>
+                                    </div>
+                                    {fileMenuOpen === f.path && (
+                                      <div className={s.fileMenu}>
+                                        <button className={s.fileMenuItem} onClick={() => { openFile(f.path); setFileMenuOpen(null); }}>
+                                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                          Edit
+                                        </button>
+                                        <button className={s.fileMenuItem} onClick={() => setFileMenuOpen(null)}>
+                                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+                                          Publish
+                                        </button>
+                                        <div className={s.fileMenuDivider} />
+                                        <button className={s.fileMenuItemDanger} onClick={() => { setConfirmDelete(f.path); setFileMenuOpen(null); }}>
+                                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                          Delete
+                                        </button>
+                                      </div>
+                                    )}
+                                    {confirmDelete === f.path && (
+                                      <div className={s.confirmOverlay}>
+                                        <span>Delete?</span>
+                                        <button className={s.confirmYes} onClick={() => deleteFile(f.path)}>Yes</button>
+                                        <button className={s.confirmNo} onClick={() => setConfirmDelete(null)}>No</button>
+                                      </div>
+                                    )}
+                                  </div>
                                 ))}
                               </div>
                             )}
@@ -395,10 +458,42 @@ export default function DashboardV2() {
                         );
                       })}
                       {files.filter(f => !f.path.includes("/")).map(f => (
-                        <button key={f.path} onClick={() => openFile(f.path)} className={activeFile === f.path ? s.fileItemActive : s.fileItem}>
-                          <span className={s.fileDot} />
-                          <span className={s.fileName}>{f.name}</span>
-                        </button>
+                        <div key={f.path} className={s.fileRow}>
+                          <button onClick={() => openFile(f.path)} className={activeFile === f.path ? s.fileItemActive : s.fileItem}>
+                            <svg className={s.fileIcon} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                            <span className={s.fileInfo}>
+                              <span className={s.fileTitle}>{f.name.replace(/\.md$/, "")}</span>
+                              <span className={s.badgeDraft}>草稿</span>
+                            </span>
+                          </button>
+                          <div className={s.fileActions}>
+                            <button onClick={(e) => { e.stopPropagation(); setFileMenuOpen(fileMenuOpen === f.path ? null : f.path); }} className={s.fileActionBtn} title="More">⋯</button>
+                          </div>
+                          {fileMenuOpen === f.path && (
+                            <div className={s.fileMenu}>
+                              <button className={s.fileMenuItem} onClick={() => { openFile(f.path); setFileMenuOpen(null); }}>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                Edit
+                              </button>
+                              <button className={s.fileMenuItem} onClick={() => setFileMenuOpen(null)}>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+                                Publish
+                              </button>
+                              <div className={s.fileMenuDivider} />
+                              <button className={s.fileMenuItemDanger} onClick={() => { setConfirmDelete(f.path); setFileMenuOpen(null); }}>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                Delete
+                              </button>
+                            </div>
+                          )}
+                          {confirmDelete === f.path && (
+                            <div className={s.confirmOverlay}>
+                              <span>Delete?</span>
+                              <button className={s.confirmYes} onClick={() => deleteFile(f.path)}>Yes</button>
+                              <button className={s.confirmNo} onClick={() => setConfirmDelete(null)}>No</button>
+                            </div>
+                          )}
+                        </div>
                       ))}
                       {files.length === 0 && folders.length === 0 && !creating && (
                         <div className={s.emptyState}>
@@ -427,18 +522,26 @@ export default function DashboardV2() {
                 )}
               </div>
 
-              {/* Bottom: avatar + theme toggle */}
+              {/* Bottom: avatar + settings + theme */}
               <div className={s.sidebarFooter}>
                 <div className={s.userBlock}>
-                  <div className={s.avatar}>R</div>
-                  <span className={s.userName}>Rain</span>
+                  {user?.avatarUrl ? (
+                    <img src={user.avatarUrl} alt="" className={s.avatarImg} />
+                  ) : (
+                    <div className={s.avatar}>{user?.username?.[0]?.toUpperCase() || "?"}</div>
+                  )}
+                  <span className={s.userName}>{user?.username || "Guest"}</span>
                 </div>
-                <div className={s.themeToggle}>
-                  <button onClick={() => setDarkMode(true)} className={darkMode ? s.themeActive : s.themeBtn} title="Dark">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                <div className={s.footerActions}>
+                  <button onClick={() => setShowSettings(true)} className={s.themeBtn} title="Settings">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                   </button>
-                  <button onClick={() => setDarkMode(false)} className={!darkMode ? s.themeActive : s.themeBtn} title="Light">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                  <button onClick={() => setDarkMode(!darkMode)} className={s.themeBtn} title={darkMode ? "Light mode" : "Dark mode"}>
+                    {darkMode ? (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                    ) : (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                    )}
                   </button>
                 </div>
               </div>
@@ -461,7 +564,9 @@ export default function DashboardV2() {
             </div>
           )}
 
-          {activeFile ? (
+          {showSettings ? (
+            <SettingsPanel onClose={() => setShowSettings(false)} />
+          ) : activeFile ? (
             pendingChange ? (
               <div className={s.editorScroll}>
                 <DiffView oldContent={content} newContent={pendingChange} />

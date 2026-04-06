@@ -272,8 +272,8 @@
 }
 
 .avatar {
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   background: #3D2A22;
   color: #D97149;
@@ -285,22 +285,29 @@
   flex-shrink: 0;
 }
 
-.userName {
-  font-size: 0.75rem;
-  color: #A8A29E;
+.avatarImg {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  object-fit: cover;
 }
 
-.themeToggle {
+.userName {
+  font-size: 0.8125rem;
+  color: #A8A29E;
+  font-weight: 500;
+}
+
+.footerActions {
   display: flex;
   align-items: center;
-  background: #292524;
-  border-radius: 4px;
-  padding: 2px;
+  gap: 0.125rem;
 }
 
 .themeBtn {
-  width: 26px;
-  height: 22px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -308,18 +315,13 @@
   border: none;
   color: #57534E;
   cursor: pointer;
-  border-radius: 3px;
+  border-radius: 6px;
   transition: color 0.15s ease, background 0.15s ease;
 }
 
 .themeBtn:hover {
   color: #A8A29E;
-}
-
-.themeActive {
-  composes: themeBtn;
-  background: #3F3A36;
-  color: #FAFAF9;
+  background: #292524;
 }
 
 .sidebarLabel {
@@ -384,14 +386,26 @@
   border-color: #D97149;
 }
 
-.fileItem {
-  width: 100%;
-  text-align: left;
-  padding: 0.375rem 0.75rem;
-  font-size: 0.75rem;
+/* File row — wrapper for item + actions */
+.fileRow {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  border-bottom: 1px solid rgba(63, 58, 54, 0.3);
+}
+
+.fileRow:hover .fileActions {
+  opacity: 1;
+}
+
+.fileItem {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  padding: 0.625rem 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
   background: none;
   border: none;
   color: #A8A29E;
@@ -410,16 +424,181 @@
   color: #FAFAF9;
 }
 
-.fileDot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: #57534E;
+.fileIcon {
   flex-shrink: 0;
+  color: #57534E;
 }
 
-.fileItemActive .fileDot {
-  background: #D97149;
+.fileItemActive .fileIcon {
+  color: #D97149;
+}
+
+.fileInfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.fileTitle {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.fileBadge {
+  font-size: 0.625rem;
+  font-weight: 500;
+  padding: 0.125rem 0.4rem;
+  border-radius: 3px;
+  flex-shrink: 0;
+  letter-spacing: 0.02em;
+}
+
+.badgeDraft {
+  composes: fileBadge;
+  color: #eab308;
+  background: rgba(234, 179, 8, 0.1);
+}
+
+.badgePublished {
+  composes: fileBadge;
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.1);
+}
+
+/* Hover action button (three dots) */
+.fileActions {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.fileActionBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #78716C;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  font-size: 1rem;
+}
+
+.fileActionBtn:hover {
+  background: #3F3A36;
+  color: #A8A29E;
+}
+
+/* Dropdown menu */
+.fileMenu {
+  position: absolute;
+  top: 100%;
+  right: 0.25rem;
+  z-index: 50;
+  min-width: 140px;
+  background: #292524;
+  border: 1px solid #3F3A36;
+  border-radius: 6px;
+  padding: 0.25rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.fileMenuItem {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.5rem;
+  font-size: 0.75rem;
+  color: #A8A29E;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.1s ease, color 0.1s ease;
+}
+
+.fileMenuItem:hover {
+  background: #3F3A36;
+  color: #E7E5E4;
+}
+
+.fileMenuItemDanger {
+  composes: fileMenuItem;
+  color: #ef4444;
+}
+
+.fileMenuItemDanger:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #f87171;
+}
+
+.fileMenuDivider {
+  height: 1px;
+  background: #3F3A36;
+  margin: 0.25rem 0;
+}
+
+/* Delete confirmation inline */
+.confirmOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 51;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: rgba(28, 25, 23, 0.92);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  color: #A8A29E;
+}
+
+.confirmYes {
+  padding: 0.2rem 0.5rem;
+  font-size: 0.6875rem;
+  border-radius: 4px;
+  border: 1px solid #ef4444;
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.1s ease;
+}
+
+.confirmYes:hover {
+  background: rgba(239, 68, 68, 0.3);
+}
+
+.confirmNo {
+  padding: 0.2rem 0.5rem;
+  font-size: 0.6875rem;
+  border-radius: 4px;
+  border: 1px solid #3F3A36;
+  background: transparent;
+  color: #78716C;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.1s ease;
+}
+
+.confirmNo:hover {
+  background: #292524;
 }
 
 .emptyState {
@@ -449,8 +628,8 @@
 .folderItem {
   width: 100%;
   text-align: left;
-  padding: 0.375rem 0.75rem;
-  font-size: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9375rem;
   display: flex;
   align-items: center;
   gap: 0.375rem;
