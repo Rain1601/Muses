@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 500" fill="none">
+  <!-- Muses Logo — Hand-drawn microphone with decorative squiggle -->
+  <!-- Style: Anthropic warm minimalism, bold marker strokes -->
+
+  <!-- === Microphone Head (terracotta filled blob) === -->
+  <path d="M178 82 C170 78, 158 88, 155 108 C152 128, 150 168, 153 195 C156 222, 164 235, 182 240 C200 245, 220 244, 238 238 C256 232, 266 220, 268 195 C270 170, 270 128, 267 108 C264 88, 252 78, 244 82 C236 86, 228 80, 210 78 C192 76, 186 86, 178 82Z"
+        fill="#d97757"/>
+
+  <!-- Microphone head outline (cream, bold) -->
+  <path d="M178 82 C170 78, 158 88, 155 108 C152 128, 150 168, 153 195 C156 222, 164 235, 182 240 C200 245, 220 244, 238 238 C256 232, 266 220, 268 195 C270 170, 270 128, 267 108 C264 88, 252 78, 244 82 C236 86, 228 80, 210 78 C192 76, 186 86, 178 82Z"
+        stroke="rgba(255,255,255,0.9)" stroke-width="8" stroke-linecap="round" fill="none"/>
+
+  <!-- Microphone grille lines (cream, medium weight) -->
+  <path d="M165 110 C185 106, 225 105, 255 110"
+        stroke="rgba(255,255,255,0.55)" stroke-width="4" stroke-linecap="round"/>
+  <path d="M162 138 C182 133, 228 132, 258 137"
+        stroke="rgba(255,255,255,0.5)" stroke-width="4" stroke-linecap="round"/>
+  <path d="M160 166 C180 161, 230 160, 260 165"
+        stroke="rgba(255,255,255,0.45)" stroke-width="4" stroke-linecap="round"/>
+  <path d="M162 194 C182 189, 228 188, 258 193"
+        stroke="rgba(255,255,255,0.4)" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- === Microphone Handle (cream outline, bold) === -->
+  <path d="M188 240 C186 248, 184 256, 185 262 C186 268, 190 270, 195 272 L195 330"
+        stroke="rgba(255,255,255,0.88)" stroke-width="10" stroke-linecap="round"/>
+  <path d="M232 238 C234 246, 236 254, 235 262 C234 268, 230 270, 225 272 L225 330"
+        stroke="rgba(255,255,255,0.88)" stroke-width="10" stroke-linecap="round"/>
+
+  <!-- Handle connector -->
+  <path d="M195 330 C198 338, 205 342, 210 343 C215 344, 222 340, 225 330"
+        stroke="rgba(255,255,255,0.88)" stroke-width="10" stroke-linecap="round"/>
+
+  <!-- Stand pole -->
+  <path d="M210 343 L211 395"
+        stroke="rgba(255,255,255,0.85)" stroke-width="9" stroke-linecap="round"/>
+
+  <!-- Stand base (thick confident arc) -->
+  <path d="M165 395 C175 398, 200 402, 212 400 C224 398, 248 396, 258 393"
+        stroke="rgba(255,255,255,0.85)" stroke-width="10" stroke-linecap="round"/>
+
+  <!-- === Sound Waves (cream arcs, decreasing opacity) === -->
+  <!-- Left waves -->
+  <path d="M135 120 C125 140, 125 175, 135 200"
+        stroke="rgba(255,255,255,0.45)" stroke-width="6" stroke-linecap="round"/>
+  <path d="M115 100 C100 135, 98 185, 115 220"
+        stroke="rgba(255,255,255,0.3)" stroke-width="5" stroke-linecap="round"/>
+
+  <!-- Right waves -->
+  <path d="M285 118 C295 138, 296 173, 286 198"
+        stroke="rgba(255,255,255,0.45)" stroke-width="6" stroke-linecap="round"/>
+  <path d="M305 98 C320 133, 322 183, 306 218"
+        stroke="rgba(255,255,255,0.3)" stroke-width="5" stroke-linecap="round"/>
+
+  <!-- === Decorative Squiggle (signature hand motif) === -->
+  <!-- Wavy M-shape — thick cream, pressure variation -->
+  <path d="M85 435 C93 412, 105 440, 118 418 C131 396, 120 438, 142 420 C164 402, 148 438, 168 425"
+        stroke="rgba(255,255,255,0.92)" stroke-width="10" stroke-linecap="round"/>
+
+  <!-- Loop -->
+  <path d="M168 425 C185 440, 200 425, 195 408 C190 391, 172 398, 175 418"
+        stroke="rgba(255,255,255,0.88)" stroke-width="9" stroke-linecap="round"/>
+
+  <!-- Tail — pressure decreasing -->
+  <path d="M175 418 C190 440, 210 438, 225 450 C240 462, 258 455, 275 460"
+        stroke="rgba(255,255,255,0.82)" stroke-width="7" stroke-linecap="round"/>
+
+  <!-- Terracotta dot at loop junction -->
+  <path d="M173 416 C180 410, 184 416, 178 422 C172 428, 166 422, 173 416Z"
+        fill="#d97757"/>
+</svg>

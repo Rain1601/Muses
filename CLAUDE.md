@@ -4,186 +4,118 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Muses** is an AI-powered blog article generation platform that converts various source materials (PDF, Markdown, text, conversations) into high-quality blog articles. It features a Next.js frontend and FastAPI (Python) backend with SQLite database.
+**Muses** is an AI-powered blog article generation platform that converts various source materials (PDF, Markdown, text, conversations) into high-quality blog articles. Next.js frontend + FastAPI backend + SQLite.
 
 ## Development Commands
 
 ### Quick Start
 ```bash
-# Initial setup (installs dependencies, creates database)
-./scripts/setup.sh
-
-# Start with Python backend (recommended)
-./start-python.sh
-
-# Traditional dev mode (if Express backend exists)
-./scripts/dev.sh
-
-# Start production mode
-./scripts/start.sh
+./start-python.sh          # Start both frontend (port 3004) and backend (port 8080)
+./scripts/setup.sh         # Initial setup (installs deps, creates DB)
 ```
 
-### Frontend (runs on port 3004)
+### Frontend (port 3004)
 ```bash
 cd frontend
-npm run dev          # Development server
-npm run dev:turbo    # Development server with Turbo
-npm run build        # Production build
-npm run start        # Production server
-npm run lint         # ESLint checks
+npm run dev                # Dev server on port 3004
+npm run dev:turbo          # Dev server with Turbo
+npm run build              # Production build
+npm run lint               # ESLint
+npx tsc --noEmit           # Type checking (no test suite yet)
 ```
 
-### Python Backend (runs on port 8080)
+### Backend (port 8080)
 ```bash
 cd backend-python
-python3 start.py     # Start FastAPI server
-# Access API docs at http://localhost:8080/docs
+python3 start.py           # Start FastAPI (auto-kills existing process on same port)
+# Swagger docs at http://localhost:8080/docs
 ```
 
-## Architecture Overview
+### Database
+```bash
+cd backend-python
+alembic revision --autogenerate -m "description"   # Create migration
+alembic upgrade head                                # Apply migrations
+```
 
-### Technology Stack
+### Testing
+```bash
+cd backend-python && python -m pytest                        # All tests
+cd backend-python && python -m pytest test_unified_ai.py     # Single test file
+```
+
+## Architecture
+
+### Tech Stack
 - **Frontend**: Next.js 14 (App Router), TypeScript, Tailwind CSS, Shadcn/ui, TanStack Query, Zustand, TipTap Editor
-- **Backend**: FastAPI (Python), SQLAlchemy ORM, JWT authentication, OpenAI integration
-- **Database**: SQLite with SQLAlchemy (production-ready, can migrate to PostgreSQL)
-- **Authentication**: GitHub OAuth + JWT tokens
+- **Backend**: FastAPI, SQLAlchemy ORM, JWT auth, multi-model AI (OpenAI/Anthropic/Google)
+- **Database**: SQLite with SQLAlchemy + Alembic migrations
+- **Auth**: GitHub OAuth → JWT tokens
 
-### Key Directories
-```
-├── frontend/                    # Next.js application
-│   ├── app/                    # Next.js App Router pages
-│   │   ├── dashboard/          # Main dashboard
-│   │   ├── agents/            # AI agent management
-│   │   ├── articles/          # Article management
-│   │   ├── onboarding/        # User onboarding flow
-│   │   └── settings/          # User settings
-│   ├── components/            # Reusable React components
-│   ├── lib/                   # Utility libraries
-│   └── store/                 # Zustand state management
-├── backend-python/            # FastAPI server
-│   ├── app/
-│   │   ├── api/              # API endpoints
-│   │   ├── services/         # Business logic (AI, GitHub integration)
-│   │   ├── models/           # SQLAlchemy models
-│   │   ├── schemas/          # Pydantic schemas
-│   │   └── utils/           # Utilities (cache, encryption)
-│   ├── uploads/             # File upload storage
-│   └── requirements.txt     # Python dependencies
-```
+### Frontend Architecture
 
-## Core Features
+**API Client** (`lib/api.ts`): Axios instance with auto JWT injection from localStorage. Environment-aware — uses prod API for `muses.ink`, dev API otherwise. 30s timeout, auto-logout on 401.
+
+**State Management**:
+- Server state: TanStack Query (`staleTime: 60s`, `refetchOnWindowFocus: false`)
+- Client state: Zustand stores in `store/` (`user.ts`, `viewMode.ts`, `aiAssistant.ts`)
+- Forms: React Hook Form + Zod validation
+
+**TipTap Editor** (`components/NotionEditor.tsx`, ~52KB): Heavy component with extensions for tables, task lists, code blocks with syntax highlighting, math (KaTeX), videos (YouTube/Bilibili), resizable images, and collapsible code blocks.
+
+**Text Actions System**: `useTextActions` hook provides unified interface for AI text operations (improve, expand, summarize, translate, fix-grammar, brainstorm, custom-prompt). Gated by AI Assistant toggle state.
+
+### Backend Architecture
+
+**Router registration** in `app/main.py`: auth, users, agents, agents_actions, articles, generate, upload, publish, process, proxy, image_upload, sync, import_files, knowledge, muses_config, chat_history, studio.
+
+**Startup**: `start.py` uses `psutil` to kill existing processes on the port before starting uvicorn. Settings from `app/config.py` (env vars).
+
+**CORS**: Configured to allow only `settings.frontend_url`. TrustedHost middleware enabled.
+
+### Three Writing Modes
+
+1. **Normal Mode**: 3-column layout — article list sidebar + article view
+2. **Co-Create Mode** (`components/CoCreateMode.tsx`): Split-screen chat + NotionEditor. Chat history persists per article via `/api/chat-history/`. Auto-save with 500ms debounce. Responses containing `<article_edit>...</article_edit>` tags replace full editor content.
+3. **Co-Read Mode**: Split-screen article reader + notes editor with text quoting.
+
+### Studio Mode (newest feature)
+
+File-based writing workspace at `~/muses-workspace` with Claude AI assistance.
+
+**Backend** (`app/api/studio.py`):
+- `POST /api/studio/chat` — Stream chat via AIHubMix (aihubmix.com/v1), supports file context injection
+- `WS /api/studio/filewatcher` — WebSocket for real-time file diffs
+- File CRUD: `GET/POST/PUT/DELETE /api/studio/files/{filename}`
+
+**Frontend** (`components/studio/`): ChatPanel, MarkdownEditor, DiffView, DiffOverlay, FileExplorer, HistoryPanel, FloatingTOC. Implements differential sync — tracks file snapshots and computes diffs with accept/reject UI.
 
 ### AI Agent System
-- Customizable AI writing assistants with different personalities and styles
-- Agent configuration includes tone, length preference, target audience, custom prompts
-- Each user can create multiple agents with different characteristics
 
-### File Processing
-- Support for PDF, Markdown, and text file uploads
-- Intelligent content extraction and parsing
-- Conversation-based article generation
+**Agent Service** (`app/agent/service.py`): `AgentService` with `generate_content()` and `stream_generate_content()`. Uses `ModelFactory` to instantiate models from agent config. Builds system messages from agent config (tone, audience, custom prompts).
 
-### Article Management
-- Full CRUD operations for articles
-- Draft/published status tracking
-- Markdown content with metadata
+**Prompt System** (`app/agent/prompts/`): `builder.py` for dynamic prompt construction, `registry.py` for action registry, `action_prompts/` subdirectory with 16 action types.
 
-### Collaborative Writing Modes
-- **Co-Create Mode**: Split-screen interface for AI-assisted writing
-  * Left panel: Chat with AI for brainstorming and content generation
-  * Right panel: Notion-style article editor
-  * Text adoption: Select AI responses and add them to the editor
-  * Chat history persistence: Conversations tied to specific articles
-  * Layout swap: Switch left/right panel positions
+**Multi-Model Support** (`app/services/unified_ai.py`): Unified client abstracting OpenAI, Anthropic, and Google APIs. Model definitions in `app/models_config.py`. Per-agent model selection.
 
-- **Co-Read Mode**: Split-screen interface for reading and note-taking
-  * Left panel: Article reading view (read-only)
-  * Right panel: Notes editor
-  * Text quoting: Select text from article and add to notes
-  * Layout swap: Switch left/right panel positions
+### Knowledge Base / RAG
 
-- **View Mode Management**:
-  * Three modes: normal (3-column), co-create, co-read
-  * Zustand-based state management with persistence
-  * Shared article list sidebar across all modes
+Located in `app/agent/knowledge/`: chunker → embedder → retriever → storage pipeline. Per-user collections (`user_{user_id}_knowledge`). API at `/api/knowledge/` with endpoints: `/add`, `/search`, `/build`, `/stats`.
 
-### GitHub Integration
-- One-click publishing to GitHub repositories
-- OAuth-based GitHub authentication
-- Configurable repository paths and commit messages
-- GitHub-based image hosting: images uploaded to user's repos and accessible via raw.githubusercontent.com URLs
+### Key Data Flows
+
+**Article Generation**: Upload materials → `/api/upload/` → text extraction → `/api/generate/article` with AgentId → AIService + unified_ai → returns title/content/summary → saves as draft.
+
+**Co-Create Chat**: Open article → chat via `/api/agents/chat` → responses persist to `/api/chat-history/save` → user can select AI text to adopt into editor.
 
 ## Database Schema
 
-Key entities:
-- **User**: GitHub OAuth users with encrypted API keys
-- **Agent**: Customizable AI writing assistants
-- **Article**: Generated articles with metadata and publishing info
-- **ChatHistory**: AI conversation history tied to articles (for co-create mode)
-- **UserSettings**: User preferences and configuration
+Key entities: User (GitHub OAuth, encrypted API keys), Agent (AI writing assistants), Article (content + metadata + publishing info), ChatHistory (per-article conversations), UserSettings, SyncHistory, MusesConfig.
 
-All sensitive data (OpenAI API keys, GitHub tokens) is encrypted before storage.
+All sensitive data (API keys, tokens) encrypted before storage.
 
-## Development Patterns
+## Environment Variables (backend-python/.env)
 
-### API Routes (Python Backend)
-- Located in `backend-python/app/api/`
-- Use Pydantic for request/response validation
-- JWT authentication via FastAPI dependencies
-- Proper error handling and logging
-- FastAPI automatic OpenAPI/Swagger documentation
-
-### Frontend Components
-- Use shadcn/ui components for consistency
-- TanStack Query for server state management
-- Zustand for client state
-- TypeScript interfaces for all props
-- TipTap for rich text editing (Notion-style editor)
-
-### State Management
-- **Server State**: TanStack Query with proper caching
-- **Client State**: Zustand stores (user.ts for user data)
-- **Forms**: React Hook Form with Zod validation
-
-### Git Commit Guidelines
-**IMPORTANT**: After completing any code changes, you MUST commit them with descriptive messages.
-
-- Commit frequently after completing each logical unit of work
-- Use conventional commit format: `type: description`
-  - `feat:` - New features
-  - `fix:` - Bug fixes
-  - `docs:` - Documentation changes
-  - `refactor:` - Code refactoring
-  - `style:` - Formatting changes
-  - `test:` - Adding tests
-  - `chore:` - Maintenance tasks
-
-- Include detailed information about what changed and why
-- For large changes, split into multiple smaller commits by functionality
-- Always add Claude Code attribution footer:
-  ```
-  🤖 Generated with [Claude Code](https://claude.com/claude-code)
-
-  Co-Authored-By: Claude <noreply@anthropic.com>
-  ```
-
-Example:
-```bash
-git add <files>
-git commit -m "feat: implement co-create mode with AI chat
-
-- Add CoCreateMode component with split-screen layout
-- Implement chat history persistence
-- Add text adoption functionality
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
-
-Co-Authored-By: Claude <noreply@anthropic.com>"
-```
-
-## Environment Configuration
-
-### Required Environment Variables (backend-python/.env)
 ```bash
 DATABASE_URL="sqlite:///./muses.db"
 JWT_SECRET="your-jwt-secret"
@@ -193,73 +125,33 @@ ENCRYPTION_KEY="your-32-char-encryption-key"
 OPENAI_API_KEY="your-openai-api-key"
 ```
 
-### GitHub OAuth Setup
-- Create OAuth App at https://github.com/settings/developers
-- Authorization callback URL: `http://localhost:8080/api/auth/github/callback`
-
-## Testing
-
-```bash
-# Python backend - run all tests
-cd backend-python && python -m pytest
-
-# Python backend - run specific test file
-cd backend-python && python -m pytest test_unified_ai.py
-
-# Frontend - no test script configured yet
-# Type checking
-cd frontend && npx tsc --noEmit
-```
-
+GitHub OAuth callback URL: `http://localhost:8080/api/auth/github/callback`
 
 ## Key API Endpoints
 
-- `/api/auth/github/callback` - GitHub OAuth callback
-- `/api/agents/` - AI agent CRUD operations
-- `/api/agents/chat` - AI chat conversation for co-create mode
-- `/api/agents/text-action` - Text processing actions (improve, expand, summarize, etc.)
-- `/api/articles/` - Article management
-- `/api/chat-history/{article_id}` - Get chat history for an article
-- `/api/chat-history/save` - Save chat history for an article
-- `/api/generate/` - AI article generation
-- `/api/upload/` - File upload processing
-- `/api/image-upload/upload-image` - GitHub image hosting
-- `/api/publish/` - GitHub repository publishing
-- `/api/users/settings` - User settings management
+- `/api/auth/github/callback` — GitHub OAuth
+- `/api/agents/` — Agent CRUD; `/api/agents/chat` — AI chat; `/api/agents/text-action` — text operations
+- `/api/articles/` — Article CRUD
+- `/api/generate/` — AI article generation
+- `/api/upload/` — File upload processing
+- `/api/chat-history/{article_id}` — Chat history per article
+- `/api/knowledge/` — RAG knowledge base operations
+- `/api/studio/` — Studio mode (chat, files, filewatcher)
+- `/api/image-upload/upload-image` — GitHub-based image hosting
+- `/api/publish/` — Publish to GitHub repos
+- `/api/users/settings` — User settings
 
-## Multi-Model AI Support
+## Git Commit Guidelines
 
-The system supports multiple AI providers through a unified interface:
-- **OpenAI**: GPT-4, GPT-4 Turbo, GPT-3.5 Turbo
-- **Anthropic**: Claude 3.5 Sonnet, Claude 3 Opus/Sonnet/Haiku
-- **Google**: Gemini 1.5 Pro/Flash, Gemini 2.0 Flash
+Use conventional commits (`feat:`, `fix:`, `docs:`, `refactor:`, `style:`, `test:`, `chore:`). Always include attribution footer:
 
-AI configuration is handled through:
-- `backend-python/app/models_config.py` - Model definitions and mappings
-- `backend-python/app/services/unified_ai.py` - Unified API client with provider-specific formatting
-- Each user can configure different models for different agents
+```
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
-## Database Management
-
-```bash
-# Create Alembic migration
-cd backend-python
-alembic revision --autogenerate -m "description"
-
-# Apply migrations
-alembic upgrade head
-
-# Database backup
-cp muses.db muses.db.backup
+Co-Authored-By: Claude <noreply@anthropic.com>
 ```
 
 ## Deployment
 
-### Mac Mini Auto-Deployment
-The project includes a complete CI/CD solution for Mac Mini deployment:
-- **Complete Guide**: See `docs/MAC_MINI_DEPLOYMENT.md` for comprehensive setup instructions
-- **Auto-sync**: Push to GitHub → Mac Mini automatically pulls and deploys
-- **External Access**: Includes Cloudflare Tunnel configuration
-
-### Traditional Deployment
-The project also includes Docker configuration and PM2 process management for traditional deployment. See `docs/DEPLOYMENT.md` for detailed deployment instructions.
+- **Mac Mini CI/CD**: Push to main → GitHub webhook → Mac Mini auto-deploys. See `docs/MAC_MINI_DEPLOYMENT.md`.
+- **Traditional**: Docker + PM2. See `docs/DEPLOYMENT.md`.
