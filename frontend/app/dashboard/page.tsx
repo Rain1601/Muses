@@ -15,7 +15,9 @@ import { CoCreateMode } from '@/components/CoCreateMode';
 import { CoReadMode } from '@/components/CoReadMode';
 // import '@/app/editor-demo/mermaid-styles.css'; // 移除这个导入，避免表格样式冲突
 import { api } from "@/lib/api";
-import { List, Info, GitBranch, ChevronLeft, ChevronRight, Send, Save, Eye, Clock, PenTool } from "lucide-react";
+import { List, Info, GitBranch, ChevronLeft, ChevronRight, Send, Save, Eye, Clock, PenTool, MessageSquare } from "lucide-react";
+import ChatPanel from "@/components/studio/ChatPanel";
+import type { ChatPanelHandle } from "@/components/studio/ChatPanel";
 import { useToast } from "@/components/Toast";
 import { usePublishNotification } from "@/components/PublishNotification";
 import { prepareFilesForGitHub } from "@/lib/publish-utils";
@@ -54,8 +56,13 @@ function DashboardContent() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [defaultAgent, setDefaultAgent] = useState<any>(null);
   const [showImportDialog, setShowImportDialog] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0); // 添加刷新key，用于强制刷新文章列表
-  const [recentArticles, setRecentArticles] = useState<Article[]>([]); // 存储最近的文章列表
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [recentArticles, setRecentArticles] = useState<Article[]>([]);
+  const [editorSelection, setEditorSelection] = useState("");
+  const [editStats, setEditStats] = useState({ added: 0, removed: 0 });
+  const [editHistory, setEditHistory] = useState<{ desc: string; added: number; removed: number; time: Date }[]>([]);
+  const [showEditHistory, setShowEditHistory] = useState(false);
+  const chatPanelRef = useRef<ChatPanelHandle>(null);
   const titleInputRef = useRef<HTMLInputElement>(null); // 标题输入框引用
   const selectedArticleRef = useRef(selectedArticle); // 用于自动保存的引用
   const { showToast, ToastContainer } = useToast();
@@ -65,6 +72,27 @@ function DashboardContent() {
   useEffect(() => {
     selectedArticleRef.current = selectedArticle;
   }, [selectedArticle]);
+
+  // 当从共创/共读模式切换回编辑模式时，重新加载文章内容以同步最新修改
+  const prevViewModeRef = useRef(viewMode);
+  useEffect(() => {
+    const switchingToEdit = prevViewModeRef.current !== 'edit' && viewMode === 'edit';
+    prevViewModeRef.current = viewMode;
+
+    if (switchingToEdit && selectedArticle?.id) {
+      // 从后端重新加载文章内容
+      api.get(`/api/articles/${selectedArticle.id}`)
+        .then(response => {
+          const article = response.data.article || response.data;
+          setEditingTitle(article.title);
+          setEditingContent(article.content);
+          setSelectedArticle(article);
+        })
+        .catch(error => {
+          console.error('重新加载文章失败:', error);
+        });
+    }
+  }, [viewMode, selectedArticle?.id]);
 
   // 获取默认agent和最近文章
   useEffect(() => {
@@ -101,7 +129,7 @@ function DashboardContent() {
     }
   }, [searchParams, user, checkAuth, router]);
 
-  // 自动保存功能 - 静默保存，不更新任何UI
+  // 自动保存功能 - 完全静默，不更新任何UI状态
   const autoSave = useCallback(async () => {
     // 只在编辑模式下自动保存，避免在共创模式创建新文章
     if (!editingContent.trim() && !editingTitle.trim()) return;
@@ -109,15 +137,13 @@ function DashboardContent() {
     if (!selectedArticle) return; // 没有选中文章时不自动保存
 
     try {
-      // 静默保存到后端
+      // 静默保存到后端，不更新任何UI状态
       await api.put(`/api/articles/${selectedArticle.id}`, {
         title: editingTitle || '无标题',
         content: editingContent,
         publishStatus: selectedArticle.publishStatus
       });
-
-      // 仅更新保存时间显示
-      setLastSaved(new Date());
+      // 不调用 setLastSaved，避免触发重新渲染
     } catch (error) {
       console.error('自动保存失败:', error);
     }
@@ -497,12 +523,17 @@ summary: ""
     }
   }, [activeHeading, rightPanelMode]);
 
-  // 监听Shift+Cmd+S快捷键
+  // 监听快捷键: Shift+Cmd+S 保存, Cmd+K 聚焦Claude
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key === 'S') {
         event.preventDefault();
         manualSave();
+      }
+      if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
+        event.preventDefault();
+        setRightPanelMode('info');
+        setRightPanelCollapsed(false);
       }
     };
 
@@ -650,8 +681,7 @@ summary: ""
             <CoCreateMode
               articleId={selectedArticle?.id}
               agentId={selectedArticle?.agentId || defaultAgent?.id}
-              initialContent={editingContent}
-              onContentChange={setEditingContent}
+              initialContent={selectedArticle?.content || ''}
             />
           </div>
         ) : viewMode === 'co-read' ? (
@@ -796,6 +826,7 @@ summary: ""
                       initialContent={editingContent}
                       onChange={setEditingContent}
                       agentId={selectedArticle?.agentId || defaultAgent?.id}
+                      onSelectionChange={setEditorSelection}
                     />
                   </div>
                 </div>
@@ -895,7 +926,7 @@ summary: ""
 
         {/* 右侧栏 - 信息面板 */}
         <aside className={`bg-muted/30 border-l border-border flex-shrink-0 hidden lg:block transition-all duration-300 ${
-          rightPanelCollapsed ? 'w-0 opacity-0 overflow-hidden' : 'w-72 opacity-100'
+          rightPanelCollapsed ? 'w-0 opacity-0 overflow-hidden' : 'w-[360px] opacity-100'
         }`}>
           <div className="h-full flex flex-col">
             {/* 切换标签 */}
@@ -923,8 +954,8 @@ summary: ""
                   onClick={() => setRightPanelMode('info')}
                 >
                   <div className="flex items-center gap-1.5">
-                    <Info className="w-3.5 h-3.5" />
-                    <span>信息</span>
+                    <MessageSquare className="w-3.5 h-3.5" />
+                    <span>Claude</span>
                   </div>
                 </button>
                 <button
@@ -1044,68 +1075,14 @@ summary: ""
                     <div className="text-sm text-muted-foreground">选中文章后可以进行同步操作</div>
                   </div>
                 )
-              ) : selectedArticle ? (
-                /* 文章信息 */
-                <div className="space-y-4 sidebar-content">
-                  {/* 基本信息 */}
-                  <div>
-                    <h4 className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">基本信息</h4>
-                    <div className="space-y-3 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">状态</span>
-                        <span className={`px-2 py-1 text-xs rounded ${
-                          selectedArticle.publishStatus === 'published'
-                            ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-                            : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400'
-                        }`}>
-                          {selectedArticle.publishStatus === 'published' ? '已发布' : '草稿'}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">字数</span>
-                        <span className="text-foreground">{selectedArticle.content.replace(/[#*`_\[\]()!-]/g, '').replace(/\s+/g, '').length} 字</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">创建</span>
-                        <span className="text-foreground">{new Date(selectedArticle.createdAt).toLocaleDateString('zh-CN')}</span>
-                      </div>
-                      {selectedArticle.updatedAt !== selectedArticle.createdAt && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">更新</span>
-                          <span className="text-foreground">{new Date(selectedArticle.updatedAt).toLocaleDateString('zh-CN')}</span>
-                        </div>
-                      )}
-                      {selectedArticle.agent && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Agent</span>
-                          <span className="text-foreground">{selectedArticle.agent.name}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* 摘要 */}
-                  {selectedArticle.summary && (
-                    <div>
-                      <h4 className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">摘要</h4>
-                      <p className="text-sm text-foreground/80 leading-relaxed bg-muted/20 rounded p-3">{selectedArticle.summary}</p>
-                    </div>
-                  )}
-                </div>
               ) : (
-                <div className="text-center py-12">
-                  <div className="mb-4 flex justify-center">
-                    {rightPanelMode === 'toc' ? (
-                      <List className="w-12 h-12 text-muted-foreground/40" />
-                    ) : (
-                      <Info className="w-12 h-12 text-muted-foreground/40" />
-                    )}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    {rightPanelMode === 'toc' ? '开始写作后这里会显示目录' :
-                     rightPanelMode === 'sync' ? '选中文章后可以进行同步操作' :
-                     '选中文章后显示详细信息'}
-                  </div>
+                /* Claude Chat Panel */
+                <div className="h-full -m-4">
+                  <ChatPanel
+                    ref={chatPanelRef}
+                    activeFile={selectedArticle?.title || null}
+                    editorSelection={editorSelection}
+                  />
                 </div>
               )}
             </div>
@@ -1114,6 +1091,55 @@ summary: ""
         </>
         )}
       </main>
+
+      {/* 底部状态栏 */}
+      <div className="h-8 border-t border-border flex items-center justify-between px-4 text-xs text-muted-foreground bg-card/50 flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <span
+            className="cursor-pointer hover:text-foreground"
+            onClick={() => { setRightPanelMode('info'); setRightPanelCollapsed(false); }}
+          >
+            Reply... <kbd className="ml-1 px-1 py-0.5 rounded text-[10px] bg-muted border border-border">⌘K</kbd>
+          </span>
+        </div>
+        <div className="flex items-center gap-3">
+          {editorSelection && (
+            <span className="text-xs text-primary/80">
+              {editorSelection.split('\n').length} lines selected
+            </span>
+          )}
+          {(editStats.added > 0 || editStats.removed > 0) && (
+            <div className="relative">
+              <button
+                onClick={() => setShowEditHistory(!showEditHistory)}
+                className="flex items-center gap-1 px-2 py-0.5 rounded border border-border hover:border-muted-foreground/50 transition-colors"
+              >
+                <span className="text-green-500 font-semibold">+{editStats.added}</span>
+                <span className="text-red-400 font-semibold">-{editStats.removed}</span>
+              </button>
+              {showEditHistory && editHistory.length > 0 && (
+                <div className="absolute bottom-full right-0 mb-2 w-72 bg-card border border-border rounded-lg shadow-xl overflow-hidden z-50">
+                  <div className="px-3 py-2 text-xs font-semibold text-muted-foreground border-b border-border">
+                    编辑记录 ({editHistory.length} 次修改)
+                  </div>
+                  <div className="max-h-48 overflow-y-auto">
+                    {editHistory.map((entry, i) => (
+                      <div key={i} className="px-3 py-2 flex justify-between items-center text-xs border-b border-border/30 hover:bg-muted/30">
+                        <span className="text-foreground/80">✓ {entry.desc}</span>
+                        <span className="text-muted-foreground">
+                          <span className="text-green-500">+{entry.added}</span>{" "}
+                          <span className="text-red-400">-{entry.removed}</span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          <span>Sonnet 4</span>
+        </div>
+      </div>
 
       {/* 文件导入对话框 */}
       {showImportDialog && (

@@ -8,12 +8,15 @@ import '../styles/text-selection.css';
 import '../styles/video-responsive.css';
 import '../styles/editor-selection-persist.css';
 import '../styles/collapsible-code.css';
+import '../styles/editor-line-numbers.css';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import Highlight from '@tiptap/extension-highlight';
 import CollapsibleCodeBlock from '@/lib/tiptap-extensions/CollapsibleCodeBlock';
 import ResizableImage from '@/lib/tiptap-extensions/ResizableImage';
 import BilibiliVideo from '@/lib/tiptap-extensions/BilibiliVideo';
+import SelectionPersistence from '@/lib/tiptap-extensions/SelectionPersistence';
+import { LineNumbers } from '@/lib/tiptap-extensions/LineNumbers';
 import Youtube from '@tiptap/extension-youtube';
 // Dropcursor 已包含在 StarterKit 中，无需单独导入
 import { Table } from '@tiptap/extension-table';
@@ -46,9 +49,11 @@ interface NotionEditorProps {
   initialContent?: string;
   onChange?: (content: string) => void;
   agentId?: string; // 当前使用的Agent ID
+  onSelectionChange?: (selectedText: string) => void;
+  onEditorReady?: (editor: any) => void;
 }
 
-export function NotionEditor({ initialContent = '', onChange, agentId }: NotionEditorProps) {
+export function NotionEditor({ initialContent = '', onChange, agentId, onSelectionChange, onEditorReady }: NotionEditorProps) {
   // Component initialized with agentId
   const { isEnabled: aiAssistantEnabled } = useAIAssistantStore();
 
@@ -658,6 +663,7 @@ export function NotionEditor({ initialContent = '', onChange, agentId }: NotionE
       console.log('🔍 setBilibiliVideo 可用:', typeof (editor.commands as any).setBilibiliVideo);
       // 保存 editor 到 ref
       editorRef.current = editor;
+      onEditorReady?.(editor);
     },
     extensions: [
       Placeholder.configure({
@@ -726,9 +732,16 @@ export function NotionEditor({ initialContent = '', onChange, agentId }: NotionE
       }),
       TextStyle,
       Color,
-      // SelectionHighlight.configure({
-      //   highlightClass: 'selection-highlight-decoration',
-      // }),
+      SelectionPersistence.configure({
+        className: 'selection-decoration',
+        onSelectionPersist: (info) => {
+          onSelectionChange?.(info.text);
+        },
+        onSelectionClear: () => {
+          onSelectionChange?.('');
+        },
+      }),
+      LineNumbers,
     ],
     content: initialContent || '',
     onUpdate: ({ editor, transaction }) => {
@@ -958,183 +971,7 @@ export function NotionEditor({ initialContent = '', onChange, agentId }: NotionE
     setMounted(true);
   }, []);
 
-  // 使用更稳定的文本选择检测
-  useEffect(() => {
-    if (!agentId) return;
-    if (!editor) {
-      console.log('⏳ Editor not ready yet, skipping selection detection');
-      return;
-    }
-    console.log('✅ Selection detection effect running with editor:', !!editor);
-
-    let selectionTimeout: NodeJS.Timeout;
-    let isSelecting = false;
-
-    const checkSelection = () => {
-      try {
-        const selection = window.getSelection();
-
-        // 错误处理：selection 可能为 null
-        if (!selection) {
-          console.warn('⚠️ getSelection returned null');
-          return;
-        }
-
-        // 没有选中文本
-        if (selection.isCollapsed || selection.rangeCount === 0) {
-        // 只有在确实需要关闭时才关闭
-        if (toolbarStateRef.current.showTextActionToolbar && !isSelecting) {
-          setShowTextActionToolbar(false);
-          setSelectedText('');
-          setSelectionRange(null);
-          toolbarStateRef.current.lastSelectedText = '';
-        }
-        if (toolbarStateRef.current.showAIDisabledTooltip) {
-          setShowAIDisabledTooltip(false);
-        }
-        return;
-      }
-
-      const selectedText = selection.toString().trim();
-
-      // 避免重复处理相同的选择
-      const now = Date.now();
-      if (selectedText === toolbarStateRef.current.lastSelectedText &&
-          now - toolbarStateRef.current.lastSelectionTime < 500) {
-        return;
-      }
-
-      if (selectedText.length >= 3 && aiAssistantEnabled && agentId) {
-        const range = selection.getRangeAt(0);
-        const rect = range.getBoundingClientRect();
-
-        if (rect.width > 0 && rect.height > 0) {
-          // 更新状态
-          toolbarStateRef.current.lastSelectedText = selectedText;
-          toolbarStateRef.current.lastSelectionTime = now;
-
-          setSelectedText(selectedText);
-          setSelectionRange(range.cloneRange());
-
-          // 计算工具栏位置，确保不超出屏幕
-          const toolbarX = Math.min(rect.right + 10, window.innerWidth - 340);
-          const toolbarY = rect.bottom + 20;
-
-          setTextActionPosition({
-            x: Math.max(10, toolbarX),
-            y: toolbarY
-          });
-
-          setShowTextActionToolbar(true);
-          setShowAIDisabledTooltip(false);
-
-          console.log('📍 Text selection detected:', selectedText.slice(0, 50));
-        }
-      } else if (selectedText.length >= 3 && !aiAssistantEnabled) {
-        // 显示 AI 禁用提示
-        setShowAIDisabledTooltip(true);
-        setShowTextActionToolbar(false);
-        toolbarStateRef.current.lastSelectedText = '';
-      } else {
-        // 清理状态
-        if (toolbarStateRef.current.showTextActionToolbar) {
-          setShowTextActionToolbar(false);
-          setSelectedText('');
-          setSelectionRange(null);
-          toolbarStateRef.current.lastSelectedText = '';
-        }
-        if (toolbarStateRef.current.showAIDisabledTooltip) {
-          setShowAIDisabledTooltip(false);
-        }
-      }
-      } catch (error) {
-        console.error('❌ Error in checkSelection:', error);
-      }
-    };
-
-    const handleMouseDown = () => {
-      isSelecting = true;
-    };
-
-    const handleMouseUp = (event: MouseEvent) => {
-      // 避免点击工具栏时触发
-      const target = event.target as HTMLElement;
-      if (target.closest('[data-text-action-toolbar]') ||
-          target.closest('[data-text-action-dialog]')) {
-        return;
-      }
-
-      // 延迟检查选择
-      clearTimeout(selectionTimeout);
-      selectionTimeout = setTimeout(() => {
-        checkSelection();
-        isSelecting = false;
-      }, 150);
-    };
-
-    const handleKeyUp = (event: KeyboardEvent) => {
-      // 支持更多键盘选择组合
-      const isSelectKey = (
-        event.shiftKey ||                                    // Shift + 方向键
-        (event.metaKey && event.shiftKey) ||                // Cmd + Shift + 方向键
-        (event.ctrlKey && event.shiftKey) ||                // Ctrl + Shift + 方向键
-        ((event.metaKey || event.ctrlKey) && event.key === 'a')  // Cmd/Ctrl + A 全选
-      );
-
-      const isNavigationKey = [
-        'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
-        'Home', 'End', 'PageUp', 'PageDown'
-      ].includes(event.key);
-
-      // 如果是选择相关的按键，检查选择
-      if (isSelectKey || (event.shiftKey && isNavigationKey)) {
-        clearTimeout(selectionTimeout);
-        selectionTimeout = setTimeout(checkSelection, 100);
-      }
-    };
-
-    // 输入法事件处理 - 当工具栏显示时阻止输入法修改选中文本
-    const handleCompositionStart = (e: CompositionEvent) => {
-      if (toolbarStateRef.current.showTextActionToolbar) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    };
-
-    const handleCompositionUpdate = (e: CompositionEvent) => {
-      if (toolbarStateRef.current.showTextActionToolbar) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    };
-
-    const handleCompositionEnd = (e: CompositionEvent) => {
-      if (toolbarStateRef.current.showTextActionToolbar) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    };
-
-    // 事件监听
-    document.addEventListener('mousedown', handleMouseDown);
-    document.addEventListener('mouseup', handleMouseUp);
-    document.addEventListener('keyup', handleKeyUp);
-
-    // 在捕获阶段监听输入法事件，确保在编辑器处理之前拦截
-    document.addEventListener('compositionstart', handleCompositionStart, true);
-    document.addEventListener('compositionupdate', handleCompositionUpdate, true);
-    document.addEventListener('compositionend', handleCompositionEnd, true);
-
-    return () => {
-      clearTimeout(selectionTimeout);
-      document.removeEventListener('mousedown', handleMouseDown);
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.removeEventListener('keyup', handleKeyUp);
-      document.removeEventListener('compositionstart', handleCompositionStart, true);
-      document.removeEventListener('compositionupdate', handleCompositionUpdate, true);
-      document.removeEventListener('compositionend', handleCompositionEnd, true);
-    };
-  }, [agentId, aiAssistantEnabled, editor]);
+  // Selection detection is now handled by the SelectionPersistence TipTap extension
 
   useEffect(() => {
     if (editor) {

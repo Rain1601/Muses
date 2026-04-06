@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { NotionEditor } from '@/components/NotionEditor';
 import { Send, Check, MessageSquarePlus, ArrowLeftRight } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -23,8 +23,7 @@ interface CoCreateModeProps {
 export function CoCreateMode({
   articleId,
   agentId,
-  initialContent = '',
-  onContentChange
+  initialContent = ''
 }: CoCreateModeProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -37,6 +36,42 @@ export function CoCreateMode({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const { showToast } = useToast();
   const shouldAutoScrollRef = useRef<boolean>(false); // 是否应该自动滚动
+  const prevArticleIdRef = useRef(articleId);
+  // 保存编辑器的初始内容，只在切换文章时更新，保证 NotionEditor 的 initialContent prop 稳定
+  const editorInitialContentRef = useRef(initialContent);
+
+
+  // 当切换文章时，重置编辑器内容和初始内容
+  useEffect(() => {
+    if (prevArticleIdRef.current !== articleId) {
+      prevArticleIdRef.current = articleId;
+      editorInitialContentRef.current = initialContent;
+      setEditorContent(initialContent);
+    }
+  }, [articleId, initialContent]);
+
+  // 自动保存编辑器内容到后端 - 更快的保存频率
+  useEffect(() => {
+    if (!articleId) {
+      return;
+    }
+    if (!editorContent) {
+      return;
+    }
+
+    // 使用更短的延迟，让保存更及时
+    const saveTimer = setTimeout(async () => {
+      try {
+        await api.put(`/api/articles/${articleId}`, {
+          content: editorContent
+        });
+      } catch (error) {
+        console.error('❌ 自动保存失败:', error);
+      }
+    }, 500); // 500ms后保存，更快响应
+
+    return () => clearTimeout(saveTimer);
+  }, [editorContent, articleId]);
 
   // 自动滚动到最新消息
   const scrollToBottom = () => {
@@ -186,10 +221,6 @@ export function CoCreateMode({
       : selectedText.text;
 
     setEditorContent(newContent);
-    if (onContentChange) {
-      onContentChange(newContent);
-    }
-
     showToast('文本已采纳到编辑器', 'success');
     setSelectedText(null);
     setSelectionPosition(null);
@@ -203,19 +234,20 @@ export function CoCreateMode({
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
+      // 确保输入框保持焦点
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 0);
     }
   };
 
   // 处理编辑器内容变化
-  const handleEditorChange = (content: string) => {
+  const handleEditorChange = useCallback((content: string) => {
     setEditorContent(content);
-    if (onContentChange) {
-      onContentChange(content);
-    }
-  };
+  }, []);
 
-  // 对话区组件
-  const ChatSection = () => (
+  // 对话区组件 - 使用 useMemo 避免不必要的重新渲染
+  const chatSection = useMemo(() => (
     <div className={`w-1/2 ${isSwapped ? 'border-l' : 'border-r'} border-border flex flex-col bg-card relative`}>
         {/* 对话标题 */}
         <div className="border-b border-border p-4 bg-muted/30">
@@ -233,8 +265,14 @@ export function CoCreateMode({
                 <div className="w-16 h-16 mx-auto mb-4 bg-primary/10 rounded-full flex items-center justify-center">
                   <MessageSquarePlus className="w-8 h-8 text-primary" />
                 </div>
-                <p className="text-base font-medium text-foreground mb-2">开始与 AI 对话创作</p>
-                <p className="text-sm text-muted-foreground">输入你的想法，AI 会帮你拓展</p>
+                <p className="text-base font-medium text-foreground mb-2">
+                  {inputValue.trim() ? '按 Enter 发送消息' : '开始与 AI 对话创作'}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {inputValue.trim()
+                    ? `准备发送: "${inputValue.trim().slice(0, 30)}${inputValue.trim().length > 30 ? '...' : ''}"`
+                    : '输入你的想法，AI 会帮你拓展'}
+                </p>
               </div>
             </div>
           ) : (
@@ -304,10 +342,10 @@ export function CoCreateMode({
           </div>
         </div>
       </div>
-  );
+  ), [messages, inputValue, isLoading, isSwapped, handleSendMessage]);
 
-  // 编辑器区组件
-  const EditorSection = () => (
+  // 编辑器区组件 - 使用 useMemo 避免不必要的重新渲染
+  const editorSection = useMemo(() => (
     <div className="w-1/2 flex flex-col bg-background">
       <div className="border-b border-border p-4 bg-muted/30">
         <h3 className="text-lg font-semibold text-foreground">文章编辑</h3>
@@ -319,27 +357,27 @@ export function CoCreateMode({
         <div className="container mx-auto py-8 max-w-4xl px-8">
           <NotionEditor
             key={`co-create-${articleId || 'new'}-${agentId}`}
-            initialContent={editorContent}
+            initialContent={editorInitialContentRef.current}
             onChange={handleEditorChange}
             agentId={agentId}
           />
         </div>
       </div>
     </div>
-  );
+  ), [articleId, agentId, handleEditorChange]);
 
   return (
     <div className="flex h-full w-full relative">
       {/* 左右布局，根据 isSwapped 决定顺序 */}
       {isSwapped ? (
         <>
-          <EditorSection />
-          <ChatSection />
+          {editorSection}
+          {chatSection}
         </>
       ) : (
         <>
-          <ChatSection />
-          <EditorSection />
+          {chatSection}
+          {editorSection}
         </>
       )}
 
