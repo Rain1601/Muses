@@ -107,34 +107,47 @@ jobs:
         docker push ${IMAGE}:latest
 
     - name: Deploy to Cloud Run
+      env:
+        CLOUD_SQL: ${{ secrets.CLOUD_SQL_INSTANCE }}
+        DB_URL: ${{ secrets.DATABASE_URL }}
+        GH_CID: ${{ secrets.OAUTH_GITHUB_CLIENT_ID }}
+        GH_CSC: ${{ secrets.OAUTH_GITHUB_CLIENT_SECRET }}
+        JWT_S: ${{ secrets.JWT_SECRET }}
+        ENC_K: ${{ secrets.ENCRYPTION_KEY }}
+        ENC_S: ${{ secrets.ENCRYPTION_SALT }}
+        OAI_K: ${{ secrets.OPENAI_API_KEY }}
+        AHM_K: ${{ secrets.AIHUBMIX_API_KEY }}
+        G_CID: ${{ secrets.GOOGLE_CLIENT_ID }}
+        G_CSC: ${{ secrets.GOOGLE_CLIENT_SECRET }}
       run: |
         IMAGE=${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/${BACKEND_SERVICE}
+
+        ENV_VARS="ENVIRONMENT=production"
+        ENV_VARS="${ENV_VARS},DEBUG=False"
+        ENV_VARS="${ENV_VARS},HOST=0.0.0.0"
+        ENV_VARS="${ENV_VARS},DATABASE_URL=${DB_URL}"
+        ENV_VARS="${ENV_VARS},GITHUB_CLIENT_ID=${GH_CID}"
+        ENV_VARS="${ENV_VARS},GITHUB_CLIENT_SECRET=${GH_CSC}"
+        ENV_VARS="${ENV_VARS},JWT_SECRET=${JWT_S}"
+        ENV_VARS="${ENV_VARS},ENCRYPTION_KEY=${ENC_K}"
+        ENV_VARS="${ENV_VARS},ENCRYPTION_SALT=${ENC_S}"
+        ENV_VARS="${ENV_VARS},OPENAI_API_KEY=${OAI_K}"
+        ENV_VARS="${ENV_VARS},AIHUBMIX_API_KEY=${AHM_K}"
+        ENV_VARS="${ENV_VARS},AIHUBMIX_BASE_URL=https://aihubmix.com/v1"
+        ENV_VARS="${ENV_VARS},GOOGLE_CLIENT_ID=${G_CID}"
+        ENV_VARS="${ENV_VARS},GOOGLE_CLIENT_SECRET=${G_CSC}"
+        ENV_VARS="${ENV_VARS},ENABLE_STUDIO=false"
+        ENV_VARS="${ENV_VARS},LOG_LEVEL=info"
 
         gcloud run deploy $BACKEND_SERVICE \
           --image ${IMAGE}:${{ github.sha }} \
           --region $REGION \
           --project $PROJECT_ID \
           --allow-unauthenticated \
-          --add-cloudsql-instances ${{ secrets.CLOUD_SQL_INSTANCE }} \
+          --add-cloudsql-instances "${CLOUD_SQL}" \
           --memory 512Mi --cpu 1 \
           --min-instances 0 --max-instances 3 \
-          --set-env-vars "\
-ENVIRONMENT=production,\
-DEBUG=False,\
-HOST=0.0.0.0,\
-DATABASE_URL=${{ secrets.DATABASE_URL }},\
-GITHUB_CLIENT_ID=${{ secrets.OAUTH_GITHUB_CLIENT_ID }},\
-GITHUB_CLIENT_SECRET=${{ secrets.OAUTH_GITHUB_CLIENT_SECRET }},\
-JWT_SECRET=${{ secrets.JWT_SECRET }},\
-ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }},\
-ENCRYPTION_SALT=${{ secrets.ENCRYPTION_SALT }},\
-OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }},\
-AIHUBMIX_API_KEY=${{ secrets.AIHUBMIX_API_KEY }},\
-AIHUBMIX_BASE_URL=https://aihubmix.com/v1,\
-GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }},\
-GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }},\
-ENABLE_STUDIO=false,\
-LOG_LEVEL=info" \
+          --set-env-vars "${ENV_VARS}" \
           --quiet
 
     - name: Get backend URL & self-update
