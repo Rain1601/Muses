@@ -25,6 +25,9 @@ PyPDF2==3.0.1
 markdown==3.5.1
 Pygments==2.17.2  # 代码高亮支持
 Pillow==10.1.0  # 图像处理
+beautifulsoup4>=4.12.0  # HTML解析
+html2text>=2020.1.16  # HTML转Markdown
+numpy>=1.24.0  # 数值计算（知识库嵌入）
 
 # 数据验证
 pydantic>=2.5.0
