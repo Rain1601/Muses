@@ -106,6 +106,18 @@
   flex-shrink: 0;
 }
 
+.googleBtn {
+  background: #FAFAF9;
+  color: #292524;
+  border-color: #D6D3D1;
+}
+
+.googleBtn:hover {
+  background: #F5F5F4;
+  border-color: #A8A29E;
+  color: #1C1917;
+}
+
 /* Subtitle */
 .subtitle {
   font-size: 0.8125rem;

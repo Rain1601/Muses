@@ -7,7 +7,7 @@ from .database import create_tables
 from .config import settings
 
 # Import routers
-from .api import auth, users, agents, articles, generate, upload, publish, process, proxy, image_upload, sync, import_files, knowledge, muses_config, chat_history, studio
+from .api import auth, users, agents, articles, generate, upload, publish, process, proxy, image_upload, sync, import_files, knowledge, muses_config, chat_history
 
 
 @asynccontextmanager
@@ -27,19 +27,21 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS中间件
+# CORS中间件 — 支持逗号分隔的多个 origin
+_origins = [o.strip() for o in settings.frontend_url.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.frontend_url],
+    allow_origins=_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # 安全中间件
+_trusted = ["localhost", "127.0.0.1", settings.host, "*.run.app"]
 app.add_middleware(
     TrustedHostMiddleware,
-    allowed_hosts=["localhost", "127.0.0.1", settings.host]
+    allowed_hosts=_trusted,
 )
 
 # 注册路由
@@ -60,7 +62,11 @@ app.include_router(import_files.router, prefix="/api/import", tags=["import"])
 app.include_router(knowledge.router, tags=["knowledge"])  # prefix已在router中定义
 app.include_router(muses_config.router, prefix="/api", tags=["muses-config"])
 app.include_router(chat_history.router, prefix="/api/chat-history", tags=["chat-history"])
-app.include_router(studio.router, prefix="/api/studio", tags=["studio"])
+
+# Studio: 条件注册（依赖本地文件系统，生产环境可关闭）
+if settings.enable_studio:
+    from .api import studio
+    app.include_router(studio.router, prefix="/api/studio", tags=["studio"])
 
 
 @app.get("/")

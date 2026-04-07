@@ -1,0 +1,12 @@
+.env
+.env.*
+muses.db
+__pycache__/
+*.pyc
+uploads/
+logs/
+.git/
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/

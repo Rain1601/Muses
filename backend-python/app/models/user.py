@@ -13,7 +13,8 @@ class User(Base):
     __tablename__ = "User"
     
     id = Column(String, primary_key=True, default=generate_uuid)
-    githubId = Column(String, unique=True, nullable=False)
+    githubId = Column(String, unique=True, nullable=True)
+    googleId = Column(String, unique=True, nullable=True)
     username = Column(String, nullable=False)
     email = Column(String, nullable=True)
     avatarUrl = Column(String, nullable=True)

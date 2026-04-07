@@ -17,7 +17,8 @@ export async function POST(request: NextRequest) {
     const timeoutId = setTimeout(() => controller.abort(), 60000); // 60秒超时（GPT-4需要更长时间）
 
     try {
-      const response = await fetch('http://localhost:8080/api/agents/text-action', {
+      const backendUrl = process.env.BACKEND_INTERNAL_URL || 'http://localhost:8080';
+      const response = await fetch(`${backendUrl}/api/agents/text-action`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

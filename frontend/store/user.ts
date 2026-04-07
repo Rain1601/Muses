@@ -5,8 +5,9 @@ interface UserStore {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  
+
   login: () => void;
+  loginWithGoogle: () => void;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
   setUser: (user: User | null) => void;
@@ -19,6 +20,10 @@ export const useUserStore = create<UserStore>((set) => ({
 
   login: () => {
     window.location.href = auth.getGitHubLoginUrl();
+  },
+
+  loginWithGoogle: () => {
+    window.location.href = auth.getGoogleLoginUrl();
   },
 
   logout: async () => {

@@ -10,31 +10,43 @@ class Settings(BaseSettings):
     debug: bool = True
     host: str = "localhost"
     port: int = 8080
+    backend_url: str = "http://localhost:8080"
     frontend_url: str = "http://localhost:3004"
-    
+
     # 数据库配置
     database_url: str = "sqlite:///./muses.db"
-    
+
     # GitHub OAuth配置
     github_client_id: str
     github_client_secret: str
-    
+
+    # Google OAuth配置
+    google_client_id: Optional[str] = None
+    google_client_secret: Optional[str] = None
+
     # JWT配置
     jwt_secret: str
     jwt_algorithm: str = "HS256"
     jwt_expire_hours: int = 168  # 7天
-    
+
     # 数据加密配置
     encryption_key: str
     encryption_salt: str = "muses_encryption_salt"
-    
+
     # OpenAI配置
     openai_api_key: Optional[str] = None
-    
+
+    # AI Hub Mix (Studio chat)
+    aihubmix_api_key: Optional[str] = None
+    aihubmix_base_url: str = "https://aihubmix.com/v1"
+
+    # Studio
+    enable_studio: bool = True
+
     # 文件上传配置
     max_file_size: int = 10485760  # 10MB
     upload_dir: str = "./uploads"
-    
+
     # 日志配置
     log_level: str = "debug"
     

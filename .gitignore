@@ -33,7 +33,9 @@ yarn-error.log*
 .env*.local
 .env
 backend/.env
+backend-python/.env
 frontend/.env.local
+backend-env.yaml
 
 # Vercel
 .vercel

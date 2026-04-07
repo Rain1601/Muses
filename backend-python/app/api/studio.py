@@ -126,10 +126,11 @@ async def delete_file(filepath: str):
 from openai import OpenAI
 from fastapi.responses import StreamingResponse
 from fastapi import Request
+from ..config import settings
 
-# AIHubMix aggregated API
-AIHUBMIX_BASE_URL = "https://aihubmix.com/v1"
-AIHUBMIX_API_KEY = "sk-dQCnrL6HHBZOjqgtBc80C9672f81411195C49c80C7B670D0"
+# AIHubMix aggregated API — read from env
+AIHUBMIX_BASE_URL = settings.aihubmix_base_url
+AIHUBMIX_API_KEY = settings.aihubmix_api_key or ""
 STUDIO_MODEL = "claude-sonnet-4-20250514"
 
 

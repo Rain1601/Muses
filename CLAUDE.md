@@ -151,7 +151,26 @@ Use conventional commits (`feat:`, `fix:`, `docs:`, `refactor:`, `style:`, `test
 Co-Authored-By: Claude <noreply@anthropic.com>
 ```
 
-## Deployment
+## Deployment (Google Cloud Run)
 
-- **Mac Mini CI/CD**: Push to main → GitHub webhook → Mac Mini auto-deploys. See `docs/MAC_MINI_DEPLOYMENT.md`.
-- **Traditional**: Docker + PM2. See `docs/DEPLOYMENT.md`.
+- **CI/CD**: Push to main → GitHub Actions → Build Docker images → Deploy to Cloud Run
+- **Backend**: `backend-python/Dockerfile` → Cloud Run + Cloud SQL PostgreSQL
+- **Frontend**: `frontend/Dockerfile` → Cloud Run (Next.js standalone)
+- **Manual deploy**: `./deploy.sh` (requires `GCP_PROJECT_ID` env var)
+- **Env config**: Copy `.env.production.template` and `backend-env.yaml.template`
+- **Studio**: Disabled in production (`ENABLE_STUDIO=false`) — depends on local filesystem
+
+### First-time Setup
+```bash
+export GCP_PROJECT_ID="your-project" DB_PASSWORD="your-pass"
+./scripts/gcp-setup.sh   # Creates Cloud SQL, service account, prints GitHub Secrets to set
+```
+
+### Required GitHub Secrets
+- `GCP_PROJECT_ID` — Google Cloud project ID
+- `GCP_SA_KEY` — Service account JSON key (from gcp-setup.sh)
+- `CLOUD_SQL_INSTANCE` — `project:region:muses-db`
+- `DATABASE_URL` — `postgresql://user:pass@/muses?host=/cloudsql/...`
+- `JWT_SECRET`, `ENCRYPTION_KEY`, `ENCRYPTION_SALT` — Security keys
+- `OAUTH_GITHUB_CLIENT_ID`, `OAUTH_GITHUB_CLIENT_SECRET` — GitHub OAuth App
+- `OPENAI_API_KEY`, `AIHUBMIX_API_KEY` — AI API keys

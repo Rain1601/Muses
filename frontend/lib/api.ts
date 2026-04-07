@@ -1,12 +1,16 @@
 import axios from 'axios';
 import { ProcessTextRequest, LLMResponse, ArticleImproveRequest, ChatRequest } from './types/llm-response';
 
-// 自动检测环境：如果是 muses.ink 域名，使用生产 API，否则使用开发环境
+// 自动检测环境：生产域名使用对应 API，否则使用开发环境
 const getApiUrl = () => {
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
     if (hostname === 'muses.ink' || hostname.endsWith('.muses.ink')) {
       return 'https://api.muses.ink';
+    }
+    // Cloud Run or other deployments: use build-time env
+    if (process.env.NEXT_PUBLIC_API_URL) {
+      return process.env.NEXT_PUBLIC_API_URL;
     }
   }
   return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';

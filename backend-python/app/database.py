@@ -4,11 +4,23 @@ from sqlalchemy.orm import sessionmaker
 from .config import settings
 
 # 创建数据库引擎
-engine = create_engine(
-    settings.database_url,
-    connect_args={"check_same_thread": False} if "sqlite" in settings.database_url else {},
-    echo=settings.debug  # 开发环境显示SQL日志
+_is_sqlite = "sqlite" in settings.database_url
+
+_engine_kwargs = dict(
+    echo=settings.debug,  # 开发环境显示SQL日志
 )
+
+if _is_sqlite:
+    _engine_kwargs["connect_args"] = {"check_same_thread": False}
+else:
+    # PostgreSQL connection pool settings
+    _engine_kwargs.update(
+        pool_size=5,
+        max_overflow=10,
+        pool_pre_ping=True,
+    )
+
+engine = create_engine(settings.database_url, **_engine_kwargs)
 
 # 创建会话工厂
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

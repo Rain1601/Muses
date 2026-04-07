@@ -10,7 +10,8 @@ class UserBase(BaseModel):
 
 
 class UserCreate(UserBase):
-    githubId: str
+    githubId: Optional[str] = None
+    googleId: Optional[str] = None
 
 
 class UserUpdate(BaseModel):
@@ -48,7 +49,8 @@ class UserSettings(UserSettingsBase):
 
 class User(UserBase):
     id: str
-    githubId: str
+    githubId: Optional[str] = None
+    googleId: Optional[str] = None
     hasOpenAIKey: bool = False
     hasClaudeKey: bool = False
     hasGeminiKey: bool = False

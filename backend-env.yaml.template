@@ -1,0 +1,22 @@
+# Cloud Run environment variables for muses-backend
+# Copy to backend-env.yaml and fill in values before deploying
+# Usage: gcloud run deploy ... --env-vars-file backend-env.yaml
+
+ENVIRONMENT: production
+DEBUG: "False"
+HOST: "0.0.0.0"
+BACKEND_URL: "https://muses-backend-XXXXX.run.app"
+FRONTEND_URL: "https://muses-frontend-XXXXX.run.app"
+DATABASE_URL: "postgresql://USER:PASSWORD@/muses?host=/cloudsql/PROJECT:REGION:INSTANCE"
+GITHUB_CLIENT_ID: ""
+GITHUB_CLIENT_SECRET: ""
+GOOGLE_CLIENT_ID: ""
+GOOGLE_CLIENT_SECRET: ""
+JWT_SECRET: ""
+ENCRYPTION_KEY: ""
+ENCRYPTION_SALT: "muses_production_salt"
+OPENAI_API_KEY: ""
+AIHUBMIX_API_KEY: ""
+AIHUBMIX_BASE_URL: "https://aihubmix.com/v1"
+ENABLE_STUDIO: "false"
+LOG_LEVEL: "info"

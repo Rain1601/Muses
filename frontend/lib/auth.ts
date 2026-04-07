@@ -1,11 +1,14 @@
 import axios from 'axios';
 
-// 自动检测环境：如果是 muses.ink 域名，使用生产 API，否则使用开发环境
+// 自动检测环境：生产域名使用对应 API，否则使用开发环境
 const getApiUrl = () => {
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
     if (hostname === 'muses.ink' || hostname.endsWith('.muses.ink')) {
       return 'https://api.muses.ink';
+    }
+    if (process.env.NEXT_PUBLIC_API_URL) {
+      return process.env.NEXT_PUBLIC_API_URL;
     }
   }
   return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
@@ -63,5 +66,10 @@ export const auth = {
   // 获取GitHub登录URL
   getGitHubLoginUrl: () => {
     return `${API_URL}/api/auth/github`;
+  },
+
+  // 获取Google登录URL
+  getGoogleLoginUrl: () => {
+    return `${API_URL}/api/auth/google`;
   },
 };
