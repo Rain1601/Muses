@@ -1,6 +1,6 @@
 # FastAPI 核心框架
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
+fastapi>=0.104.1
+uvicorn[standard]>=0.24.0
 
 # 数据库
 sqlalchemy==2.0.23
@@ -14,8 +14,8 @@ passlib[bcrypt]==1.7.4
 cryptography==41.0.7
 
 # HTTP客户端和API
-httpx[socks]==0.25.2
-requests==2.31.0
+httpx[socks]>=0.25.2
+requests>=2.31.0
 
 # AI和文件处理
 openai>=1.68.2
@@ -25,8 +25,8 @@ Pygments==2.17.2  # 代码高亮支持
 Pillow==10.1.0  # 图像处理
 
 # 数据验证
-pydantic==2.5.0
-pydantic-settings==2.1.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
 
 # 开发工具
 pytest==7.4.3
@@ -38,4 +38,4 @@ cachetools==5.3.2
 
 # RAG相关依赖
 chromadb>=0.5.23  # 向量数据库
-sentence-transformers==2.2.2  # 文本嵌入
+sentence-transformers>=2.2.2  # 文本嵌入
