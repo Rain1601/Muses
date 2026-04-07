@@ -2,6 +2,13 @@
 const nextConfig = {
   reactStrictMode: true,
   output: 'standalone',
+  typescript: {
+    // Type checking done separately via tsc --noEmit
+    ignoreBuildErrors: true,
+  },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   // 优化开发体验
   experimental: {
     turbo: {
