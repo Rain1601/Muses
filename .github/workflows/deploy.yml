@@ -137,7 +137,7 @@ jobs:
         ENV_VARS="${ENV_VARS},GOOGLE_CLIENT_ID=${G_CID}"
         ENV_VARS="${ENV_VARS},GOOGLE_CLIENT_SECRET=${G_CSC}"
         ENV_VARS="${ENV_VARS},ENABLE_STUDIO=false"
-        ENV_VARS="${ENV_VARS},LOG_LEVEL=info"
+        ENV_VARS="${ENV_VARS},LOG_LEVEL=INFO"
 
         gcloud run deploy $BACKEND_SERVICE \
           --image ${IMAGE}:${{ github.sha }} \

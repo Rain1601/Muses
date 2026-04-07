@@ -39,7 +39,7 @@ class AgentExecutionLogger:
 
         # 创建专门的logger
         self.logger = logging.getLogger('agent.execution')
-        self.logger.setLevel(getattr(logging, debug_config.LOG_LEVEL))
+        self.logger.setLevel(getattr(logging, debug_config.LOG_LEVEL.upper()))
 
         # 文件处理器 - 记录所有agent执行
         log_file = self.log_dir / f"agent_{datetime.now().strftime('%Y%m%d')}.log"
