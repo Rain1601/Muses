@@ -437,12 +437,12 @@ export default function SettingsPage() {
         console.log(`🕐 [TIMEOUT] Cleared test result for ${type} after 3 seconds`);
       }, 3000);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error(`❌ [ERROR] Failed to test ${type} key:`, error);
       console.error(`❌ [ERROR] Error details:`, {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status
       });
 
       // Update error state
