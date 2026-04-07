@@ -187,8 +187,40 @@
   letter-spacing: 0.02em;
 }
 
+/* Writing animation — lines appear as if being drawn by the pen */
+.writingLine {
+  fill: none;
+  stroke-dasharray: 200;
+  stroke-dashoffset: 200;
+  animation: writeLine 2.2s ease-out forwards;
+}
+.writingLine1 { animation-delay: 0.3s; }
+.writingLine2 { animation-delay: 0.8s; }
+.writingLine3 { animation-delay: 1.3s; }
+.writingLine4 { animation-delay: 1.8s; }
+.writingLine5 { animation-delay: 2.4s; }
+.writingLine6 { animation-delay: 2.9s; }
+
+@keyframes writeLine {
+  0% {
+    stroke-dashoffset: 200;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .illustration {
     animation: none;
+  }
+  .writingLine {
+    animation: none;
+    stroke-dashoffset: 0;
   }
 }

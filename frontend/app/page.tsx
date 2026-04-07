@@ -5,65 +5,110 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import s from "./page.module.css";
 
-/* Hand-drawn Muses pen illustration — Anthropic warm minimalism style */
+/* Hand-drawn Muses pen + paper illustration — Anthropic warm minimalism style */
 function MusesIllustration({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 420 500" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-      {/* === Quill / Fountain Pen (terracotta filled, hand-drawn) === */}
-      {/* Pen nib — bold terracotta blob */}
-      <path
-        d="M210 68 C218 65, 228 72, 235 92 C242 112, 248 145, 250 178 C252 211, 248 238, 240 258 C232 278, 222 285, 212 286 C202 287, 192 280, 184 260 C176 240, 170 213, 168 180 C166 147, 170 114, 178 94 C186 74, 202 71, 210 68Z"
-        fill="#d97757"
-      />
-      {/* Pen outline (cream, bold stroke) */}
-      <path
-        d="M210 68 C218 65, 228 72, 235 92 C242 112, 248 145, 250 178 C252 211, 248 238, 240 258 C232 278, 222 285, 212 286 C202 287, 192 280, 184 260 C176 240, 170 213, 168 180 C166 147, 170 114, 178 94 C186 74, 202 71, 210 68Z"
-        stroke="rgba(255,255,255,0.9)" strokeWidth="7" strokeLinecap="round" fill="none"
-      />
+      {/* === Paper / Notepad — tilted, hand-drawn rectangle === */}
+      <g transform="rotate(-6, 200, 220)">
+        {/* Paper fill — subtle terracotta tint */}
+        <path
+          d="M95 72 C155 66, 275 64, 325 70 C332 140, 335 280, 330 380 C270 388, 150 390, 92 384 C86 280, 84 140, 95 72Z"
+          fill="rgba(217,119,87,0.08)"
+        />
+        {/* Paper outline — bold white */}
+        <path
+          d="M95 72 C155 66, 275 64, 325 70 C332 140, 335 280, 330 380 C270 388, 150 390, 92 384 C86 280, 84 140, 95 72Z"
+          stroke="rgba(255,255,255,0.9)" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" fill="none"
+        />
+        {/* Page fold — corner detail */}
+        <path
+          d="M290 68 C295 68, 322 65, 325 70 C326 78, 326 95, 324 108 C312 100, 298 92, 290 88 C290 80, 290 72, 290 68Z"
+          fill="rgba(217,119,87,0.15)" stroke="rgba(255,255,255,0.4)" strokeWidth="3" strokeLinecap="round"
+        />
 
-      {/* Nib tip — pointed end, two bold strokes converging */}
-      <path d="M200 282 C205 310, 208 335, 210 365"
-        stroke="rgba(255,255,255,0.88)" strokeWidth="8" strokeLinecap="round" />
-      <path d="M222 280 C218 308, 214 333, 212 363"
-        stroke="rgba(255,255,255,0.88)" strokeWidth="8" strokeLinecap="round" />
-      {/* Nib slit */}
-      <path d="M211 290 L211 358"
-        stroke="rgba(255,255,255,0.35)" strokeWidth="3" strokeLinecap="round" />
+        {/* === Written lines on paper (animated — stroke-dasharray drawing effect) === */}
+        {/* Line 1 */}
+        <path
+          d="M130 130 C165 126, 245 125, 290 129"
+          stroke="rgba(255,255,255,0.55)" strokeWidth="6" strokeLinecap="round"
+          className={`${s.writingLine} ${s.writingLine1}`}
+        />
+        {/* Line 2 */}
+        <path
+          d="M128 170 C170 166, 260 165, 295 169"
+          stroke="rgba(255,255,255,0.45)" strokeWidth="5" strokeLinecap="round"
+          className={`${s.writingLine} ${s.writingLine2}`}
+        />
+        {/* Line 3 */}
+        <path
+          d="M132 210 C168 207, 240 206, 280 210"
+          stroke="rgba(255,255,255,0.4)" strokeWidth="5" strokeLinecap="round"
+          className={`${s.writingLine} ${s.writingLine3}`}
+        />
+        {/* Line 4 — shorter, paragraph end */}
+        <path
+          d="M130 250 C155 247, 200 246, 225 249"
+          stroke="rgba(255,255,255,0.35)" strokeWidth="5" strokeLinecap="round"
+          className={`${s.writingLine} ${s.writingLine4}`}
+        />
+        {/* Line 5 */}
+        <path
+          d="M128 298 C168 294, 255 293, 292 297"
+          stroke="rgba(255,255,255,0.45)" strokeWidth="5" strokeLinecap="round"
+          className={`${s.writingLine} ${s.writingLine5}`}
+        />
+        {/* Line 6 — shorter, trailing off */}
+        <path
+          d="M132 338 C158 335, 210 334, 248 337"
+          stroke="rgba(255,255,255,0.35)" strokeWidth="5" strokeLinecap="round"
+          className={`${s.writingLine} ${s.writingLine6}`}
+        />
+      </g>
 
-      {/* Pen barrel detail lines (grille-like, cream) */}
-      <path d="M178 120 C192 116, 222 115, 240 119"
-        stroke="rgba(255,255,255,0.4)" strokeWidth="4" strokeLinecap="round" />
-      <path d="M174 155 C190 150, 224 149, 244 154"
-        stroke="rgba(255,255,255,0.35)" strokeWidth="4" strokeLinecap="round" />
-      <path d="M172 190 C188 185, 226 184, 246 189"
-        stroke="rgba(255,255,255,0.3)" strokeWidth="4" strokeLinecap="round" />
+      {/* === Pen — angled as if writing, terracotta fill + white outline === */}
+      <g>
+        {/* Pen barrel — bold terracotta, angled ~40 degrees */}
+        <path
+          d="M280 130 C284 126, 290 128, 292 132 L338 310 C340 318, 336 322, 330 320 L318 316 C312 314, 310 310, 312 304 L280 130Z"
+          fill="#d97757"
+        />
+        {/* Pen barrel outline */}
+        <path
+          d="M280 130 C284 126, 290 128, 292 132 L338 310 C340 318, 336 322, 330 320 L318 316 C312 314, 310 310, 312 304 L280 130Z"
+          stroke="rgba(255,255,255,0.9)" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" fill="none"
+        />
+        {/* Pen grip band */}
+        <path d="M314 278 C318 274, 332 284, 328 288"
+          stroke="rgba(255,255,255,0.5)" strokeWidth="4" strokeLinecap="round" />
+        <path d="M312 268 C316 264, 330 274, 326 278"
+          stroke="rgba(255,255,255,0.4)" strokeWidth="4" strokeLinecap="round" />
+        {/* Pen nib — pointed tip touching paper */}
+        <path
+          d="M280 130 C278 125, 273 118, 268 108 C265 102, 272 98, 276 104 C279 110, 282 120, 285 128"
+          fill="#d97757" stroke="rgba(255,255,255,0.85)" strokeWidth="4" strokeLinecap="round"
+        />
+        {/* Nib slit */}
+        <path d="M274 112 L280 130"
+          stroke="rgba(255,255,255,0.3)" strokeWidth="2.5" strokeLinecap="round" />
+      </g>
 
-      {/* === Ink drops (small terracotta blobs near nib) === */}
-      <path d="M228 355 C234 350, 240 356, 236 364 C232 372, 224 370, 226 362 C228 358, 230 354, 228 355Z"
+      {/* === Ink dot — where pen meets paper === */}
+      <path d="M266 106 C270 102, 275 106, 273 110 C271 114, 264 112, 266 106Z"
         fill="#d97757" />
-      <path d="M188 368 C192 364, 197 368, 195 374 C193 380, 186 378, 187 372Z"
-        fill="#d97757" />
 
-      {/* === Writing lines (cream strokes — text being written) === */}
-      <path d="M255 368 C268 365, 290 362, 318 366"
-        stroke="rgba(255,255,255,0.5)" strokeWidth="6" strokeLinecap="round" />
-      <path d="M250 392 C270 388, 305 386, 335 390"
-        stroke="rgba(255,255,255,0.38)" strokeWidth="5" strokeLinecap="round" />
-      <path d="M258 416 C278 412, 310 411, 328 414"
-        stroke="rgba(255,255,255,0.28)" strokeWidth="4" strokeLinecap="round" />
-
-      {/* === Decorative Squiggle (signature hand motif) === */}
+      {/* === Decorative Squiggle (signature Anthropic hand motif) === */}
       {/* Wavy M-shape — thick cream, pressure variation */}
-      <path d="M72 430 C80 407, 92 435, 105 413 C118 391, 107 433, 129 415 C151 397, 135 433, 155 420"
+      <path d="M62 430 C70 407, 82 435, 95 413 C108 391, 97 433, 119 415 C141 397, 125 433, 145 420"
         stroke="rgba(255,255,255,0.92)" strokeWidth="10" strokeLinecap="round" />
       {/* Loop */}
-      <path d="M155 420 C172 435, 187 420, 182 403 C177 386, 159 393, 162 413"
+      <path d="M145 420 C162 435, 177 420, 172 403 C167 386, 149 393, 152 413"
         stroke="rgba(255,255,255,0.88)" strokeWidth="9" strokeLinecap="round" />
       {/* Tail — pressure decreasing */}
-      <path d="M162 413 C177 435, 195 432, 208 445"
+      <path d="M152 413 C167 435, 185 432, 198 445"
         stroke="rgba(255,255,255,0.82)" strokeWidth="7" strokeLinecap="round" />
       {/* Terracotta dot at loop junction */}
-      <path d="M160 411 C167 405, 171 411, 165 417 C159 423, 153 417, 160 411Z"
+      <path d="M150 411 C157 405, 161 411, 155 417 C149 423, 143 417, 150 411Z"
         fill="#d97757" />
     </svg>
   );
