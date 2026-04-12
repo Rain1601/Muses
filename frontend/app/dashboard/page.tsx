@@ -298,20 +298,31 @@ export default function Dashboard() {
   }, []);
 
   const saveFile = useCallback(async (htmlContent?: string) => {
-    if (!activeFile) return;
     const html = htmlContent ?? contentRef.current;
     try {
-      // Convert HTML back to markdown for file storage
-      const td = await getTurndownService();
-      const markdown = td.turndown(html);
-      await fetch(`${API_BASE}/api/studio/files/${activeFile}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: markdown }),
-      });
-      setSavedContent(html); // track HTML for dirty checking
+      if (activeDbArticle) {
+        // Save DB article via API
+        const token = localStorage.getItem("token");
+        if (!token) return;
+        await fetch(`${API_BASE}/api/articles/${activeDbArticle.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ content: html }),
+        });
+        setSavedContent(html);
+      } else if (activeFile) {
+        // Save Studio file
+        const td = await getTurndownService();
+        const markdown = td.turndown(html);
+        await fetch(`${API_BASE}/api/studio/files/${activeFile}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: markdown }),
+        });
+        setSavedContent(html);
+      }
     } catch (e) { console.error("Save failed:", e); }
-  }, [activeFile]);
+  }, [activeFile, activeDbArticle]);
 
   const createFile = useCallback(async (name: string) => {
     const filename = name.endsWith(".md") ? name : `${name}.md`;
