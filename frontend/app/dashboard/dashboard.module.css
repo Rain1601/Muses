@@ -819,6 +819,37 @@
   max-width: 720px;
   margin: 0 auto;
   padding: 2.5rem 2.5rem 4rem;
+  /* Force dark-mode CSS variables for the always-dark dashboard editor */
+  --foreground: 63 23% 98%;
+  --muted-foreground: 63 23% 75%;
+  --background: 60 4% 15%;
+  --border: 60 4% 22%;
+  --input: 60 4% 22%;
+  --card: 60 4% 18%;
+  --card-foreground: 63 23% 98%;
+  --popover: 60 4% 18%;
+  --popover-foreground: 63 23% 98%;
+  color: #FAFAF9;
+}
+
+/* Force prose text colors for always-dark editor */
+.editorInner :global(.prose) {
+  --tw-prose-body: #E7E5E4;
+  --tw-prose-headings: #FAFAF9;
+  --tw-prose-lead: #A8A29E;
+  --tw-prose-links: #D97149;
+  --tw-prose-bold: #FAFAF9;
+  --tw-prose-counters: #A8A29E;
+  --tw-prose-bullets: #78716C;
+  --tw-prose-hr: #3F3A36;
+  --tw-prose-quotes: #E7E5E4;
+  --tw-prose-quote-borders: #3F3A36;
+  --tw-prose-captions: #A8A29E;
+  --tw-prose-code: #FAFAF9;
+  --tw-prose-pre-code: #E7E5E4;
+  --tw-prose-pre-bg: #292524;
+  --tw-prose-th-borders: #57534E;
+  --tw-prose-td-borders: #3F3A36;
 }
 
 /* ===== Welcome Screen ===== */
