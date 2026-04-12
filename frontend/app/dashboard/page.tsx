@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { marked } from "marked";
 import { useUserStore } from "@/store/user";
 import { NotionEditor } from "@/components/NotionEditor";
@@ -30,8 +31,16 @@ interface EditRecord { desc: string; added: number; removed: number; time: Date;
 interface FolderNode { name: string; path: string; files: FileItem[]; folders: FolderNode[]; expanded: boolean; }
 
 export default function Dashboard() {
-  const { user, checkAuth } = useUserStore();
+  const router = useRouter();
+  const { user, isLoading, isAuthenticated, checkAuth } = useUserStore();
   useEffect(() => { checkAuth(); }, [checkAuth]);
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.replace("/");
+    }
+  }, [isLoading, isAuthenticated, router]);
 
   const [files, setFiles] = useState<FileItem[]>([]);
   const [dbArticles, setDbArticles] = useState<DBArticle[]>([]);
@@ -486,6 +495,11 @@ export default function Dashboard() {
   };
 
   const handleEditorReady = useCallback((editor: any) => { editorRef.current = editor; }, []);
+
+  // Show nothing while checking auth (prevents flash before redirect)
+  if (isLoading || !isAuthenticated) {
+    return <div className={s.shell} />;
+  }
 
   return (
     <div className={s.shell}>
