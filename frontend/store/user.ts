@@ -34,17 +34,29 @@ export const useUserStore = create<UserStore>((set) => ({
   checkAuth: async () => {
     set({ isLoading: true });
     try {
+      // Pick up token from URL if present (OAuth redirect)
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        const urlToken = params.get('token');
+        if (urlToken) {
+          await auth.handleCallback(urlToken);
+          // Remove token from URL without reload
+          const clean = window.location.pathname;
+          window.history.replaceState({}, '', clean);
+        }
+      }
+
       const user = await auth.verifyToken();
-      set({ 
-        user, 
+      set({
+        user,
         isAuthenticated: !!user,
-        isLoading: false 
+        isLoading: false
       });
     } catch (error) {
-      set({ 
-        user: null, 
+      set({
+        user: null,
         isAuthenticated: false,
-        isLoading: false 
+        isLoading: false
       });
     }
   },
