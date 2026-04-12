@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from .config import settings
@@ -41,3 +41,18 @@ def get_db():
 # 创建所有表
 def create_tables():
     Base.metadata.create_all(bind=engine)
+
+
+def run_migrations():
+    """添加新列到已有表（create_all 不处理 ALTER TABLE）"""
+    insp = inspect(engine)
+    if "User" not in insp.get_table_names():
+        return
+
+    existing = {c["name"] for c in insp.get_columns("User")}
+    new_cols = ["aihubmixKey", "openrouterKey", "bailianKey"]
+    with engine.begin() as conn:
+        for col in new_cols:
+            if col not in existing:
+                conn.execute(text(f'ALTER TABLE "User" ADD COLUMN "{col}" VARCHAR'))
+                print(f"Migration: added column {col} to User table")

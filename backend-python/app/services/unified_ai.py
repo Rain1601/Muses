@@ -1,63 +1,33 @@
 """
 统一的AI调用接口
-支持自动格式化请求以适配不同的模型API
+所有聚合 API（AIHubMix / OpenRouter / 百炼）均通过 OpenAI 兼容 SDK 调用
 """
 
 from typing import Dict, List, Optional, Any
 import openai
-import anthropic
 
 from ..models import User
 from ..utils.security import decrypt
 from ..utils.exceptions import ValidationError
-from ..models_config import get_model_for_provider
+from ..models_config import get_default_model
+
+# 聚合 API base URLs
+PROVIDER_BASE_URLS = {
+    "aihubmix": "https://aihubmix.com/v1",
+    "openrouter": "https://openrouter.ai/api/v1",
+    "bailian": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+}
+
+# Provider → User model key field
+PROVIDER_KEY_FIELDS = {
+    "aihubmix": "aihubmixKey",
+    "openrouter": "openrouterKey",
+    "bailian": "bailianKey",
+}
 
 
 class UnifiedAIClient:
-    """统一的AI客户端，自动适配不同模型的API格式"""
-
-    @staticmethod
-    def format_messages_for_provider(
-        messages: List[Dict[str, str]],
-        provider: str
-    ) -> tuple[List[Dict[str, str]], Optional[str]]:
-        """
-        根据不同的提供商格式化消息
-
-        Args:
-            messages: 标准消息格式 [{"role": "system/user/assistant", "content": "..."}]
-            provider: 提供商名称
-
-        Returns:
-            (formatted_messages, system_prompt) 元组
-        """
-        system_prompt = None
-        formatted_messages = []
-
-        for msg in messages:
-            if msg["role"] == "system":
-                system_prompt = msg["content"]
-                # OpenAI和GPT-4.1支持system消息在messages中
-                if provider == "openai":
-                    formatted_messages.append(msg)
-                # Claude需要单独的system参数
-                # Gemini也需要特殊处理
-            else:
-                formatted_messages.append({
-                    "role": msg["role"],
-                    "content": msg["content"]
-                })
-
-        # 确保至少有一条用户消息
-        if not any(msg["role"] == "user" for msg in formatted_messages):
-            if formatted_messages and formatted_messages[-1]["role"] == "assistant":
-                # 如果最后一条是assistant消息，添加一个用户消息
-                formatted_messages.append({"role": "user", "content": "Continue"})
-            elif not formatted_messages:
-                # 如果没有任何消息，添加默认用户消息
-                formatted_messages.append({"role": "user", "content": "Hello"})
-
-        return formatted_messages, system_prompt
+    """统一的AI客户端 — 所有 provider 通过 OpenAI 兼容接口调用"""
 
     @classmethod
     async def call(
@@ -75,205 +45,70 @@ class UnifiedAIClient:
 
         Args:
             user: 用户对象
-            messages: 统一的消息格式
-            provider: 指定提供商 (openai/claude/gemini)
-            model: 指定模型
-            temperature: 温度参数 (0.0-1.0)
-            max_tokens: 最大生成长度
-            **kwargs: 其他特定于模型的参数
-
-        Returns:
-            AI生成的文本响应
+            messages: [{"role": "system/user/assistant", "content": "..."}]
+            provider: aihubmix / openrouter / bailian
+            model: 模型 ID（如 claude-sonnet-4-20250514, gpt-4o 等）
+            temperature: 温度
+            max_tokens: 最大 token 数
         """
-        # 自动选择提供商
         if not provider:
             provider = cls._determine_provider(user)
 
-        # 获取默认模型
         if not model:
-            model = get_model_for_provider(provider)
+            model = get_default_model(provider)
 
-        # DEBUG: Print what we're using
-        print(f"🔍 UnifiedAI Debug: provider={provider}, model={model}, temperature={temperature}")
-
-        # 格式化消息
-        formatted_messages, system_prompt = cls.format_messages_for_provider(messages, provider)
-
-        # 调用对应的API
-        if provider == "openai":
-            return cls._call_openai(
-                user, model, formatted_messages, system_prompt,
-                temperature, max_tokens, **kwargs
-            )
-        elif provider == "claude":
-            print(f"🔍 Calling _call_claude with model={model}, temperature={temperature}")
-            return cls._call_claude(
-                user, model, formatted_messages, system_prompt,
-                temperature, max_tokens, **kwargs
-            )
-        elif provider == "gemini":
-            return cls._call_gemini(
-                user, model, formatted_messages, system_prompt,
-                temperature, max_tokens, **kwargs
-            )
-        else:
+        # 获取 API key 和 base_url
+        api_key = cls._get_api_key(user, provider)
+        base_url = PROVIDER_BASE_URLS.get(provider)
+        if not base_url:
             raise ValidationError(f"Unsupported provider: {provider}")
 
-    @staticmethod
-    def _call_openai(
-        user: User,
-        model: str,
-        messages: List[Dict[str, str]],
-        system_prompt: Optional[str],
-        temperature: float,
-        max_tokens: int,
-        **kwargs
-    ) -> str:
-        """调用OpenAI API"""
-        if not user.openaiKey:
-            raise ValidationError("OpenAI API key not configured")
+        client = openai.OpenAI(api_key=api_key, base_url=base_url)
 
-        api_key = decrypt(user.openaiKey)
-        client = openai.OpenAI(api_key=api_key)
-
-        # GPT-5系列只支持temperature=1.0
-        if model.startswith("gpt-5"):
-            print(f"🔍 GPT-5 detected, overriding temperature from {temperature} to 1.0")
-            temperature = 1.0
-
-        # GPT-5系列的特殊处理
-        if model.startswith("gpt-5"):
-            # 提取用户消息
-            user_message = ""
-            for msg in messages:
-                if msg["role"] == "user":
-                    user_message = msg["content"]
-                    break
-
-            # 如果有system prompt，添加到用户消息前
-            if system_prompt:
-                user_message = f"{system_prompt}\n\n{user_message}"
-
-            # 尝试使用新的responses API
-            try:
-                response = client.responses.create(
-                    model=model,
-                    input=user_message,
-                    reasoning=kwargs.get("reasoning", {"effort": "medium"}),
-                    text=kwargs.get("text", {"verbosity": "medium"})
-                )
-                return response.output_text or ""
-            except (AttributeError, Exception):
-                # 回退到标准API - GPT-5 使用 max_completion_tokens
-                response = client.chat.completions.create(
-                    model=model,
-                    messages=messages,
-                    temperature=temperature,
-                    max_completion_tokens=max_tokens
-                )
-                return response.choices[0].message.content or ""
-
-        # GPT-4.1和其他模型使用标准API
-        else:
-            params = {
-                "model": model,
-                "messages": messages,
-                "temperature": temperature,
-            }
-
-            # GPT-4o 系列也使用 max_completion_tokens
-            if "gpt-4o" in model or model.startswith("gpt-4-"):
-                params["max_completion_tokens"] = max_tokens
-            else:
-                params["max_tokens"] = max_tokens
-
-            # 添加额外参数
-            for key in ["top_p", "frequency_penalty", "presence_penalty"]:
-                if key in kwargs:
-                    params[key] = kwargs[key]
-
-            response = client.chat.completions.create(**params)
-            return response.choices[0].message.content or ""
-
-    @staticmethod
-    def _call_claude(
-        user: User,
-        model: str,
-        messages: List[Dict[str, str]],
-        system_prompt: Optional[str],
-        temperature: float,
-        max_tokens: int,
-        **kwargs
-    ) -> str:
-        """调用Claude API"""
-        if not user.claudeKey:
-            raise ValidationError("Claude API key not configured")
-
-        api_key = decrypt(user.claudeKey)
-        client = anthropic.Anthropic(api_key=api_key)
-
-        # Claude 4 系列模型只支持 temperature=1.0
-        # 检查是否为 Claude 4.x 模型 (sonnet-4, opus-4)
-        print(f"🔍 _call_claude: model={model}, temperature BEFORE check={temperature}")
-        if "sonnet-4" in model or "opus-4" in model:
-            print(f"✅ Detected Claude 4 model, overriding temperature to 1.0")
-            temperature = 1.0
-        print(f"🔍 _call_claude: temperature AFTER check={temperature}")
-
-        # 构建参数
+        # 构建请求参数
         params = {
             "model": model,
             "messages": messages,
+            "temperature": temperature,
             "max_tokens": max_tokens,
-            "temperature": temperature
         }
-        print(f"🔍 Final params to Claude API: {params}")
 
-        # 添加system prompt（如果有）
-        if system_prompt:
-            params["system"] = system_prompt
-
-        # 添加额外参数
-        for key in ["top_p", "top_k"]:
+        # 传递额外参数
+        for key in ["top_p", "frequency_penalty", "presence_penalty"]:
             if key in kwargs:
                 params[key] = kwargs[key]
 
-        response = client.messages.create(**params)
-
-        # 提取响应文本
-        if response.content and len(response.content) > 0:
-            return response.content[0].text
-        return ""
+        response = client.chat.completions.create(**params)
+        return response.choices[0].message.content or ""
 
     @staticmethod
-    def _call_gemini(
-        user: User,
-        model: str,
-        messages: List[Dict[str, str]],
-        system_prompt: Optional[str],
-        temperature: float,
-        max_tokens: int,
-        **kwargs
-    ) -> str:
-        """调用Gemini API（待实现）"""
-        if not user.geminiKey:
-            raise ValidationError("Gemini API key not configured")
+    def _get_api_key(user: User, provider: str) -> str:
+        """获取并解密用户的 API key"""
+        field = PROVIDER_KEY_FIELDS.get(provider)
+        if not field:
+            raise ValidationError(f"Unknown provider: {provider}")
 
-        # 待实现Gemini API调用
-        raise ValidationError("Gemini support is not yet implemented")
+        encrypted_key = getattr(user, field, None)
+        if not encrypted_key:
+            raise ValidationError(
+                f"未配置 {provider} API Key，请在设置中添加"
+            )
+        return decrypt(encrypted_key)
 
     @staticmethod
     def _determine_provider(user: User) -> str:
-        """根据用户配置自动选择提供商"""
-        # 优先级：OpenAI > Claude > Gemini
-        if user.openaiKey:
-            return "openai"
-        elif user.claudeKey:
-            return "claude"
-        elif user.geminiKey:
-            return "gemini"
+        """根据用户已配置的 key 自动选择 provider"""
+        # 优先级：aihubmix > openrouter > bailian
+        if user.aihubmixKey:
+            return "aihubmix"
+        elif user.openrouterKey:
+            return "openrouter"
+        elif user.bailianKey:
+            return "bailian"
         else:
-            raise ValidationError("No AI API keys configured")
+            raise ValidationError(
+                "未配置任何 AI API Key，请在设置中添加 AIHubMix、OpenRouter 或百炼的 API Key"
+            )
 
 
 # 便捷函数
@@ -285,25 +120,9 @@ async def unified_ai_call(
     model: str = None,
     **kwargs
 ) -> str:
-    """
-    简化的AI调用接口
-
-    Args:
-        user: 用户对象
-        prompt: 用户输入
-        system_prompt: 系统提示（可选）
-        provider: 指定提供商（可选）
-        model: 指定模型（可选）
-        **kwargs: 其他参数
-
-    Returns:
-        AI响应文本
-    """
     messages = []
-
     if system_prompt:
         messages.append({"role": "system", "content": system_prompt})
-
     messages.append({"role": "user", "content": prompt})
 
     return await UnifiedAIClient.call(

@@ -169,7 +169,7 @@ class AgentService:
             return None
 
     async def _create_model_from_agent(self, agent: AgentModel):
-        """根据Agent配置创建模型实例
+        """根据Agent配置创建模型实例 — 通过聚合 API（OpenAI 兼容）
 
         Args:
             agent: Agent数据模型
@@ -177,33 +177,38 @@ class AgentService:
         Returns:
             BaseModel: 模型实例
         """
-        # 获取模型配置
-        model_config = agent.modelConfig or {}
-        model_type = model_config.get('type', 'claude')
+        from ..services.unified_ai import PROVIDER_BASE_URLS, PROVIDER_KEY_FIELDS
 
-        # 解密API密钥（假设存储在User表中的encryptedOpenaiApiKey字段）
-        # 这里需要根据实际的数据库结构调整
         user = agent.user
-        api_key = None
+        model_config = agent.modelConfig or {}
 
-        if model_type == 'claude':
-            api_key = decrypt(user.claudeKey) if user.claudeKey else None
-        elif model_type == 'openai':
-            api_key = decrypt(user.openaiKey) if user.openaiKey else None
-        elif model_type == 'gemini':
-            api_key = decrypt(user.geminiKey) if user.geminiKey else None
+        # 确定使用哪个聚合 provider（优先级：aihubmix > openrouter > bailian）
+        provider = None
+        api_key = None
+        for p, field in PROVIDER_KEY_FIELDS.items():
+            encrypted = getattr(user, field, None)
+            if encrypted:
+                provider = p
+                api_key = decrypt(encrypted)
+                break
 
         if not api_key:
-            raise ValueError(f"No API key found for model type: {model_type}")
+            raise ValueError("未配置任何 AI API Key，请在设置中添加")
 
-        # 创建模型配置
+        base_url = PROVIDER_BASE_URLS[provider]
+
+        # 所有聚合 API 走 OpenAI 兼容接口
         full_config = {
-            'type': model_type,
+            'type': 'openai',
             'api_key': api_key,
-            **model_config
+            'base_url': base_url,
+            **model_config,
         }
+        # 如果没有指定 model，使用默认模型
+        if 'model' not in full_config:
+            from ..models_config import get_default_model
+            full_config['model'] = get_default_model(provider)
 
-        # 创建模型实例
         return self.model_factory.create(full_config)
 
     def _build_system_message(self, agent: AgentModel) -> Optional[str]:

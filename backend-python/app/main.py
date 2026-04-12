@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from contextlib import asynccontextmanager
 
-from .database import create_tables
+from .database import create_tables, run_migrations
 from .config import settings
 
 # Import routers
@@ -14,6 +14,7 @@ from .api import auth, users, agents, articles, generate, upload, publish, proce
 async def lifespan(app: FastAPI):
     # 启动时创建数据库表
     create_tables()
+    run_migrations()
     print("✅ Database tables created")
     yield
 

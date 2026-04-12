@@ -21,7 +21,10 @@ export interface User {
   username: string;
   email?: string;
   avatarUrl?: string;
-  hasOpenAIKey: boolean;
+  hasAihubmixKey?: boolean;
+  hasOpenrouterKey?: boolean;
+  hasBailianKey?: boolean;
+  hasOpenAIKey?: boolean;
 }
 
 export const auth = {

@@ -9,6 +9,32 @@ interface Props {
   onClose: () => void;
 }
 
+const PROVIDERS = [
+  {
+    key: "aihubmix",
+    name: "AIHubMix",
+    desc: "推荐 · 国内直连，支持 Claude / GPT / Gemini 等主流模型",
+    placeholder: "sk-...",
+    link: "https://aihubmix.com",
+  },
+  {
+    key: "openrouter",
+    name: "OpenRouter",
+    desc: "国际聚合，模型覆盖最广",
+    placeholder: "sk-or-...",
+    link: "https://openrouter.ai/keys",
+  },
+  {
+    key: "bailian",
+    name: "百炼",
+    desc: "阿里云百炼平台，支持通义千问 / DeepSeek 等国产模型",
+    placeholder: "sk-...",
+    link: "https://bailian.console.aliyun.com",
+  },
+] as const;
+
+type ProviderKey = typeof PROVIDERS[number]["key"];
+
 export default function SettingsPanel({ onClose }: Props) {
   const { user } = useUserStore();
   const [isLoading, setIsLoading] = useState(false);
@@ -17,9 +43,9 @@ export default function SettingsPanel({ onClose }: Props) {
   const [saveMsg, setSaveMsg] = useState("");
 
   const [formData, setFormData] = useState({
-    openaiKey: "",
-    claudeKey: "",
-    geminiKey: "",
+    aihubmixKey: "",
+    openrouterKey: "",
+    bailianKey: "",
     githubToken: "",
     defaultRepoUrl: "",
     language: "zh-CN",
@@ -32,10 +58,10 @@ export default function SettingsPanel({ onClose }: Props) {
     storageUsed: "0 MB",
   });
 
-  const [testStates, setTestStates] = useState({
-    openai: { loading: false, result: null as boolean | null },
-    claude: { loading: false, result: null as boolean | null },
-    gemini: { loading: false, result: null as boolean | null },
+  const [testStates, setTestStates] = useState<Record<string, { loading: boolean; result: boolean | null }>>({
+    aihubmix: { loading: false, result: null },
+    openrouter: { loading: false, result: null },
+    bailian: { loading: false, result: null },
   });
 
   useEffect(() => {
@@ -56,19 +82,20 @@ export default function SettingsPanel({ onClose }: Props) {
       const userData = response.data;
 
       const newFormData = {
-        openaiKey: "",
-        claudeKey: "",
-        geminiKey: "",
+        aihubmixKey: "",
+        openrouterKey: "",
+        bailianKey: "",
         githubToken: "",
         defaultRepoUrl: userData.defaultRepoUrl || "",
         language: userData.settings?.language || "zh-CN",
         theme: userData.settings?.theme || "light",
       };
 
+      // Fetch existing keys
       const keyTypes: { type: string; field: string }[] = [];
-      if (userData.hasOpenAIKey) keyTypes.push({ type: "openai", field: "openaiKey" });
-      if (userData.hasClaudeKey) keyTypes.push({ type: "claude", field: "claudeKey" });
-      if (userData.hasGeminiKey) keyTypes.push({ type: "gemini", field: "geminiKey" });
+      if (userData.hasAihubmixKey) keyTypes.push({ type: "aihubmix", field: "aihubmixKey" });
+      if (userData.hasOpenrouterKey) keyTypes.push({ type: "openrouter", field: "openrouterKey" });
+      if (userData.hasBailianKey) keyTypes.push({ type: "bailian", field: "bailianKey" });
       if (userData.hasGitHubToken) keyTypes.push({ type: "github", field: "githubToken" });
 
       const keyPromises = keyTypes.map(async ({ type, field }) => {
@@ -142,15 +169,17 @@ export default function SettingsPanel({ onClose }: Props) {
     setIsLoading(true);
     try {
       const updateData: any = {};
-      if (formData.openaiKey && !formData.openaiKey.includes("•") && (formData.openaiKey.startsWith("sk-") || formData.openaiKey.startsWith("sk-proj-")))
-        updateData.openaiKey = formData.openaiKey;
-      if (formData.claudeKey && !formData.claudeKey.includes("•") && formData.claudeKey.startsWith("sk-ant-"))
-        updateData.claudeKey = formData.claudeKey;
-      if (formData.geminiKey && !formData.geminiKey.includes("•") && formData.geminiKey.startsWith("AI"))
-        updateData.geminiKey = formData.geminiKey;
+      for (const p of PROVIDERS) {
+        const fieldKey = `${p.key}Key` as keyof typeof formData;
+        const val = formData[fieldKey];
+        if (val && val.trim()) {
+          updateData[fieldKey] = val.trim();
+        }
+      }
 
       if (Object.keys(updateData).length === 0) {
-        alert("没有检测到有效的API Key");
+        alert("请输入至少一个 API Key");
+        setIsLoading(false);
         return;
       }
       await api.post("/api/user/settings", updateData);
@@ -194,26 +223,24 @@ export default function SettingsPanel({ onClose }: Props) {
     }
   };
 
-  const testApiKey = async (type: "openai" | "claude" | "gemini") => {
-    let keyValue = formData[`${type}Key`];
+  const testApiKey = async (providerKey: ProviderKey) => {
+    const fieldKey = `${providerKey}Key` as keyof typeof formData;
+    let keyValue = formData[fieldKey];
     if (!keyValue) {
-      try {
-        const profileRes = await api.get("/api/user/profile");
-        const fieldMap = { openai: "hasOpenAIKey", claude: "hasClaudeKey", gemini: "hasGeminiKey" };
-        if (!profileRes.data[fieldMap[type]]) { alert(`请先输入 API Key`); return; }
-        const keyRes = await api.post("/api/user/get-api-key", { keyType: type });
-        keyValue = keyRes.data.key;
-      } catch { alert("获取 Key 失败"); return; }
+      alert("请先输入 API Key");
+      return;
     }
 
-    setTestStates((prev) => ({ ...prev, [type]: { loading: true, result: null } }));
+    setTestStates((prev) => ({ ...prev, [providerKey]: { loading: true, result: null } }));
     try {
-      const res = await api.post(`/api/user/verify-${type}-key`, { [`${type}Key`]: keyValue });
-      setTestStates((prev) => ({ ...prev, [type]: { loading: false, result: res.data.valid } }));
+      const res = await api.post("/api/user/verify-api-key", null, {
+        params: { provider: providerKey, key: keyValue },
+      });
+      setTestStates((prev) => ({ ...prev, [providerKey]: { loading: false, result: res.data.valid } }));
     } catch {
-      setTestStates((prev) => ({ ...prev, [type]: { loading: false, result: false } }));
+      setTestStates((prev) => ({ ...prev, [providerKey]: { loading: false, result: false } }));
     }
-    setTimeout(() => setTestStates((prev) => ({ ...prev, [type]: { loading: false, result: null } })), 3000);
+    setTimeout(() => setTestStates((prev) => ({ ...prev, [providerKey]: { loading: false, result: null } })), 3000);
   };
 
   const tabs = [
@@ -245,7 +272,6 @@ export default function SettingsPanel({ onClose }: Props) {
 
       {/* Content */}
       <div className={s.content}>
-        {/* Saved indicator */}
         {saveMsg && <div className={s.savedMsg}>{saveMsg}</div>}
 
         {/* Account */}
@@ -312,27 +338,31 @@ export default function SettingsPanel({ onClose }: Props) {
           </div>
         )}
 
-        {/* Models */}
+        {/* Models — 聚合 API */}
         {activeTab === "models" && (
           <div className={s.section}>
-            {(["openai", "claude", "gemini"] as const).map((type) => {
-              const labels = { openai: "OpenAI", claude: "Claude", gemini: "Gemini" };
-              const placeholders = { openai: "sk-...", claude: "sk-ant-...", gemini: "AI..." };
-              const fieldKey = `${type}Key` as "openaiKey" | "claudeKey" | "geminiKey";
-              const test = testStates[type];
+            <p className={s.hint} style={{ marginBottom: 16 }}>
+              配置聚合 API Key，即可调用 Claude / GPT / Gemini / 通义千问等模型。只需配置一个即可。
+            </p>
+            {PROVIDERS.map((p) => {
+              const fieldKey = `${p.key}Key` as keyof typeof formData;
+              const test = testStates[p.key];
               return (
-                <div key={type} className={s.field}>
-                  <label className={s.label}>{labels[type]} API Key</label>
+                <div key={p.key} className={s.field}>
+                  <label className={s.label}>
+                    {p.name}
+                    <a href={p.link} target="_blank" rel="noopener noreferrer" className={s.link} style={{ marginLeft: 8, fontSize: 12 }}>获取 Key</a>
+                  </label>
                   <div className={s.inputRow}>
                     <input
                       type="password"
                       value={formData[fieldKey]}
                       onChange={(e) => setFormData({ ...formData, [fieldKey]: e.target.value })}
                       className={s.input}
-                      placeholder={placeholders[type]}
+                      placeholder={p.placeholder}
                       autoComplete="new-password"
                     />
-                    <button onClick={() => testApiKey(type)} disabled={test.loading} className={s.testBtn}>
+                    <button onClick={() => testApiKey(p.key)} disabled={test.loading} className={s.testBtn}>
                       {test.loading ? (
                         <span className={s.spinner} />
                       ) : test.result === true ? (
@@ -344,6 +374,7 @@ export default function SettingsPanel({ onClose }: Props) {
                       )}
                     </button>
                   </div>
+                  <p className={s.hint}>{p.desc}</p>
                 </div>
               );
             })}

@@ -1,141 +1,104 @@
 """
-AI模型配置
+AI 模型配置 — 聚合 API（AIHubMix / OpenRouter / 百炼）
+所有 provider 均通过 OpenAI 兼容接口调用，模型 ID 共享。
 """
 
 from typing import Dict, List, Any
 
-# OpenAI模型配置
-OPENAI_MODELS = {
-    "gpt-5-2025-08-07": {
-        "name": "GPT-5",
-        "description": "最新最强的 OpenAI 模型，卓越的推理和创造力",
-        "max_tokens": 200000,
-        "default": True,
-        "capabilities": ["text", "code", "analysis", "creative", "vision"]
-    },
-    "gpt-5-mini-2025-08-07": {
-        "name": "GPT-5 Mini",
-        "description": "轻量级 GPT-5，快速高效",
-        "max_tokens": 128000,
-        "capabilities": ["text", "code", "analysis", "creative"]
-    }
-}
-
-# Claude模型配置
-CLAUDE_MODELS = {
+# 通用模型列表（聚合 API 支持的主流模型）
+MODELS = {
+    # Claude 系列
     "claude-sonnet-4-5-20250929": {
         "name": "Claude Sonnet 4.5",
-        "description": "最新最强的 Claude 模型，卓越的能力和性能",
+        "provider_origin": "anthropic",
+        "description": "最新最强 Claude，卓越的推理和创造力",
         "max_tokens": 200000,
         "default": True,
-        "capabilities": ["text", "code", "analysis", "creative", "vision"]
     },
     "claude-sonnet-4-20250514": {
         "name": "Claude Sonnet 4",
-        "description": "强大的 Claude 4 模型，性能优异",
+        "provider_origin": "anthropic",
+        "description": "高性能 Claude 4 模型",
         "max_tokens": 200000,
-        "capabilities": ["text", "code", "analysis", "creative"]
     },
     "claude-opus-4-1-20250805": {
         "name": "Claude Opus 4.1",
+        "provider_origin": "anthropic",
         "description": "最强大的 Claude 模型，适合复杂任务",
         "max_tokens": 200000,
-        "capabilities": ["text", "code", "analysis", "creative", "vision"]
-    }
-}
-
-# Gemini模型配置
-GEMINI_MODELS = {
+    },
+    # GPT 系列
+    "gpt-4o": {
+        "name": "GPT-4o",
+        "provider_origin": "openai",
+        "description": "OpenAI 旗舰多模态模型",
+        "max_tokens": 128000,
+    },
+    "gpt-4o-mini": {
+        "name": "GPT-4o Mini",
+        "provider_origin": "openai",
+        "description": "轻量高效的 GPT-4o",
+        "max_tokens": 128000,
+    },
+    # Gemini 系列
     "gemini-2.5-flash": {
         "name": "Gemini 2.5 Flash",
-        "description": "最新的 Google Gemini 模型，快速高效",
+        "provider_origin": "google",
+        "description": "Google 最新快速模型",
         "max_tokens": 100000,
-        "default": True,
-        "capabilities": ["text", "code", "analysis", "vision"]
-    }
+    },
+    "gemini-2.5-pro": {
+        "name": "Gemini 2.5 Pro",
+        "provider_origin": "google",
+        "description": "Google 最强推理模型",
+        "max_tokens": 100000,
+    },
+    # 国产模型（百炼专属）
+    "qwen-max": {
+        "name": "通义千问 Max",
+        "provider_origin": "alibaba",
+        "description": "阿里最强大模型",
+        "max_tokens": 32000,
+    },
+    "qwen-plus": {
+        "name": "通义千问 Plus",
+        "provider_origin": "alibaba",
+        "description": "高性价比通义千问",
+        "max_tokens": 32000,
+    },
+    "deepseek-chat": {
+        "name": "DeepSeek V3",
+        "provider_origin": "deepseek",
+        "description": "DeepSeek 最新对话模型",
+        "max_tokens": 64000,
+    },
 }
 
-# 默认模型选择
+# 每个聚合 provider 的默认模型
 DEFAULT_MODELS = {
-    "openai": "gpt-5-2025-08-07",
-    "claude": "claude-sonnet-4-5-20250929",
-    "gemini": "gemini-2.5-flash"
+    "aihubmix": "claude-sonnet-4-5-20250929",
+    "openrouter": "claude-sonnet-4-5-20250929",
+    "bailian": "qwen-max",
 }
 
+
+def get_default_model(provider: str) -> str:
+    """获取 provider 的默认模型 ID"""
+    return DEFAULT_MODELS.get(provider, "claude-sonnet-4-5-20250929")
+
+
+def get_model_info(model_id: str) -> Dict[str, Any]:
+    """获取模型信息"""
+    return MODELS.get(model_id, {})
+
+
+def get_available_models() -> List[Dict[str, Any]]:
+    """获取所有可用模型"""
+    return [{"id": mid, **info} for mid, info in MODELS.items()]
+
+
+# Legacy compatibility
 def get_model_for_provider(provider: str, preferred_model: str = None) -> str:
-    """
-    根据提供商获取模型ID
-
-    Args:
-        provider: 模型提供商 (openai, claude, gemini)
-        preferred_model: 用户偏好的模型
-
-    Returns:
-        模型ID字符串
-    """
-    if provider == "openai":
-        models = OPENAI_MODELS
-        default = DEFAULT_MODELS["openai"]
-    elif provider == "claude":
-        models = CLAUDE_MODELS
-        default = DEFAULT_MODELS["claude"]
-    elif provider == "gemini":
-        models = GEMINI_MODELS
-        default = DEFAULT_MODELS["gemini"]
-    else:
-        raise ValueError(f"Unknown provider: {provider}")
-
-    # 如果指定了偏好模型且存在，使用它
-    if preferred_model and preferred_model in models:
+    if preferred_model and preferred_model in MODELS:
         return preferred_model
-
-    # 否则使用默认模型
-    return default
-
-def get_model_info(provider: str, model_id: str) -> Dict[str, Any]:
-    """
-    获取模型信息
-
-    Args:
-        provider: 模型提供商
-        model_id: 模型ID
-
-    Returns:
-        模型信息字典
-    """
-    if provider == "openai":
-        return OPENAI_MODELS.get(model_id, {})
-    elif provider == "claude":
-        return CLAUDE_MODELS.get(model_id, {})
-    elif provider == "gemini":
-        return GEMINI_MODELS.get(model_id, {})
-    else:
-        return {}
-
-def get_available_models(provider: str) -> List[Dict[str, Any]]:
-    """
-    获取提供商的所有可用模型
-
-    Args:
-        provider: 模型提供商
-
-    Returns:
-        模型列表
-    """
-    if provider == "openai":
-        models_dict = OPENAI_MODELS
-    elif provider == "claude":
-        models_dict = CLAUDE_MODELS
-    elif provider == "gemini":
-        models_dict = GEMINI_MODELS
-    else:
-        return []
-
-    models_list = []
-    for model_id, info in models_dict.items():
-        models_list.append({
-            "id": model_id,
-            **info
-        })
-
-    return models_list
+    return get_default_model(provider)

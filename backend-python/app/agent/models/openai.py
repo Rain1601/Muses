@@ -11,7 +11,10 @@ class OpenAIModel(BaseModel):
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
         self.api_key = config['api_key']
-        self.client = openai.AsyncOpenAI(api_key=self.api_key)
+        kwargs = {"api_key": self.api_key}
+        if config.get('base_url'):
+            kwargs["base_url"] = config['base_url']
+        self.client = openai.AsyncOpenAI(**kwargs)
 
     async def generate(self, prompt: str, **kwargs) -> GenerationResponse:
         """生成文本内容"""

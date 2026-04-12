@@ -51,6 +51,9 @@ class User(UserBase):
     id: str
     githubId: Optional[str] = None
     googleId: Optional[str] = None
+    hasAihubmixKey: bool = False
+    hasOpenrouterKey: bool = False
+    hasBailianKey: bool = False
     hasOpenAIKey: bool = False
     hasClaudeKey: bool = False
     hasGeminiKey: bool = False
@@ -71,6 +74,9 @@ class UserProfile(User):
 
 class UserSettingsRequest(BaseModel):
     """用户设置更新请求"""
+    aihubmixKey: Optional[str] = None
+    openrouterKey: Optional[str] = None
+    bailianKey: Optional[str] = None
     openaiKey: Optional[str] = None
     claudeKey: Optional[str] = None
     geminiKey: Optional[str] = None

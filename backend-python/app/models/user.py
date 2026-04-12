@@ -18,9 +18,14 @@ class User(Base):
     username = Column(String, nullable=False)
     email = Column(String, nullable=True)
     avatarUrl = Column(String, nullable=True)
-    openaiKey = Column(String, nullable=True)  # 加密存储
-    claudeKey = Column(String, nullable=True)  # 加密存储
-    geminiKey = Column(String, nullable=True)  # 加密存储
+    # AI 聚合 API 密钥（加密存储）
+    aihubmixKey = Column(String, nullable=True)
+    openrouterKey = Column(String, nullable=True)
+    bailianKey = Column(String, nullable=True)
+    # Legacy keys (kept for backward compat during migration)
+    openaiKey = Column(String, nullable=True)
+    claudeKey = Column(String, nullable=True)
+    geminiKey = Column(String, nullable=True)
     githubToken = Column(String, nullable=True)  # 加密存储
     defaultRepoUrl = Column(String, nullable=True)
     createdAt = Column(DateTime, default=func.now())
