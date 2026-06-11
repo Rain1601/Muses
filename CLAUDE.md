@@ -4,24 +4,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Muses** is an AI-powered blog article generation platform that converts various source materials (PDF, Markdown, text, conversations) into high-quality blog articles. Next.js frontend + FastAPI backend + SQLite.
+**Muses** is an AI-powered writing platform centered on a single `/dashboard` workspace: three-panel layout combining an article/file sidebar, a Notion-style editor, and an AI chat panel. Articles can be drafted, AI-edited, published to GitHub, and managed from one place. Next.js frontend + FastAPI backend + SQLite.
 
 ## Development Commands
 
 ### Quick Start
 ```bash
-./start-python.sh          # Start both frontend (port 3004) and backend (port 8080)
+./start-python.sh          # Start both frontend (3004) and backend (8080) in new Terminals
 ./scripts/setup.sh         # Initial setup (installs deps, creates DB)
 ```
 
 ### Frontend (port 3004)
 ```bash
 cd frontend
-npm run dev                # Dev server on port 3004
-npm run dev:turbo          # Dev server with Turbo
+npm run dev                # Dev server
 npm run build              # Production build
 npm run lint               # ESLint
-npx tsc --noEmit           # Type checking (no test suite yet)
+npx tsc --noEmit           # Type checking
 ```
 
 ### Backend (port 8080)
@@ -38,81 +37,86 @@ alembic revision --autogenerate -m "description"   # Create migration
 alembic upgrade head                                # Apply migrations
 ```
 
-### Testing
-```bash
-cd backend-python && python -m pytest                        # All tests
-cd backend-python && python -m pytest test_unified_ai.py     # Single test file
-```
+> No automated test suite. After a UI change, drive the app in a browser and confirm the path manually (see "Doing tasks" in your operator instructions).
 
 ## Architecture
 
 ### Tech Stack
-- **Frontend**: Next.js 14 (App Router), TypeScript, Tailwind CSS, Shadcn/ui, TanStack Query, Zustand, TipTap Editor
-- **Backend**: FastAPI, SQLAlchemy ORM, JWT auth, multi-model AI (OpenAI/Anthropic/Google)
+- **Frontend**: Next.js 14 (App Router), TypeScript, Tailwind CSS, Shadcn/ui, TanStack Query, Zustand, TipTap editor
+- **Backend**: FastAPI, SQLAlchemy ORM, JWT auth, aggregated AI providers (AIHubMix / OpenRouter / 百炼) via OpenAI-compatible SDK
 - **Database**: SQLite with SQLAlchemy + Alembic migrations
-- **Auth**: GitHub OAuth → JWT tokens
+- **Auth**: GitHub / Google OAuth → JWT tokens
 
 ### Frontend Architecture
 
-**API Client** (`lib/api.ts`): Axios instance with auto JWT injection from localStorage. Environment-aware — uses prod API for `muses.ink`, dev API otherwise. 30s timeout, auto-logout on 401.
+The app intentionally has only two user-facing pages:
 
-**State Management**:
+- `app/page.tsx` — landing + GitHub/Google login (also: "browse as guest" → /dashboard)
+- `app/dashboard/page.tsx` — the entire product (~1400 lines, three-panel workspace)
+- `app/auth/callback/` — OAuth callback
+
+**API Client** (`lib/api.ts`): Axios instance with auto JWT injection from localStorage. Environment-aware — uses prod API for `muses.ink`, dev API otherwise. 30s timeout, auto-logout on 401. Next.js rewrites `/api/*` to the backend (`next.config.js`), so the frontend uses relative URLs.
+
+**State**:
 - Server state: TanStack Query (`staleTime: 60s`, `refetchOnWindowFocus: false`)
-- Client state: Zustand stores in `store/` (`user.ts`, `viewMode.ts`, `aiAssistant.ts`)
-- Forms: React Hook Form + Zod validation
+- Client state: Zustand stores in `store/` — `user.ts` (auth), `aiAssistant.ts` (AI toggle)
 
-**TipTap Editor** (`components/NotionEditor.tsx`, ~52KB): Heavy component with extensions for tables, task lists, code blocks with syntax highlighting, math (KaTeX), videos (YouTube/Bilibili), resizable images, and collapsible code blocks.
+**TipTap Editor** (`components/NotionEditor.tsx`, ~52 KB): tables, task lists, syntax-highlighted code blocks, KaTeX math, YouTube/Bilibili embeds, resizable images, collapsible code blocks. Extensions live in `lib/tiptap-extensions/`.
 
-**Text Actions System**: `useTextActions` hook provides unified interface for AI text operations (improve, expand, summarize, translate, fix-grammar, brainstorm, custom-prompt). Gated by AI Assistant toggle state.
+**Text Actions System**: `useTextActions` hook (`lib/hooks/`) provides unified AI text operations (improve, expand, summarize, translate, fix-grammar, brainstorm, custom-prompt). Posts to `/api/agents/text-action`. Gated by AI Assistant toggle.
+
+**Dashboard-embedded components** (everything routes through `app/dashboard/page.tsx`):
+- `studio/ChatPanel` + `studio/SettingsPanel` — right-side AI chat with model picker
+- `studio/DiffView` — accept/reject pane for AI-proposed edits
+- `PublishHistoryPanel` — publish-to-GitHub history (reads `SyncHistory`)
+- `SkillLibrary` — writing skill picker (CRUD against `/api/skills`)
+- `TaskCenter` — background task tracker
+- `FileImport` — drag-drop import for PDF/Markdown/text
 
 ### Backend Architecture
 
-**Router registration** in `app/main.py`: auth, users, agents, agents_actions, articles, generate, upload, publish, process, proxy, image_upload, sync, import_files, knowledge, muses_config, chat_history, studio.
+**Router registration** (`app/main.py`): `auth`, `users`, `agents`, `agents_actions`, `articles`, `upload`, `publish`, `image_upload`, `import_files`, `skills`. `studio` is conditionally registered when `settings.enable_studio=True` (off in production — depends on local filesystem).
 
-**Startup**: `start.py` uses `psutil` to kill existing processes on the port before starting uvicorn. Settings from `app/config.py` (env vars).
+**Startup**: `start.py` uses `psutil` to kill existing processes on the port before launching uvicorn. Settings come from `app/config.py` (env vars).
 
-**CORS**: Configured to allow only `settings.frontend_url`. TrustedHost middleware enabled.
+**CORS**: Allows only `settings.frontend_url` (comma-separated origins supported). TrustedHost middleware enabled.
 
-### Three Writing Modes
+### Studio Mode (powers the dashboard chat panel)
 
-1. **Normal Mode**: 3-column layout — article list sidebar + article view
-2. **Co-Create Mode** (`components/CoCreateMode.tsx`): Split-screen chat + NotionEditor. Chat history persists per article via `/api/chat-history/`. Auto-save with 500ms debounce. Responses containing `<article_edit>...</article_edit>` tags replace full editor content.
-3. **Co-Read Mode**: Split-screen article reader + notes editor with text quoting.
-
-### Studio Mode (newest feature)
-
-File-based writing workspace at `~/muses-workspace` with Claude AI assistance.
+File-based writing workspace at `~/muses-workspace`. The endpoints back the right-side chat in the dashboard.
 
 **Backend** (`app/api/studio.py`):
-- `POST /api/studio/chat` — Stream chat via AIHubMix (aihubmix.com/v1), supports file context injection
+- `POST /api/studio/chat` — Stream chat through the user's configured aggregated provider, with optional file context
 - `WS /api/studio/filewatcher` — WebSocket for real-time file diffs
 - File CRUD: `GET/POST/PUT/DELETE /api/studio/files/{filename}`
 
-**Frontend** (`components/studio/`): ChatPanel, MarkdownEditor, DiffView, DiffOverlay, FileExplorer, HistoryPanel, FloatingTOC. Implements differential sync — tracks file snapshots and computes diffs with accept/reject UI.
+**Frontend**: `components/studio/{ChatPanel,DiffView,SettingsPanel}`. Differential sync — tracks file snapshots and computes diffs with accept/reject UI.
+
+### Skill Library (`app/api/skills.py`, `Skill` model)
+
+User-owned library of writing-prompt templates. Each Skill is `{name, description, icon (emoji), category, prompt, isPreset}`. Categories: `general`, `opening`, `structure`, `polish`, `style`, `meta`. `PRESET_SKILLS` are seeded on first access for each user and marked `isPreset=True` (read-only). Frontend: `components/SkillLibrary.tsx`.
 
 ### AI Agent System
 
 **Agent Service** (`app/agent/service.py`): `AgentService` with `generate_content()` and `stream_generate_content()`. Uses `ModelFactory` to instantiate models from agent config. Builds system messages from agent config (tone, audience, custom prompts).
 
-**Prompt System** (`app/agent/prompts/`): `builder.py` for dynamic prompt construction, `registry.py` for action registry, `action_prompts/` subdirectory with 16 action types.
+**Prompt System** (`app/agent/prompts/`): `builder.py` for dynamic prompt construction, `registry.py` for action registry, `action_prompts/` subdirectory with the action templates used by `/api/agents/text-action`.
 
-**Multi-Model Support** (`app/services/unified_ai.py`): Unified client abstracting OpenAI, Anthropic, and Google APIs. Model definitions in `app/models_config.py`. Per-agent model selection.
-
-### Knowledge Base / RAG
-
-Located in `app/agent/knowledge/`: chunker → embedder → retriever → storage pipeline. Per-user collections (`user_{user_id}_knowledge`). API at `/api/knowledge/` with endpoints: `/add`, `/search`, `/build`, `/stats`.
+**Multi-Model Support** (`app/services/unified_ai.py`): Single OpenAI-compatible SDK path against 3 aggregated provider base URLs — AIHubMix (`aihubmix.com/v1`), OpenRouter (`openrouter.ai/api/v1`), 百炼 (`dashscope.aliyuncs.com/compatible-mode/v1`). User stores per-provider keys (`aihubmixKey`, `openrouterKey`, `bailianKey`) on the User model, encrypted. Model registry in `app/models_config.py` is shared across providers (Claude, GPT, Gemini, Qwen, DeepSeek). Per-agent model + provider selection. Legacy `openaiKey`/`claudeKey`/`geminiKey` columns are kept only for migration.
 
 ### Key Data Flows
 
-**Article Generation**: Upload materials → `/api/upload/` → text extraction → `/api/generate/article` with AgentId → AIService + unified_ai → returns title/content/summary → saves as draft.
+**Article in dashboard**: Sidebar shows DB-stored articles + local workspace files → user selects one → loaded into TipTap → autosaved with debounce → AI chat/diff applies edits → publish to GitHub via `/api/publish`.
 
-**Co-Create Chat**: Open article → chat via `/api/agents/chat` → responses persist to `/api/chat-history/save` → user can select AI text to adopt into editor.
+**Text action**: User selects text in editor → `useTextActions` → `POST /api/agents/text-action` → response inserted via diff or directly.
 
 ## Database Schema
 
-Key entities: User (GitHub OAuth, encrypted API keys), Agent (AI writing assistants), Article (content + metadata + publishing info), ChatHistory (per-article conversations), UserSettings, SyncHistory, MusesConfig.
+Active models: `User` (OAuth + encrypted API keys), `UserSettings`, `Agent` (AI writing assistants), `Article` (content + publish state), `Skill` (prompt templates), `SyncHistory` (publish log).
 
 All sensitive data (API keys, tokens) encrypted before storage.
+
+> Legacy tables `ChatHistory`, `MusesConfig`, `ConfigHistory`, `ConfigTemplate`, `AgentMusesConfig` still exist in the SQLite file but no longer have ORM models (Phase 6 of slimming kept the data, dropped the code). New migrations should not depend on them.
 
 ## Environment Variables (backend-python/.env)
 
@@ -122,24 +126,25 @@ JWT_SECRET="your-jwt-secret"
 GITHUB_CLIENT_ID="your-github-oauth-app-id"
 GITHUB_CLIENT_SECRET="your-github-oauth-app-secret"
 ENCRYPTION_KEY="your-32-char-encryption-key"
-OPENAI_API_KEY="your-openai-api-key"
 ```
+
+AI provider keys (AIHubMix / OpenRouter / 百炼) are configured **per-user** via the Settings panel and stored encrypted on the User model — they are not loaded from env vars at startup.
 
 GitHub OAuth callback URL: `http://localhost:8080/api/auth/github/callback`
 
 ## Key API Endpoints
 
 - `/api/auth/github/callback` — GitHub OAuth
-- `/api/agents/` — Agent CRUD; `/api/agents/chat` — AI chat; `/api/agents/text-action` — text operations
+- `/api/user/settings` — User settings (note: singular `user`, not `users`)
+- `/api/user/verify-api-key`, `/api/user/get-api-key` — Per-provider key management
+- `/api/agents/` — Agent CRUD; `/api/agents/chat` — streaming AI chat; `/api/agents/text-action` — text operations
 - `/api/articles/` — Article CRUD
-- `/api/generate/` — AI article generation
 - `/api/upload/` — File upload processing
-- `/api/chat-history/{article_id}` — Chat history per article
-- `/api/knowledge/` — RAG knowledge base operations
-- `/api/studio/` — Studio mode (chat, files, filewatcher)
-- `/api/image-upload/upload-image` — GitHub-based image hosting
-- `/api/publish/` — Publish to GitHub repos
-- `/api/users/settings` — User settings
+- `/api/import/` — Import workspace files (FileImport)
+- `/api/publish/` — Publish to GitHub repos (+ `/history` reads `SyncHistory`)
+- `/api/upload-image` — GitHub-based image hosting
+- `/api/skills/` — Writing skill library (CRUD + preset seeding)
+- `/api/studio/*` — Dashboard chat + file workspace (dev only)
 
 ## Git Commit Guidelines
 
@@ -157,7 +162,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 - **Backend**: `backend-python/Dockerfile` → Cloud Run + Cloud SQL PostgreSQL
 - **Frontend**: `frontend/Dockerfile` → Cloud Run (Next.js standalone)
 - **Manual deploy**: `./deploy.sh` (requires `GCP_PROJECT_ID` env var)
-- **Env config**: Copy `.env.production.template` and `backend-env.yaml.template`
+- **Env config**: Copy `.env.production.template` and `backend-env.yaml.template`, fill values, do not commit
 - **Studio**: Disabled in production (`ENABLE_STUDIO=false`) — depends on local filesystem
 
 ### First-time Setup
@@ -174,3 +179,20 @@ export GCP_PROJECT_ID="your-project" DB_PASSWORD="your-pass"
 - `JWT_SECRET`, `ENCRYPTION_KEY`, `ENCRYPTION_SALT` — Security keys
 - `OAUTH_GITHUB_CLIENT_ID`, `OAUTH_GITHUB_CLIENT_SECRET` — GitHub OAuth App
 - `OPENAI_API_KEY`, `AIHUBMIX_API_KEY` — AI API keys
+
+## Repository Layout
+
+```
+backend-python/   FastAPI app (app/), Dockerfile, start.py, requirements.txt
+frontend/         Next.js app (app/, components/, lib/), Dockerfile
+scripts/          setup.sh, start.sh, dev.sh, stop.sh, build.sh, test.sh,
+                  gcp-setup.sh, migrate_local_to_remote.py
+docs/             All project documentation, including docs/dev/ (design notes)
+
+README.md  LICENSE  CONTRIBUTING.md  CLAUDE.md  AGENTS.md   # project-level docs
+deploy.sh                                                    # Cloud Run deploy
+start-python.sh                                              # macOS Terminal launcher
+.env.production.template  backend-env.yaml.template          # env templates
+```
+
+Anything outside that list (`muses.db`, `venv/`, `node_modules/`, `upload-files/`) is local-only and gitignored.
