@@ -7,7 +7,7 @@ from .database import create_tables, run_migrations
 from .config import settings
 
 # Import routers
-from .api import auth, users, agents, articles, generate, upload, publish, process, proxy, image_upload, sync, import_files, knowledge, muses_config, chat_history
+from .api import auth, users, agents, agents_actions, articles, upload, publish, image_upload, import_files, skills
 
 
 @asynccontextmanager
@@ -49,20 +49,13 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api/auth", tags=["authentication"])
 app.include_router(users.router, prefix="/api/user", tags=["users"])
 app.include_router(agents.router, prefix="/api/agents", tags=["agents"])
-from .api import agents_actions
 app.include_router(agents_actions.router, prefix="/api/agents", tags=["agent-actions"])
 app.include_router(articles.router, prefix="/api/articles", tags=["articles"])
-app.include_router(generate.router, prefix="/api/generate", tags=["generate"])
 app.include_router(upload.router, prefix="/api/upload", tags=["upload"])
 app.include_router(publish.router, prefix="/api/publish", tags=["publish"])
-app.include_router(process.router, prefix="/api/process", tags=["process"])
-app.include_router(proxy.router, prefix="/api", tags=["proxy"])
 app.include_router(image_upload.router, prefix="/api", tags=["image-upload"])
-app.include_router(sync.router, prefix="/api/sync", tags=["sync"])
 app.include_router(import_files.router, prefix="/api/import", tags=["import"])
-app.include_router(knowledge.router, tags=["knowledge"])  # prefix已在router中定义
-app.include_router(muses_config.router, prefix="/api", tags=["muses-config"])
-app.include_router(chat_history.router, prefix="/api/chat-history", tags=["chat-history"])
+app.include_router(skills.router, prefix="/api/skills", tags=["skills"])
 
 # Studio: 条件注册（依赖本地文件系统，生产环境可关闭）
 if settings.enable_studio:

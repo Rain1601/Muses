@@ -509,8 +509,8 @@ async def unpublish_from_github(
                     # 文件夹可能不存在或已被删除，继续执行
                     pass
 
-            # 更新文章状态为草稿
-            article.publishStatus = "draft"
+            # 更新文章状态为已下架（隐藏，不在默认列表展示）
+            article.publishStatus = "unpublished"
             article.syncStatus = "unsynced"
             article.githubUrl = None
             # repoPath 保留，以便重新发布时可以使用相同路径
@@ -549,7 +549,7 @@ async def get_publish_history(
     current_user = Depends(get_current_user_db),
     db: Session = Depends(get_db)
 ):
-    """获取发布历史"""
+    """获取发布历史 — 当前发布状态 + 完整同步历史记录"""
 
     article = db.query(Article).filter(
         Article.id == article_id,
@@ -559,11 +559,30 @@ async def get_publish_history(
     if not article:
         raise HTTPNotFoundError("Article not found")
 
+    history_records = db.query(SyncHistory).filter(
+        SyncHistory.articleId == article_id
+    ).order_by(SyncHistory.createdAt.desc()).all()
+
     return {
         "publishInfo": {
             "publishStatus": article.publishStatus,
             "publishedAt": article.publishedAt.isoformat() if article.publishedAt else None,
             "githubUrl": article.githubUrl,
-            "repoPath": article.repoPath
-        }
+            "repoPath": article.repoPath,
+            "firstSyncAt": article.firstSyncAt.isoformat() if article.firstSyncAt else None,
+            "lastSyncAt": article.lastSyncAt.isoformat() if article.lastSyncAt else None,
+            "syncCount": article.syncCount,
+        },
+        "history": [{
+            "id": h.id,
+            "syncType": h.syncType,
+            "syncDirection": h.syncDirection,
+            "syncStatus": h.syncStatus,
+            "hasChanges": h.hasChanges,
+            "githubUrl": h.githubUrl,
+            "repoPath": h.repoPath,
+            "errorMessage": h.errorMessage,
+            "syncDuration": h.syncDuration,
+            "createdAt": h.createdAt.isoformat() if h.createdAt else None,
+        } for h in history_records]
     }
