@@ -17,7 +17,6 @@ rain.blog/
 
 # Production
 frontend/dist/
-backend/dist/
 
 # Misc
 .DS_Store
@@ -32,7 +31,6 @@ yarn-error.log*
 # Local env files
 .env*.local
 .env
-backend/.env
 backend-python/.env
 frontend/.env.local
 backend-env.yaml
@@ -45,13 +43,13 @@ backend-env.yaml
 next-env.d.ts
 
 # Database
-backend/*.db
-backend/*.db-journal
-backend/prisma/migrations/
+backend-python/*.db
+backend-python/*.db-journal
 
 # Uploads
-backend/uploads/
-backend/temp/
+backend-python/uploads/
+backend-python/temp/
+upload-files/
 venv/
 venv_deploy/
 
@@ -71,7 +69,6 @@ logs/
 
 # Cache
 .cache/
-backend/.cache/
 # Python cache files
 backend-python/**/__pycache__/
 backend-python/venv_deploy/
