@@ -5,8 +5,6 @@ import { useRouter } from "next/navigation";
 import { marked } from "marked";
 import { useUserStore } from "@/store/user";
 import { NotionEditor } from "@/components/NotionEditor";
-import ChatPanel, { ChatPanelHandle } from "@/components/studio/ChatPanel";
-import DiffView from "@/components/studio/DiffView";
 import SettingsPanel from "@/components/studio/SettingsPanel";
 import PublishHistoryPanel from "@/components/PublishHistoryPanel";
 import SkillLibrary from "@/components/SkillLibrary";
@@ -16,8 +14,10 @@ import { persistSelection, clearPersistedSelection } from "@/lib/tiptap-extensio
 import { getLineContent } from "@/lib/tiptap-extensions/LineNumbers";
 import { isCodeContext, registerSlotRange, unregisterSlotRange, getSlotRange } from "@/lib/tiptap-extensions/PromptSlot";
 import { useSlotEngine } from "@/lib/hooks/useSlotEngine";
+import { useEditHistory, newEditId } from "@/lib/hooks/useEditHistory";
 import CandidatePopover, { type AcceptMode } from "@/components/CandidatePopover";
 import SelectionTaskMenu from "@/components/SelectionTaskMenu";
+import EditHistoryPanel from "@/components/EditHistoryPanel";
 import { createPortal } from "react-dom";
 import s from "./dashboard.module.css";
 
@@ -36,7 +36,6 @@ const CHAT_WIDTH_MAX = 600;
 
 interface FileItem { name: string; path: string; size: number; modified: number; }
 interface DBArticle { id: string; title: string; summary?: string; publishStatus: string; publishedAt?: string; githubUrl?: string; createdAt: string; updatedAt: string; }
-interface EditRecord { desc: string; added: number; removed: number; time: Date; }
 interface FolderNode { name: string; path: string; files: FileItem[]; folders: FolderNode[]; expanded: boolean; }
 
 export default function Dashboard() {
@@ -68,12 +67,6 @@ export default function Dashboard() {
 
   const [selection, setSelection] = useState("");
   const editorRef = useRef<any>(null);
-  // Track selection range and markdown for partial edits
-  const selectionRangeRef = useRef<{ from: number; to: number } | null>(null);
-  const selectionMdRef = useRef<string>("");
-  // Partial edit state: when AI edits only the selection
-  const [partialEdit, setPartialEdit] = useState<{ oldMd: string; newMd: string } | null>(null);
-
   // Chat panel resizable width
   const [chatWidth, setChatWidth] = useState(CHAT_WIDTH_DEFAULT);
   const isDragging = useRef(false);
@@ -113,28 +106,6 @@ export default function Dashboard() {
   const handleSelectionChange = useCallback(async (text: string, from?: number, to?: number) => {
     if (text.trim()) {
       setSelection(text);
-      if (from !== undefined && to !== undefined) {
-        selectionRangeRef.current = { from, to };
-        // Capture selection as markdown for merge
-        const editor = editorRef.current;
-        if (editor) {
-          try {
-            const { DOMSerializer } = await import("@tiptap/pm/model");
-            const slice = editor.state.doc.slice(from, to);
-            const serializer = DOMSerializer.fromSchema(editor.schema);
-            const fragment = serializer.serializeFragment(slice.content);
-            const div = document.createElement("div");
-            div.appendChild(fragment);
-            const td = await getTurndownService();
-            selectionMdRef.current = td.turndown(div.innerHTML);
-          } catch {
-            selectionMdRef.current = text;
-          }
-        }
-      }
-    } else {
-      selectionRangeRef.current = null;
-      selectionMdRef.current = "";
     }
   }, []);
 
@@ -142,16 +113,6 @@ export default function Dashboard() {
     setSelection("");
     if (editorRef.current) clearPersistedSelection(editorRef.current);
   }, []);
-
-  const handleGetLineContent = useCallback((start: number, end?: number) => {
-    return getLineContent(editorRef.current, start, end);
-  }, []);
-
-  const [pendingChange, setPendingChange] = useState<string | null>(null);
-
-  const [editStats, setEditStats] = useState({ added: 0, removed: 0 });
-  const [editRecords, setEditRecords] = useState<EditRecord[]>([]);
-  const [showHistory, setShowHistory] = useState(false);
 
   const [creating, setCreating] = useState(false);
   const [creatingFolder, setCreatingFolder] = useState(false);
@@ -185,7 +146,6 @@ export default function Dashboard() {
   const [publishStatus, setPublishStatus] = useState<{ type: "success" | "error" | "info"; msg: string } | null>(null);
   const translatePopoverRef = useRef<HTMLDivElement>(null);
   const runningTaskIdsRef = useRef<Set<string>>(new Set());
-  const chatRef = useRef<ChatPanelHandle>(null);
   const createInputRef = useRef<HTMLInputElement>(null);
 
   const autoSaveRef = useRef<NodeJS.Timeout | null>(null);
@@ -409,7 +369,6 @@ export default function Dashboard() {
       setContent(htmlContent);
       setSavedContent(htmlContent);
       setMarkdownContent(md);
-      setPendingChange(null);
       setSelection("");
       setShowSettings(false);
     } catch (e) { console.error("Open file failed:", e); }
@@ -443,7 +402,6 @@ export default function Dashboard() {
       setContent(htmlContent);
       setSavedContent(htmlContent);
       setMarkdownContent(md);
-      setPendingChange(null);
       setSelection("");
       setShowSettings(false);
     } catch (e) { console.error("Open DB article failed:", e); }
@@ -522,61 +480,6 @@ export default function Dashboard() {
     }, 3000);
     return () => { if (autoSaveRef.current) clearInterval(autoSaveRef.current); };
   }, [activeFile, saveFile]);
-
-  // ===== Accept / Reject =====
-  const acceptChange = useCallback(async () => {
-    if (!pendingChange) return;
-
-    let finalMd: string;
-    if (partialEdit) {
-      // Partial edit: merge AI's edit into the full article markdown
-      const td = await getTurndownService();
-      const currentMd = contentRef.current ? td.turndown(contentRef.current) : markdownContent;
-      const idx = currentMd.indexOf(partialEdit.oldMd);
-      if (idx !== -1) {
-        finalMd = currentMd.slice(0, idx) + pendingChange + currentMd.slice(idx + partialEdit.oldMd.length);
-      } else {
-        // Fallback: replace full content
-        finalMd = pendingChange;
-      }
-    } else {
-      // Full edit: pendingChange is the complete article
-      finalMd = pendingChange;
-    }
-
-    const oldLines = markdownContent.split("\n").length;
-    const newLines = finalMd.split("\n").length;
-    const added = Math.max(0, newLines - oldLines);
-    const removed = Math.max(0, oldLines - newLines);
-
-    const htmlContent = await marked(finalMd);
-    setContent(htmlContent);
-    setMarkdownContent(finalMd);
-    saveFile(htmlContent);
-    setEditStats(prev => ({ added: prev.added + added, removed: prev.removed + removed }));
-    setEditRecords(prev => [{ desc: "Claude edit", added, removed, time: new Date() }, ...prev]);
-    setPendingChange(null);
-    setPartialEdit(null);
-  }, [pendingChange, partialEdit, markdownContent, saveFile]);
-
-  const rejectChange = useCallback(() => { setPendingChange(null); setPartialEdit(null); }, []);
-
-  const handleArticleEdit = useCallback(async (newContent: string) => {
-    const hasSelection = !!selectionMdRef.current;
-    if (hasSelection) {
-      // Partial edit: diff only the selection vs AI's edit
-      setPartialEdit({ oldMd: selectionMdRef.current, newMd: newContent });
-      setPendingChange(newContent);
-    } else {
-      // Full edit: sync markdownContent and show full diff
-      if (contentRef.current) {
-        const td = await getTurndownService();
-        setMarkdownContent(td.turndown(contentRef.current));
-      }
-      setPartialEdit(null);
-      setPendingChange(newContent);
-    }
-  }, []);
 
   // Close file menu on outside click
   useEffect(() => {
@@ -697,14 +600,10 @@ export default function Dashboard() {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "s") { e.preventDefault(); saveFile(); }
-      if (pendingChange) {
-        if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); acceptChange(); }
-        if (e.key === "Escape") { e.preventDefault(); rejectChange(); }
-      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [saveFile, pendingChange, acceptChange, rejectChange]);
+  }, [saveFile]);
 
   // ===== Notion-style keyboard shortcuts =====
   useEffect(() => {
@@ -812,6 +711,10 @@ export default function Dashboard() {
   useEffect(() => { slotEngineRef.current = slotEngine; }, [slotEngine]);
   const getSlotState = useCallback(() => slotEngineRef.current.getStateRef(), []);
 
+  // ===== AI edit history (per article) =====
+  // Keyed by the live article id; switching articles loads its own log.
+  const editHistory = useEditHistory(activeDbArticle?.id ?? activeFile ?? "untitled");
+
   // Force decoration re-render when slot map changes (dispatch a no-op tx).
   useEffect(() => {
     if (!editorState) return;
@@ -918,27 +821,48 @@ export default function Dashboard() {
     await slotEngine.fireSlot(key, { prompt, contextBefore: before, contextAfter: after });
   }, [editorState, selMenu, slotEngine]);
 
-  // Accept handler — replace bracket / selection with chosen text (with AiSource mark).
+  // Accept handler — replace bracket / selection with chosen text (with AiSource mark
+  // carrying a fresh editId), and log a history record for revert.
   const acceptForSlot = useCallback((key: string, text: string, mode: AcceptMode) => {
     if (!editorState) return;
+    const editId = newEditId();
+    const slot = slotEngine.slots.get(key);
+    const cand = slot?.candidates?.find(c => c.text === text);
     const tracked = getSlotRange(editorState.view, key);
+
     if (tracked) {
+      // Selection task.
       const { from, to } = tracked;
+      const originalText = mode === "replace"
+        ? editorState.state.doc.textBetween(from, to, " ")
+        : "";
       if (mode === "replace") {
         editorState.chain().focus()
-          .insertContentAt({ from, to }, [{ type: "text", text, marks: [{ type: "aiSource" }] }])
+          .insertContentAt({ from, to }, [
+            { type: "text", text, marks: [{ type: "aiSource", attrs: { editId } }] },
+          ])
           .run();
       } else {
+        // Mark BOTH the leading space and the AI text so revert removes them together.
         editorState.chain().focus()
           .insertContentAt(to, [
-            { type: "text", text: " ", marks: [] },
-            { type: "text", text, marks: [{ type: "aiSource" }] },
+            { type: "text", text: " ", marks: [{ type: "aiSource", attrs: { editId } }] },
+            { type: "text", text, marks: [{ type: "aiSource", attrs: { editId } }] },
           ])
           .run();
       }
       unregisterSlotRange(editorState.view, key);
+      editHistory.addRecord({
+        source: "selection",
+        instruction: slot?.instruction,
+        originalText: originalText || (slot?.originalText ?? ""),
+        newText: text,
+        mode,
+        model: cand?.model,
+        costUsd: cand?.cost_usd ?? undefined,
+      });
     } else {
-      // Bracket slot — find by content and replace 【key】.
+      // Bracket slot — find 【key】 by content + replace.
       let from = -1, to = -1;
       editorState.state.doc.descendants((node: any, pos: number, parent: any) => {
         if (!node.isText || !node.text) return;
@@ -952,12 +876,74 @@ export default function Dashboard() {
       });
       if (from === -1) return;
       editorState.chain().focus()
-        .insertContentAt({ from, to }, [{ type: "text", text, marks: [{ type: "aiSource" }] }])
+        .insertContentAt({ from, to }, [
+          { type: "text", text, marks: [{ type: "aiSource", attrs: { editId } }] },
+        ])
         .run();
+      editHistory.addRecord({
+        source: "bracket",
+        promptKey: key,
+        originalText: `【${key}】`,
+        newText: text,
+        mode: "replace",
+        model: cand?.model,
+        costUsd: cand?.cost_usd ?? undefined,
+      });
     }
     slotEngine.clearSlot(key);
     setOpenSlot(null);
-  }, [editorState, slotEngine]);
+  }, [editorState, slotEngine, editHistory]);
+
+  // Revert a logged AI edit by finding the matching AiSource span (by editId
+  // attribute) and either restoring the original text or deleting the span.
+  const revertEdit = useCallback((id: string) => {
+    if (!editorState) return;
+    const rec = editHistory.records.find(r => r.id === id);
+    if (!rec || rec.reverted) return;
+
+    // Collect contiguous runs whose aiSource mark carries this editId.
+    const ranges: { from: number; to: number }[] = [];
+    let curStart = -1, curEnd = -1;
+    editorState.state.doc.descendants((node: any, pos: number) => {
+      if (!node.isText || !node.text) return;
+      const m = node.marks?.find((mk: any) => mk.type.name === "aiSource" && mk.attrs.editId === id);
+      const nodeFrom = pos;
+      const nodeTo = pos + node.nodeSize;
+      if (m) {
+        if (curStart === -1) { curStart = nodeFrom; curEnd = nodeTo; }
+        else if (nodeFrom === curEnd) { curEnd = nodeTo; }
+        else { ranges.push({ from: curStart, to: curEnd }); curStart = nodeFrom; curEnd = nodeTo; }
+      } else if (curStart !== -1) {
+        ranges.push({ from: curStart, to: curEnd });
+        curStart = -1; curEnd = -1;
+      }
+    });
+    if (curStart !== -1) ranges.push({ from: curStart, to: curEnd });
+
+    if (ranges.length === 0) {
+      // Span already gone (user manually deleted). Mark as reverted in the log
+      // anyway since there's nothing left to undo.
+      editHistory.markReverted(id);
+      return;
+    }
+
+    if (rec.mode === "replace") {
+      // Replace the bounding extent with original text — single chain step.
+      const from = ranges[0].from;
+      const to = ranges[ranges.length - 1].to;
+      editorState.chain().focus()
+        .insertContentAt({ from, to }, [{ type: "text", text: rec.originalText, marks: [] }])
+        .run();
+    } else {
+      // Append — delete the marked spans, in reverse order so positions stay valid.
+      let chain = editorState.chain().focus();
+      for (let i = ranges.length - 1; i >= 0; i--) {
+        chain = chain.deleteRange(ranges[i]);
+      }
+      chain.run();
+    }
+    editHistory.markReverted(id);
+  }, [editorState, editHistory]);
 
   const regenerateForSlot = useCallback(async (key: string) => {
     const st = slotEngine.slots.get(key);
@@ -1701,43 +1687,21 @@ export default function Dashboard() {
 
         {/* Editor */}
         <div className={s.editorArea}>
-          {pendingChange && (
-            <div className={s.acceptBanner}>
-              <div className={s.acceptBannerLabel}>
-                <span className={s.acceptPulse} />
-                <span>Claude suggested changes</span>
-              </div>
-              <div className={s.acceptActions}>
-                <button onClick={rejectChange} className={s.btnReject}>Reject <kbd className={s.kbd}>esc</kbd></button>
-                <button onClick={acceptChange} className={s.btnAccept}>Accept <kbd className={s.kbd}>&#8984;&#9166;</kbd></button>
-              </div>
-            </div>
-          )}
-
           {showSettings ? (
             <SettingsPanel onClose={() => setShowSettings(false)} />
           ) : (activeFile || activeDbArticle) ? (
-            pendingChange ? (
-              <div className={s.editorScroll}>
-                <DiffView
-                  oldContent={partialEdit ? partialEdit.oldMd : markdownContent}
-                  newContent={partialEdit ? partialEdit.newMd : pendingChange}
+            <div className={s.editorScroll}>
+              <div className={s.editorInner}>
+                <NotionEditor
+                  key={activeFile || activeDbArticle?.id || "empty"}
+                  initialContent={content}
+                  onChange={setContent}
+                  onSelectionChange={handleSelectionChange}
+                  onEditorReady={handleEditorReady}
+                  getSlotState={getSlotState}
                 />
               </div>
-            ) : (
-              <div className={s.editorScroll}>
-                <div className={s.editorInner}>
-                  <NotionEditor
-                    key={activeFile || activeDbArticle?.id || "empty"}
-                    initialContent={content}
-                    onChange={setContent}
-                    onSelectionChange={handleSelectionChange}
-                    onEditorReady={handleEditorReady}
-                    getSlotState={getSlotState}
-                  />
-                </div>
-              </div>
-            )
+            </div>
           ) : (
             <div className={s.welcomeScreen}>
               <div style={{ textAlign: "center" }}>
@@ -1753,15 +1717,12 @@ export default function Dashboard() {
           <div className={s.resizeHandleLine} />
         </div>
 
-        {/* Chat */}
+        {/* AI Edit History — replaces the legacy ChatPanel */}
         <div className={s.chatPanel} style={{ width: chatWidth }}>
-          <ChatPanel
-            ref={chatRef}
-            activeFile={activeFile || (activeDbArticle ? `${activeDbArticle.title}.md` : null)}
-            editorSelection={selection}
-            onClearSelection={handleClearSelection}
-            onArticleEdit={handleArticleEdit}
-            getLineContent={handleGetLineContent}
+          <EditHistoryPanel
+            records={editHistory.records}
+            onRevert={revertEdit}
+            onClear={editHistory.clear}
           />
         </div>
         </>
@@ -1771,7 +1732,7 @@ export default function Dashboard() {
       {/* Status bar */}
       <div className={s.statusbar}>
         <div className={s.statusLeft}>
-          <span>Chat <kbd className={s.statusKbd}>&#8984;K</kbd></span>
+          <span>Select + <kbd className={s.statusKbd}>&#8984;K</kbd> for AI</span>
           {selection && (
             <span className={s.statusSelection}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
@@ -1781,30 +1742,6 @@ export default function Dashboard() {
           )}
         </div>
         <div className={s.statusRight}>
-          {(editStats.added > 0 || editStats.removed > 0) && (
-            <div style={{ position: "relative" }}>
-              <button onClick={() => setShowHistory(!showHistory)} className={s.editStatsBtn}>
-                <span className={s.editStatsAdded}>+{editStats.added}</span>
-                <span className={s.editStatsRemoved}>-{editStats.removed}</span>
-              </button>
-              {showHistory && editRecords.length > 0 && (
-                <div className={s.historyDropdown}>
-                  <div className={s.historyHeader}>Edit history ({editRecords.length})</div>
-                  <div className={s.historyList}>
-                    {editRecords.map((r, i) => (
-                      <div key={i} className={s.historyItem}>
-                        <span className={s.historyItemLabel}>{r.desc}</span>
-                        <span>
-                          <span className={s.editStatsAdded}>+{r.added}</span>{" "}
-                          <span className={s.editStatsRemoved}>-{r.removed}</span>
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
           <span className={s.modelLabel}>Sonnet 4</span>
         </div>
       </div>
