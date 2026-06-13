@@ -10,6 +10,8 @@ import '../styles/editor-selection-persist.css';
 import '../styles/collapsible-code.css';
 import '../styles/editor-line-numbers.css';
 import StarterKit from '@tiptap/starter-kit';
+import { SlotDecorations, AiSource } from '@/lib/tiptap-extensions/PromptSlot';
+import type { SlotState } from '@/lib/tiptap-extensions/PromptSlot';
 import Placeholder from '@tiptap/extension-placeholder';
 import Highlight from '@tiptap/extension-highlight';
 import CollapsibleCodeBlock from '@/lib/tiptap-extensions/CollapsibleCodeBlock';
@@ -51,9 +53,15 @@ interface NotionEditorProps {
   agentId?: string; // 当前使用的Agent ID
   onSelectionChange?: (selectedText: string, from?: number, to?: number) => void;
   onEditorReady?: (editor: any) => void;
+  /**
+   * Returns the live slot-state map so the bracket decoration plugin can render
+   * status dots. When omitted, brackets render as plain text and the system is
+   * inert. Both PromptSlot and AiSource are otherwise always loaded.
+   */
+  getSlotState?: () => Map<string, SlotState>;
 }
 
-export function NotionEditor({ initialContent = '', onChange, agentId, onSelectionChange, onEditorReady }: NotionEditorProps) {
+export function NotionEditor({ initialContent = '', onChange, agentId, onSelectionChange, onEditorReady, getSlotState }: NotionEditorProps) {
   // Component initialized with agentId
   const { isEnabled: aiAssistantEnabled } = useAIAssistantStore();
 
@@ -700,6 +708,8 @@ export function NotionEditor({ initialContent = '', onChange, agentId, onSelecti
         // 禁用 Link，因为我们单独配置它
         link: false,
       }),
+      AiSource,
+      ...(getSlotState ? [SlotDecorations({ getState: getSlotState })] : []),
       Highlight,
       CollapsibleCodeBlock,
       ResizableImage,

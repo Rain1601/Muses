@@ -8,8 +8,17 @@ import { NotionEditor } from "@/components/NotionEditor";
 import ChatPanel, { ChatPanelHandle } from "@/components/studio/ChatPanel";
 import DiffView from "@/components/studio/DiffView";
 import SettingsPanel from "@/components/studio/SettingsPanel";
+import PublishHistoryPanel from "@/components/PublishHistoryPanel";
+import SkillLibrary from "@/components/SkillLibrary";
+import { TaskCenter } from "@/components/TaskCenter";
+import { FileImport } from "@/components/FileImport";
 import { persistSelection, clearPersistedSelection } from "@/lib/tiptap-extensions/SelectionPersistence";
 import { getLineContent } from "@/lib/tiptap-extensions/LineNumbers";
+import { isCodeContext, registerSlotRange, unregisterSlotRange, getSlotRange } from "@/lib/tiptap-extensions/PromptSlot";
+import { useSlotEngine } from "@/lib/hooks/useSlotEngine";
+import CandidatePopover, { type AcceptMode } from "@/components/CandidatePopover";
+import SelectionTaskMenu from "@/components/SelectionTaskMenu";
+import { createPortal } from "react-dom";
 import s from "./dashboard.module.css";
 
 // HTML → Markdown converter (lazy loaded)
@@ -154,8 +163,28 @@ export default function Dashboard() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const darkMode = true; // Dark-only UI — warm minimalist design
   const [showSettings, setShowSettings] = useState(false);
+  const [showPublishHistory, setShowPublishHistory] = useState(false);
+  const [showTaskCenter, setShowTaskCenter] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [articleMenuOpen, setArticleMenuOpen] = useState<string | null>(null);
+  // Menu anchor — fixed position relative to click point (right-click or ··· button)
+  const [articleMenuAnchor, setArticleMenuAnchor] = useState<{ top: number; left: number } | null>(null);
+  const [confirmDeleteArticle, setConfirmDeleteArticle] = useState<string | null>(null);
+  const [renamingArticleId, setRenamingArticleId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  // ⌘K quick switcher state
+  const [quickSwitcherOpen, setQuickSwitcherOpen] = useState(false);
+  const [qsQuery, setQsQuery] = useState("");
+  const [qsIndex, setQsIndex] = useState(0);
+  const [showTranslate, setShowTranslate] = useState(false);
+  const [translateLang, setTranslateLang] = useState("en");
+  const [translateMode, setTranslateMode] = useState<"translated" | "bilingual">("translated");
+  const [translating, setTranslating] = useState(false);
+  const [hasRunningTasks, setHasRunningTasks] = useState(false);
   const [publishingFile, setPublishingFile] = useState<string | null>(null);
-  const [publishStatus, setPublishStatus] = useState<{ type: "success" | "error"; msg: string } | null>(null);
+  const [publishStatus, setPublishStatus] = useState<{ type: "success" | "error" | "info"; msg: string } | null>(null);
+  const translatePopoverRef = useRef<HTMLDivElement>(null);
+  const runningTaskIdsRef = useRef<Set<string>>(new Set());
   const chatRef = useRef<ChatPanelHandle>(null);
   const createInputRef = useRef<HTMLInputElement>(null);
 
@@ -169,6 +198,113 @@ export default function Dashboard() {
   useEffect(() => {
     document.documentElement.classList.add("dark");
   }, []);
+
+  // ===== Running tasks indicator + completion notifications =====
+  // Note: We dispatch a custom event when articles need reloading instead of
+  // calling loadDbArticles directly, because loadDbArticles is defined later
+  // (useCallback hoisting / TDZ).
+  useEffect(() => {
+    const check = () => {
+      try {
+        const raw = localStorage.getItem("muses_tasks");
+        if (!raw) { setHasRunningTasks(false); runningTaskIdsRef.current = new Set(); return; }
+        const tasks: any[] = JSON.parse(raw);
+        setHasRunningTasks(tasks.some(t => t.status === "pending" || t.status === "running"));
+
+        const currentRunning = new Set<string>(
+          tasks.filter(t => t.status === "pending" || t.status === "running").map(t => t.taskId)
+        );
+        for (const id of runningTaskIdsRef.current) {
+          if (currentRunning.has(id)) continue;
+          const t = tasks.find(x => x.taskId === id);
+          if (!t) continue;
+          const isTranslate = t.task_type === "translate_article";
+          if (t.status === "completed") {
+            const title = t.result?.title || t.article_id || "";
+            setPublishStatus({
+              type: "success",
+              msg: isTranslate ? `翻译完成${title ? `: ${title}` : ""}` : `任务完成${title ? `: ${title}` : ""}`,
+            });
+            setTimeout(() => setPublishStatus(null), 5000);
+            window.dispatchEvent(new Event("muses-articles-changed"));
+          } else if (t.status === "failed") {
+            setPublishStatus({
+              type: "error",
+              msg: (isTranslate ? "翻译失败: " : "任务失败: ") + (t.error || "未知错误"),
+            });
+            setTimeout(() => setPublishStatus(null), 6000);
+          }
+        }
+        runningTaskIdsRef.current = currentRunning;
+      } catch { setHasRunningTasks(false); }
+    };
+    check();
+    const interval = setInterval(check, 2000);
+    const onUpdate = () => check();
+    window.addEventListener("muses-task-update", onUpdate);
+    return () => { clearInterval(interval); window.removeEventListener("muses-task-update", onUpdate); };
+  }, []);
+
+  // ===== Click outside closes translate popover =====
+  useEffect(() => {
+    if (!showTranslate) return;
+    const handler = (e: MouseEvent) => {
+      if (translatePopoverRef.current && !translatePopoverRef.current.contains(e.target as Node)) {
+        setShowTranslate(false);
+      }
+    };
+    setTimeout(() => window.addEventListener("click", handler), 0);
+    return () => window.removeEventListener("click", handler);
+  }, [showTranslate]);
+
+  // ===== Trigger translation =====
+  const doTranslate = useCallback(async () => {
+    if (!activeDbArticle) return;
+    setTranslating(true);
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      const res = await fetch(`${API_BASE}/api/articles/${activeDbArticle.id}/translate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ targetLanguage: translateLang, mode: translateMode }),
+      });
+      const result = await res.json();
+      if (res.ok && result.taskId) {
+        try {
+          const raw = localStorage.getItem("muses_tasks");
+          const tasks = raw ? JSON.parse(raw) : [];
+          const now = new Date().toISOString();
+          tasks.unshift({
+            taskId: result.taskId,
+            status: result.status || "pending",
+            progress: 0,
+            total: 0,
+            createdAt: now,
+            updatedAt: now,
+            task_type: "translate_article",
+            article_id: activeDbArticle.id,
+            target_language: translateLang,
+            mode: translateMode,
+            result: { article_id: activeDbArticle.id, title: activeDbArticle.title },
+          });
+          localStorage.setItem("muses_tasks", JSON.stringify(tasks));
+          window.dispatchEvent(new Event("muses-task-update"));
+        } catch (e) { console.warn("Failed to record task:", e); }
+        setPublishStatus({ type: "info", msg: "翻译任务已启动 — 在任务中心查看进度" });
+        setTimeout(() => setPublishStatus(null), 3500);
+        setShowTranslate(false);
+      } else {
+        setPublishStatus({ type: "error", msg: result.detail || "翻译启动失败" });
+        setTimeout(() => setPublishStatus(null), 3500);
+      }
+    } catch (e: any) {
+      setPublishStatus({ type: "error", msg: e.message || "翻译启动失败" });
+      setTimeout(() => setPublishStatus(null), 3500);
+    } finally {
+      setTranslating(false);
+    }
+  }, [activeDbArticle, translateLang]);
 
   // ===== File operations =====
   const loadFiles = useCallback(async () => {
@@ -194,6 +330,13 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => { loadFiles(); loadDbArticles(); }, [loadFiles, loadDbArticles]);
+
+  // Refresh DB article list when a background task completes (translation, import, etc.)
+  useEffect(() => {
+    const handler = () => loadDbArticles();
+    window.addEventListener("muses-articles-changed", handler);
+    return () => window.removeEventListener("muses-articles-changed", handler);
+  }, [loadDbArticles]);
 
   // ===== Publish =====
   const publishFile = useCallback(async (filePath: string) => {
@@ -443,18 +586,117 @@ export default function Dashboard() {
     return () => window.removeEventListener("click", handler);
   }, [fileMenuOpen]);
 
+  // Close article menu on outside click
+  useEffect(() => {
+    if (!articleMenuOpen) return;
+    const handler = () => { setArticleMenuOpen(null); setArticleMenuAnchor(null); };
+    window.addEventListener("click", handler);
+    return () => window.removeEventListener("click", handler);
+  }, [articleMenuOpen]);
+
+  // ===== Notion-style keyboard shortcuts =====
+  // Helper: are we currently editing inside an input or the TipTap editor?
+  const isTypingTarget = (el: EventTarget | null): boolean => {
+    if (!(el instanceof HTMLElement)) return false;
+    const tag = el.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || el.isContentEditable) return true;
+    if (el.closest(".ProseMirror")) return true;
+    return false;
+  };
+
+  // ===== Article actions: rename / duplicate / delete =====
+  const renameArticle = useCallback(async (articleId: string, newTitle: string) => {
+    const trimmed = newTitle.trim();
+    if (!trimmed) { setRenamingArticleId(null); setRenameValue(""); return; }
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      await fetch(`${API_BASE}/api/articles/${articleId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ title: trimmed }),
+      });
+      loadDbArticles();
+      // Refresh active article if it was the one renamed
+      if (activeDbArticle?.id === articleId) {
+        setActiveDbArticle({ ...activeDbArticle, title: trimmed });
+      }
+    } catch (e) { console.error("Rename article failed:", e); }
+    finally { setRenamingArticleId(null); setRenameValue(""); }
+  }, [activeDbArticle, loadDbArticles]);
+
+  const duplicateArticle = useCallback(async (article: DBArticle) => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      // Get full article content
+      const detailRes = await fetch(`${API_BASE}/api/articles/${article.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const detail = await detailRes.json();
+      const src = detail.article || {};
+      const cloneRes = await fetch(`${API_BASE}/api/articles`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          title: `${article.title} (副本)`,
+          content: src.content || "",
+          summary: src.summary || "",
+          agentId: src.agentId,
+        }),
+      });
+      if (cloneRes.ok) {
+        setPublishStatus({ type: "success", msg: "已创建副本" });
+        setTimeout(() => setPublishStatus(null), 2500);
+        loadDbArticles();
+      } else {
+        const data = await cloneRes.json().catch(() => ({}));
+        setPublishStatus({ type: "error", msg: data.detail || "复制失败" });
+        setTimeout(() => setPublishStatus(null), 3000);
+      }
+    } catch (e: any) {
+      setPublishStatus({ type: "error", msg: e.message || "复制失败" });
+      setTimeout(() => setPublishStatus(null), 3000);
+    }
+  }, [loadDbArticles]);
+
+  const deleteArticle = useCallback(async (articleId: string) => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      const res = await fetch(`${API_BASE}/api/articles/${articleId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        if (activeDbArticle?.id === articleId) {
+          setActiveDbArticle(null);
+          setContent(""); setSavedContent(""); setMarkdownContent("");
+        }
+        setPublishStatus({ type: "success", msg: "文章已删除" });
+        setTimeout(() => setPublishStatus(null), 2500);
+        loadDbArticles();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setPublishStatus({ type: "error", msg: data.detail || "删除失败" });
+        setTimeout(() => setPublishStatus(null), 3000);
+      }
+    } catch (e: any) {
+      setPublishStatus({ type: "error", msg: e.message || "删除失败" });
+      setTimeout(() => setPublishStatus(null), 3000);
+    } finally {
+      setConfirmDeleteArticle(null);
+      setArticleMenuOpen(null);
+    }
+  }, [activeDbArticle, loadDbArticles]);
+
   // ===== Keyboard shortcuts =====
+  // ⌘K is owned by the new selection-task system (see capture-phase handler
+  // below). The legacy "⌘K → persist selection → focus chat input" behavior
+  // was removed in favor of the inline task creator.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "s") { e.preventDefault(); saveFile(); }
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        if (editorRef.current) {
-          const info = persistSelection(editorRef.current);
-          if (info) handleSelectionChange(info.text, info.from, info.to);
-        }
-        chatRef.current?.focusInput();
-      }
       if (pendingChange) {
         if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); acceptChange(); }
         if (e.key === "Escape") { e.preventDefault(); rejectChange(); }
@@ -463,6 +705,64 @@ export default function Dashboard() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [saveFile, pendingChange, acceptChange, rejectChange]);
+
+  // ===== Notion-style keyboard shortcuts =====
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const inEditor = isTypingTarget(e.target);
+
+      // ⌘P — quick switcher (Notion: Quick Find). Always intercept browser Print.
+      if ((e.metaKey || e.ctrlKey) && (e.key === "p" || e.key === "P")) {
+        e.preventDefault();
+        setQuickSwitcherOpen(true);
+        setQsQuery("");
+        setQsIndex(0);
+        return;
+      }
+
+      // ⌘⇧N — new article.
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === "n" || e.key === "N")) {
+        e.preventDefault();
+        setSidebarTab("article");
+        startCreateFile();
+        return;
+      }
+
+      // Row-level shortcuts only when not typing.
+      if (inEditor) return;
+
+      // Esc — close quick switcher / cancel rename / close menus.
+      if (e.key === "Escape") {
+        if (quickSwitcherOpen) { e.preventDefault(); setQuickSwitcherOpen(false); return; }
+        if (renamingArticleId) { e.preventDefault(); setRenamingArticleId(null); setRenameValue(""); return; }
+        if (articleMenuOpen) { e.preventDefault(); setArticleMenuOpen(null); setArticleMenuAnchor(null); return; }
+      }
+
+      // Per-article actions on the currently-active article.
+      if (!activeDbArticle) return;
+      if (e.key === "F2") {
+        e.preventDefault();
+        setRenamingArticleId(activeDbArticle.id);
+        setRenameValue(activeDbArticle.title);
+        return;
+      }
+      if (e.key === "Delete" || e.key === "Backspace") {
+        // Only Del (not Backspace) — Backspace too easy to mistrigger
+        if (e.key === "Delete") {
+          e.preventDefault();
+          setConfirmDeleteArticle(activeDbArticle.id);
+        }
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && (e.key === "d" || e.key === "D")) {
+        e.preventDefault();
+        duplicateArticle(activeDbArticle);
+        return;
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [quickSwitcherOpen, renamingArticleId, articleMenuOpen, activeDbArticle, duplicateArticle]);
 
   useEffect(() => { if (creating && createInputRef.current) createInputRef.current.focus(); }, [creating]);
 
@@ -494,22 +794,389 @@ export default function Dashboard() {
     setCreatingInFolder(inFolder || null);
   };
 
-  const handleEditorReady = useCallback((editor: any) => { editorRef.current = editor; }, []);
+  // Mirror the editor instance into React state so hooks (useSlotEngine, ⌘K) can react.
+  const [editorState, setEditorState] = useState<any>(null);
+  const handleEditorReady = useCallback((editor: any) => {
+    editorRef.current = editor;
+    setEditorState(editor);
+  }, []);
+
+  // ===== Prompt-driven task system (brackets + ⌘K selection) =====
+  const slotEngine = useSlotEngine(editorState, {
+    provider: "local:claude",
+    model: "sonnet",
+    autoFireBrackets: true,
+  });
+  // Stable accessor used by the SlotDecorations plugin to read the map.
+  const slotEngineRef = useRef(slotEngine);
+  useEffect(() => { slotEngineRef.current = slotEngine; }, [slotEngine]);
+  const getSlotState = useCallback(() => slotEngineRef.current.getStateRef(), []);
+
+  // Force decoration re-render when slot map changes (dispatch a no-op tx).
+  useEffect(() => {
+    if (!editorState) return;
+    editorState.view.dispatch(editorState.view.state.tr.setMeta("slot-redraw", true));
+  }, [slotEngine.slots, editorState]);
+
+  // Open candidate popover.
+  const [openSlot, setOpenSlot] = useState<{
+    key: string;
+    anchor: { top: number; left: number };
+    headerText: string;
+    isSelectionTask: boolean;
+  } | null>(null);
+
+  // Selection-task menu state.
+  const [selMenu, setSelMenu] = useState<{
+    anchor: { top: number; left: number };
+    selectedText: string;
+    range: { from: number; to: number };
+  } | null>(null);
+
+  // Click handler on slot status dots — open candidate popover.
+  useEffect(() => {
+    if (!editorState) return;
+    const root = editorState.view.dom;
+    const onClick = (e: MouseEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (!t) return;
+      const dot = t.closest("[data-slot-key]") as HTMLElement | null;
+      if (!dot) return;
+      const key = dot.getAttribute("data-slot-key") || "";
+      const isSelectionTask = !!getSlotRange(editorState.view, key);
+      const slot = slotEngineRef.current?.slots.get(key);
+      const rect = dot.getBoundingClientRect();
+      setOpenSlot({
+        key,
+        anchor: {
+          top: rect.bottom + 6,
+          left: Math.min(window.innerWidth - 440, rect.left - 12),
+        },
+        headerText: isSelectionTask ? (slot?.instruction ?? key) : key,
+        isSelectionTask,
+      });
+      e.stopPropagation();
+    };
+    root.addEventListener("click", onClick);
+    return () => root.removeEventListener("click", onClick);
+  }, [editorState]);
+
+  // ⌘K with a selection → open SelectionTaskMenu. When there's no selection,
+  // fall through to the legacy behavior (focus chat with current selection).
+  // We intercept at capture phase so we win over the existing keydown listener.
+  useEffect(() => {
+    if (!editorState) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.key !== "k") return;
+      const { from, to } = editorState.state.selection;
+      if (from === to) return;  // no selection → let existing chat-focus handler win
+      const text = editorState.state.doc.textBetween(from, to, " ");
+      if (!text.trim()) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const coords = editorState.view.coordsAtPos(to);
+      setSelMenu({
+        anchor: {
+          top: Math.min(window.innerHeight - 360, coords.bottom + 8),
+          left: Math.min(window.innerWidth - 380, coords.left),
+        },
+        selectedText: text,
+        range: { from, to },
+      });
+    };
+    // Capture phase ensures this fires before the existing dashboard ⌘K listener.
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [editorState]);
+
+  // Submit a selection task: stash range + instruction on the slot, fire backend.
+  // Submit a selection task: register the range with the plugin (so the
+  // inline decoration tracks it through later edits) and fire the backend.
+  // The popover does NOT auto-open — user clicks the green dot when ready.
+  const submitSelectionTask = useCallback(async (input: { instruction: string; selectedText: string }) => {
+    if (!editorState || !selMenu) return;
+    const key = `sel:${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const { range } = selMenu;
+    const fullText = editorState.getText();
+    const occIdx = fullText.indexOf(input.selectedText);
+    const CTX = 400;
+    const ctxFrom = occIdx >= 0 ? occIdx : 0;
+    const ctxTo = occIdx >= 0 ? occIdx + input.selectedText.length : 0;
+    const before = fullText.slice(Math.max(0, ctxFrom - CTX), ctxFrom);
+    const after = fullText.slice(ctxTo, Math.min(fullText.length, ctxTo + CTX));
+
+    registerSlotRange(editorState.view, key, range.from, range.to);
+    slotEngine.updateSlot(key, {
+      status: "pending",
+      range,
+      originalText: input.selectedText,
+      instruction: input.instruction,
+    });
+    setSelMenu(null);
+
+    const prompt = `${input.instruction}\n\n原文：\n${input.selectedText}`;
+    await slotEngine.fireSlot(key, { prompt, contextBefore: before, contextAfter: after });
+  }, [editorState, selMenu, slotEngine]);
+
+  // Accept handler — replace bracket / selection with chosen text (with AiSource mark).
+  const acceptForSlot = useCallback((key: string, text: string, mode: AcceptMode) => {
+    if (!editorState) return;
+    const tracked = getSlotRange(editorState.view, key);
+    if (tracked) {
+      const { from, to } = tracked;
+      if (mode === "replace") {
+        editorState.chain().focus()
+          .insertContentAt({ from, to }, [{ type: "text", text, marks: [{ type: "aiSource" }] }])
+          .run();
+      } else {
+        editorState.chain().focus()
+          .insertContentAt(to, [
+            { type: "text", text: " ", marks: [] },
+            { type: "text", text, marks: [{ type: "aiSource" }] },
+          ])
+          .run();
+      }
+      unregisterSlotRange(editorState.view, key);
+    } else {
+      // Bracket slot — find by content and replace 【key】.
+      let from = -1, to = -1;
+      editorState.state.doc.descendants((node: any, pos: number, parent: any) => {
+        if (!node.isText || !node.text) return;
+        if (isCodeContext(node, parent)) return;
+        const idx = node.text.indexOf(`【${key}】`);
+        if (idx !== -1 && from === -1) {
+          from = pos + idx;
+          to = from + key.length + 2;
+          return false;
+        }
+      });
+      if (from === -1) return;
+      editorState.chain().focus()
+        .insertContentAt({ from, to }, [{ type: "text", text, marks: [{ type: "aiSource" }] }])
+        .run();
+    }
+    slotEngine.clearSlot(key);
+    setOpenSlot(null);
+  }, [editorState, slotEngine]);
+
+  const regenerateForSlot = useCallback(async (key: string) => {
+    const st = slotEngine.slots.get(key);
+    if (!editorState || !st) return;
+    const fullText = editorState.getText();
+    const CTX = 500;
+    if (st.instruction && st.originalText) {
+      const occIdx = fullText.indexOf(st.originalText);
+      const ctxFrom = occIdx >= 0 ? occIdx : 0;
+      const ctxTo = occIdx >= 0 ? occIdx + st.originalText.length : 0;
+      const before = fullText.slice(Math.max(0, ctxFrom - CTX), ctxFrom);
+      const after = fullText.slice(ctxTo, Math.min(fullText.length, ctxTo + CTX));
+      const prompt = `${st.instruction}\n\n原文：\n${st.originalText}`;
+      await slotEngine.fireSlot(key, { prompt, contextBefore: before, contextAfter: after });
+    } else {
+      const occIdx = fullText.indexOf(`【${key}】`);
+      const ctxFrom = occIdx >= 0 ? occIdx : 0;
+      const ctxTo = occIdx >= 0 ? occIdx + key.length + 2 : 0;
+      const before = fullText.slice(Math.max(0, ctxFrom - CTX), ctxFrom);
+      const after = fullText.slice(ctxTo, Math.min(fullText.length, ctxTo + CTX));
+      await slotEngine.fireSlot(key, { prompt: key, contextBefore: before, contextAfter: after });
+    }
+  }, [editorState, slotEngine]);
+
+  const discardSlot = useCallback((key: string) => {
+    if (editorState && getSlotRange(editorState.view, key)) {
+      unregisterSlotRange(editorState.view, key);
+    }
+    slotEngine.clearSlot(key);
+    setOpenSlot(null);
+  }, [editorState, slotEngine]);
+
+  const openSlotState = openSlot ? slotEngine.slots.get(openSlot.key) : undefined;
 
   // Show nothing while checking auth (prevents flash before redirect)
   if (isLoading || !isAuthenticated) {
     return <div className={s.shell} />;
   }
 
+  // Filtered articles for quick switcher (case-insensitive substring on title)
+  const qsResults = (() => {
+    const q = qsQuery.trim().toLowerCase();
+    if (!q) return dbArticles.slice(0, 20);
+    return dbArticles.filter(a => a.title.toLowerCase().includes(q)).slice(0, 20);
+  })();
+
   return (
     <div className={s.shell}>
-      {/* Publish toast */}
+      {/* Selection task menu (⌘K) */}
+      {selMenu && typeof window !== "undefined" && createPortal(
+        <SelectionTaskMenu
+          anchor={selMenu.anchor}
+          selectedText={selMenu.selectedText}
+          onSubmit={submitSelectionTask}
+          onClose={() => setSelMenu(null)}
+        />,
+        document.body,
+      )}
+      {/* Candidate popover (bracket + selection tasks share this) */}
+      {openSlot && openSlotState && typeof window !== "undefined" && createPortal(
+        <CandidatePopover
+          slotKey={openSlot.key}
+          state={openSlotState}
+          anchor={openSlot.anchor}
+          headerText={openSlot.headerText}
+          hasAppendMode={openSlot.isSelectionTask}
+          onAccept={(text, mode) => acceptForSlot(openSlot.key, text, mode)}
+          onRegenerate={() => regenerateForSlot(openSlot.key)}
+          onDiscard={() => discardSlot(openSlot.key)}
+          onClose={() => setOpenSlot(null)}
+        />,
+        document.body,
+      )}
+      {/* Quick switcher (⌘P) — Notion-style article finder */}
+      {quickSwitcherOpen && (
+        <div className={s.qsBackdrop} onClick={() => setQuickSwitcherOpen(false)}>
+          <div className={s.qsPanel} onClick={e => e.stopPropagation()}>
+            <div className={s.qsSearchRow}>
+              <svg className={s.qsSearchIcon} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+              <input
+                autoFocus
+                className={s.qsSearchInput}
+                placeholder="Find an article…"
+                value={qsQuery}
+                onChange={e => { setQsQuery(e.target.value); setQsIndex(0); }}
+                onKeyDown={e => {
+                  if (e.key === "ArrowDown") { e.preventDefault(); setQsIndex(i => Math.min(qsResults.length - 1, i + 1)); }
+                  else if (e.key === "ArrowUp") { e.preventDefault(); setQsIndex(i => Math.max(0, i - 1)); }
+                  else if (e.key === "Enter") {
+                    e.preventDefault();
+                    const target = qsResults[qsIndex];
+                    if (target) {
+                      openDbArticle(target);
+                      setQuickSwitcherOpen(false);
+                    }
+                  } else if (e.key === "Escape") {
+                    e.preventDefault();
+                    setQuickSwitcherOpen(false);
+                  }
+                }}
+              />
+            </div>
+            <div className={s.qsList}>
+              {qsResults.length === 0 ? (
+                <div className={s.qsEmpty}>无匹配文章</div>
+              ) : qsResults.map((a, i) => (
+                <div
+                  key={a.id}
+                  className={i === qsIndex ? s.qsItemActive : s.qsItem}
+                  onMouseEnter={() => setQsIndex(i)}
+                  onClick={() => { openDbArticle(a); setQuickSwitcherOpen(false); }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                  <span className={s.qsItemTitle}>{a.title}</span>
+                  <span className={s.qsItemBadge}>{a.publishStatus === "published" ? "已发布" : "草稿"}</span>
+                </div>
+              ))}
+            </div>
+            <div className={s.qsFooter}>
+              <span><kbd>↑</kbd><kbd>↓</kbd> navigate</span>
+              <span><kbd>↵</kbd> open</span>
+              <span><kbd>esc</kbd> close</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Publish history modal */}
+      {showPublishHistory && activeDbArticle && (
+        <PublishHistoryPanel
+          articleId={activeDbArticle.id}
+          articleTitle={activeDbArticle.title}
+          onClose={() => setShowPublishHistory(false)}
+          onChanged={async () => {
+            // Re-fetch list; if the active article no longer appears (deleted or unpublished), clear the editor
+            try {
+              const token = localStorage.getItem("token");
+              if (!token) return;
+              const res = await fetch(`${API_BASE}/api/articles?page_size=50`, {
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              const data = await res.json();
+              const articles: DBArticle[] = data.articles || [];
+              setDbArticles(articles);
+              const stillThere = articles.find(a => a.id === activeDbArticle.id);
+              if (!stillThere) {
+                setActiveDbArticle(null);
+                setContent("");
+                setSavedContent("");
+                setMarkdownContent("");
+              } else {
+                setActiveDbArticle(stillThere);
+              }
+            } catch (e) { console.error("Refresh after publish action failed:", e); }
+          }}
+        />
+      )}
+      {/* Task Center */}
+      <TaskCenter
+        isOpen={showTaskCenter}
+        onClose={() => setShowTaskCenter(false)}
+        onArticleClick={async (articleId) => {
+          setShowTaskCenter(false);
+          // Load articles, find by id, open it
+          const token = localStorage.getItem("token");
+          if (!token) return;
+          try {
+            const res = await fetch(`${API_BASE}/api/articles/${articleId}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            const data = await res.json();
+            if (data.article) openDbArticle(data.article);
+          } catch (e) { console.error("Open from task center failed:", e); }
+        }}
+      />
+
+      {/* File import modal */}
+      {showImport && (
+        <div
+          style={{
+            position: "fixed", inset: 0, zIndex: 1000,
+            background: "rgba(0, 0, 0, 0.55)", backdropFilter: "blur(4px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: "2rem",
+          }}
+          onClick={() => setShowImport(false)}
+        >
+          <div
+            style={{
+              width: "520px", maxWidth: "100%", maxHeight: "92vh", overflow: "auto",
+              background: "#1C1917", border: "1px solid #3F3A36", borderRadius: 12,
+              boxShadow: "0 24px 60px rgba(0,0,0,0.55)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <FileImport
+              onClose={() => setShowImport(false)}
+              onImportComplete={() => loadDbArticles()}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Toast: success / error / info */}
       {publishStatus && (
-        <div className={publishStatus.type === "success" ? s.toastSuccess : s.toastError}>
+        <div
+          className={publishStatus.type === "success" ? s.toastSuccess : publishStatus.type === "error" ? s.toastError : s.toastSuccess}
+          style={publishStatus.type === "info" ? {
+            background: "rgba(165, 180, 252, 0.12)",
+            border: "1px solid rgba(165, 180, 252, 0.3)",
+            color: "#a5b4fc",
+          } : undefined}
+        >
           {publishStatus.type === "success" ? (
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
-          ) : (
+          ) : publishStatus.type === "error" ? (
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+          ) : (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
           )}
           {publishStatus.msg}
         </div>
@@ -541,7 +1208,148 @@ export default function Dashboard() {
           {sidebarTab === "article" && (
             <>
               <button onClick={() => saveFile()} className={s.btnGhost}>Save</button>
-              <button className={s.btnPrimary}>Publish</button>
+
+              {/* Translate — only enabled for DB articles */}
+              <div style={{ position: "relative" }} ref={translatePopoverRef}>
+                <button
+                  onClick={(e) => { e.stopPropagation(); activeDbArticle && setShowTranslate(v => !v); }}
+                  disabled={!activeDbArticle}
+                  className={s.iconBtn}
+                  title={activeDbArticle ? "翻译这篇文章(异步,任务中心查进度)" : "选中文章后可翻译"}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M5 8l6 6"/>
+                    <path d="M4 14l6-6 2-3"/>
+                    <path d="M2 5h12"/>
+                    <path d="M7 2h1"/>
+                    <path d="M22 22l-5-10-5 10"/>
+                    <path d="M14 18h6"/>
+                  </svg>
+                </button>
+                {showTranslate && activeDbArticle && (
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 100,
+                      width: 280, padding: "0.875rem",
+                      background: "#1C1917", border: "1px solid #3F3A36", borderRadius: 10,
+                      boxShadow: "0 12px 32px rgba(0,0,0,0.5)",
+                    }}
+                  >
+                    <div style={{ fontSize: "0.625rem", letterSpacing: "0.12em", textTransform: "uppercase", color: "#78716C", marginBottom: "0.5rem", fontWeight: 500 }}>
+                      Translate this article
+                    </div>
+                    <div style={{ fontSize: "0.75rem", color: "#A8A29E", marginBottom: "0.75rem", lineHeight: 1.5 }}>
+                      异步生成新文章,可在任务中心查看进度。
+                    </div>
+
+                    <label style={{ display: "block", fontSize: "0.625rem", letterSpacing: "0.02em", color: "#78716C", marginBottom: "0.375rem" }}>
+                      翻译模式
+                    </label>
+                    <div style={{ display: "flex", gap: 0, background: "#292524", border: "1px solid #3F3A36", borderRadius: 6, padding: 3, marginBottom: "0.75rem" }}>
+                      {([
+                        { v: "translated", label: "整篇翻译", hint: "纯译文" },
+                        { v: "bilingual", label: "双语对照", hint: "原文 + 译文" },
+                      ] as const).map(opt => (
+                        <button
+                          key={opt.v}
+                          onClick={() => setTranslateMode(opt.v)}
+                          style={{
+                            flex: 1,
+                            display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+                            padding: "0.375rem 0.5rem",
+                            borderRadius: 4,
+                            border: "none",
+                            background: translateMode === opt.v ? "#3F3A36" : "transparent",
+                            color: translateMode === opt.v ? "#FAFAF9" : "#78716C",
+                            cursor: "pointer",
+                            fontFamily: "inherit",
+                            transition: "all 0.15s ease",
+                          }}
+                        >
+                          <span style={{ fontSize: "0.6875rem", fontWeight: 500 }}>{opt.label}</span>
+                          <span style={{ fontSize: "0.5625rem", color: translateMode === opt.v ? "#A8A29E" : "#57534E" }}>{opt.hint}</span>
+                        </button>
+                      ))}
+                    </div>
+
+                    <label style={{ display: "block", fontSize: "0.625rem", letterSpacing: "0.02em", color: "#78716C", marginBottom: "0.375rem" }}>
+                      目标语言
+                    </label>
+                    <select
+                      value={translateLang}
+                      onChange={(e) => setTranslateLang(e.target.value)}
+                      style={{
+                        width: "100%", background: "#292524", border: "1px solid #3F3A36", borderRadius: 6,
+                        padding: "0.4375rem 0.5rem", color: "#FAFAF9", fontSize: "0.75rem",
+                        fontFamily: "inherit", outline: "none", marginBottom: "0.75rem",
+                      }}
+                    >
+                      <option value="en">English</option>
+                      <option value="zh-CN">简体中文</option>
+                      <option value="zh-TW">繁體中文</option>
+                      <option value="ja">日本語</option>
+                      <option value="ko">한국어</option>
+                      <option value="fr">Français</option>
+                      <option value="de">Deutsch</option>
+                      <option value="es">Español</option>
+                    </select>
+                    <div style={{ display: "flex", gap: "0.4375rem" }}>
+                      <button
+                        onClick={doTranslate}
+                        disabled={translating}
+                        style={{
+                          flex: 1, fontSize: "0.6875rem", padding: "0.4375rem 0.75rem", borderRadius: 6,
+                          border: "1px solid #D97149", background: "#D97149", color: "white",
+                          cursor: translating ? "not-allowed" : "pointer", fontFamily: "inherit", fontWeight: 500,
+                          opacity: translating ? 0.6 : 1,
+                        }}
+                      >
+                        {translating ? "启动中…" : "开始翻译"}
+                      </button>
+                      <button
+                        onClick={() => setShowTranslate(false)}
+                        style={{
+                          fontSize: "0.6875rem", padding: "0.4375rem 0.75rem", borderRadius: 6,
+                          border: "1px solid #3F3A36", background: "transparent", color: "#A8A29E",
+                          cursor: "pointer", fontFamily: "inherit",
+                        }}
+                      >
+                        取消
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={() => setShowTaskCenter(true)}
+                className={s.iconBtn}
+                title="任务中心(翻译等后台任务)"
+                style={{ position: "relative" }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="8" y="3" width="8" height="4" rx="1"/>
+                  <path d="M16 5h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2"/>
+                  <line x1="9" y1="12" x2="15" y2="12"/>
+                  <line x1="9" y1="16" x2="13" y2="16"/>
+                </svg>
+                {hasRunningTasks && (
+                  <span style={{
+                    position: "absolute", top: 3, right: 3,
+                    width: 6, height: 6, borderRadius: 999,
+                    background: "#3b82f6", boxShadow: "0 0 6px rgba(59, 130, 246, 0.6)",
+                  }} />
+                )}
+              </button>
+              <button
+                onClick={() => activeDbArticle && setShowPublishHistory(true)}
+                disabled={!activeDbArticle}
+                className={s.btnPrimary}
+                title={activeDbArticle ? "发布、同步、下架、删除、翻译" : "选中文章后可发布"}
+              >
+                Publish
+              </button>
             </>
           )}
         </div>
@@ -557,12 +1365,7 @@ export default function Dashboard() {
             <p className={s.fullPlaceholderSub}>Coming soon</p>
           </div>
         ) : sidebarTab === "skill" ? (
-          <div className={s.fullPlaceholder}>
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#3F3A36" strokeWidth="1.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-            <p className={s.fullPlaceholderTitle}>Skill Library</p>
-            <p className={s.fullPlaceholderDesc}>Browse and install writing skills — templates, workflows, and automation tools.</p>
-            <p className={s.fullPlaceholderSub}>Coming soon</p>
-          </div>
+          <SkillLibrary />
         ) : (
         <>
         {/* Sidebar */}
@@ -590,6 +1393,9 @@ export default function Dashboard() {
                         </button>
                         <button onClick={() => startCreateFolder()} className={s.sidebarAddBtn} title="New folder">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
+                        </button>
+                        <button onClick={() => setShowImport(true)} className={s.sidebarAddBtn} title="Import files (Markdown / Notion zip / URL)">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                         </button>
                       </div>
                     </div>
@@ -742,26 +1548,131 @@ export default function Dashboard() {
                             <span className={s.sidebarLabel}>Articles</span>
                             <span className={s.folderCount}>{dbArticles.length}</span>
                           </div>
-                          {dbArticles.map(a => (
-                            <div key={a.id} className={s.fileRow}>
-                              <button onClick={() => openDbArticle(a)} className={activeDbArticle?.id === a.id ? s.fileItemActive : s.fileItem}>
-                                <svg className={s.fileIcon} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                                <span className={s.fileInfo}>
-                                  <span className={s.fileTitle}>{a.title}</span>
-                                  <span className={a.publishStatus === "published" ? s.badgePublished : s.badgeDraft}>
-                                    {a.publishStatus === "published" ? "已发布" : "草稿"}
+                          {dbArticles.map(a => {
+                            const isActive = activeDbArticle?.id === a.id;
+                            const openMenuAt = (clientX: number, clientY: number) => {
+                              // Clamp so menu stays in viewport
+                              const top = Math.min(window.innerHeight - 380, clientY);
+                              const left = Math.min(window.innerWidth - 240, clientX);
+                              setArticleMenuOpen(a.id);
+                              setArticleMenuAnchor({ top, left });
+                            };
+                            return (
+                            <div
+                              key={a.id}
+                              className={isActive ? s.fileRowActive : s.fileRow}
+                              onContextMenu={(e) => {
+                                e.preventDefault();
+                                openMenuAt(e.clientX, e.clientY);
+                              }}
+                            >
+                              <span className={s.fileBullet}>·</span>
+                              {renamingArticleId === a.id ? (
+                                <div style={{ flex: 1, padding: "0.25rem 0.4rem" }}>
+                                  <input
+                                    autoFocus
+                                    value={renameValue}
+                                    onChange={e => setRenameValue(e.target.value)}
+                                    onKeyDown={e => {
+                                      if (e.key === "Enter") renameArticle(a.id, renameValue);
+                                      if (e.key === "Escape") { setRenamingArticleId(null); setRenameValue(""); }
+                                    }}
+                                    onBlur={() => renameArticle(a.id, renameValue)}
+                                    className={s.createInput}
+                                  />
+                                </div>
+                              ) : (
+                                <button onClick={() => openDbArticle(a)} className={isActive ? s.fileItemActive : s.fileItem}>
+                                  <svg className={s.fileIcon} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                                  <span className={s.fileInfo}>
+                                    <span className={s.fileTitle}>{a.title}</span>
+                                    <span className={a.publishStatus === "published" ? s.badgePublished : s.badgeDraft}>
+                                      {a.publishStatus === "published" ? "已发布" : "草稿"}
+                                    </span>
                                   </span>
-                                </span>
-                              </button>
-                              {a.githubUrl && (
-                                <div className={s.fileActions} style={{ opacity: 1 }}>
-                                  <a href={a.githubUrl} target="_blank" rel="noopener noreferrer" className={s.fileActionBtn} title="View on GitHub">
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                                  </a>
+                                </button>
+                              )}
+                              <div className={s.fileActions}>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                    openMenuAt(rect.right, rect.bottom + 4);
+                                  }}
+                                  className={s.fileActionBtn}
+                                  title="More (right-click)"
+                                >⋯</button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); startCreateFile(); }}
+                                  className={s.fileActionBtn}
+                                  title="New article (⌘⇧N)"
+                                >+</button>
+                              </div>
+                              {articleMenuOpen === a.id && articleMenuAnchor && (
+                                <div
+                                  className={s.fileMenu}
+                                  style={{ top: articleMenuAnchor.top, left: articleMenuAnchor.left }}
+                                  onClick={e => e.stopPropagation()}
+                                  onMouseDown={e => e.stopPropagation()}
+                                >
+                                  <button className={s.fileMenuItem} onClick={() => { openDbArticle(a); setArticleMenuOpen(null); setArticleMenuAnchor(null); }}>
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                    <span className={s.fileMenuItemLabel}>打开编辑</span>
+                                    <span className={s.fileMenuItemKbd}>↵</span>
+                                  </button>
+                                  <button className={s.fileMenuItem} onClick={() => { setRenamingArticleId(a.id); setRenameValue(a.title); setArticleMenuOpen(null); setArticleMenuAnchor(null); }}>
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                                    <span className={s.fileMenuItemLabel}>重命名</span>
+                                    <span className={s.fileMenuItemKbd}>F2</span>
+                                  </button>
+                                  <button className={s.fileMenuItem} onClick={() => { duplicateArticle(a); setArticleMenuOpen(null); setArticleMenuAnchor(null); }}>
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                    <span className={s.fileMenuItemLabel}>复制副本</span>
+                                    <span className={s.fileMenuItemKbd}>⌘D</span>
+                                  </button>
+                                  <div className={s.fileMenuDivider} />
+                                  <button className={s.fileMenuItem} onClick={() => { navigator.clipboard.writeText(a.id); setPublishStatus({ type: "info", msg: "已复制页面 ID" }); setTimeout(() => setPublishStatus(null), 2000); setArticleMenuOpen(null); setArticleMenuAnchor(null); }}>
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h6M6 14h4"/></svg>
+                                    <span className={s.fileMenuItemLabel}>复制页面 ID</span>
+                                  </button>
+                                  <button
+                                    className={a.githubUrl ? s.fileMenuItem : s.fileMenuItemDisabled}
+                                    onClick={() => {
+                                      if (!a.githubUrl) return;
+                                      navigator.clipboard.writeText(a.githubUrl);
+                                      setPublishStatus({ type: "info", msg: "已复制访问链接" });
+                                      setTimeout(() => setPublishStatus(null), 2000);
+                                      setArticleMenuOpen(null); setArticleMenuAnchor(null);
+                                    }}
+                                  >
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                                    <span className={s.fileMenuItemLabel}>复制访问链接</span>
+                                    {!a.githubUrl && <span className={s.fileMenuItemKbd}>未发布</span>}
+                                  </button>
+                                  {a.githubUrl && (
+                                    <a href={a.githubUrl} target="_blank" rel="noopener noreferrer" className={s.fileMenuItem} onClick={() => { setArticleMenuOpen(null); setArticleMenuAnchor(null); }}>
+                                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                                      <span className={s.fileMenuItemLabel}>在 GitHub 查看</span>
+                                    </a>
+                                  )}
+                                  <div className={s.fileMenuDivider} />
+                                  <button className={s.fileMenuItemDanger} onClick={() => { setConfirmDeleteArticle(a.id); setArticleMenuOpen(null); setArticleMenuAnchor(null); }}>
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                    <span className={s.fileMenuItemLabel}>删除</span>
+                                    <span className={s.fileMenuItemKbd}>Del</span>
+                                  </button>
+                                </div>
+                              )}
+                              {confirmDeleteArticle === a.id && (
+                                <div className={s.confirmOverlay}>
+                                  <span>删除该文章?</span>
+                                  <button className={s.confirmYes} onClick={() => deleteArticle(a.id)}>确认</button>
+                                  <button className={s.confirmNo} onClick={() => setConfirmDeleteArticle(null)}>取消</button>
                                 </div>
                               )}
                             </div>
-                          ))}
+                          );
+                          })}
                         </>
                       )}
                     </div>
@@ -822,6 +1733,7 @@ export default function Dashboard() {
                     onChange={setContent}
                     onSelectionChange={handleSelectionChange}
                     onEditorReady={handleEditorReady}
+                    getSlotState={getSlotState}
                   />
                 </div>
               </div>
