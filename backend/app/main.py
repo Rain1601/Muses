@@ -7,7 +7,7 @@ from .database import create_tables, run_migrations
 from .config import settings
 
 # Import routers
-from .api import auth, users, agents, agents_actions, articles, upload, publish, image_upload, import_files, skills, claude_code
+from .api import auth, users, agents, agents_actions, articles, upload, publish, image_upload, import_files, skills, claude_code, slot_fill
 
 
 @asynccontextmanager
@@ -65,6 +65,7 @@ if settings.enable_studio:
 # Claude Code: 本地子进程驱动，与 Studio 同等的本地依赖
 if settings.enable_studio:
     app.include_router(claude_code.router, prefix="/api/claude-code", tags=["claude-code"])
+    app.include_router(slot_fill.router, prefix="/api/slot-fill", tags=["slot-fill"])
 
 
 @app.get("/")
