@@ -1,91 +1,50 @@
-# Muses 脚本说明
+# scripts/
 
-本目录包含了用于管理 Muses 项目的各种脚本。
+辅助脚本。常用入口仍以根目录的 `start-python.sh`、`deploy.sh` 为准；本目录主要服务于一些一次性场景（GCP 初始化、数据迁移）。
 
-## 快速开始
+> **现状提示**：`dev.sh` / `stop.sh` / `build.sh` / `test.sh` 仍是早期 Node.js 后端时代写的（用 `pnpm dev`、杀 `ts-node`、`prisma studio` 等），在当前 Python 后端下**无法直接使用**。`setup.sh` 和 `start.sh` 部分逻辑已更新到 Python 路径，但流程仍偏老，目前推荐直接看根目录 `README.md` 的快速开始 + `./start-python.sh`。这些脚本未来要么修要么删，目前留作历史参考。
+
+## 当前可信赖的脚本
+
+### gcp-setup.sh — 一次性 GCP 初始化
+首次部署 Cloud Run 前运行，自动完成：
+- 启用 Cloud Run / Cloud SQL / Secret Manager API
+- 创建 Cloud SQL 实例 `muses-db`
+- 创建部署用 Service Account 并下发 JSON key
+- 打印需要在 GitHub Secrets 配置的项
 
 ```bash
-# 1. 首次设置项目
-./scripts/setup.sh
-
-# 2. 启动开发环境
-./scripts/start.sh
-# 或使用开发模式（在独立终端窗口中启动）
-./scripts/dev.sh
-
-# 3. 停止所有服务
-./scripts/stop.sh
+export GCP_PROJECT_ID="your-project" DB_PASSWORD="strong-pass"
+./scripts/gcp-setup.sh
 ```
 
-## 脚本详细说明
+### migrate_local_to_remote.py — 本地 SQLite → 远端 Cloud SQL
+把本地 `backend/muses.db` 里的 articles 与 agents 通过远端 API 灌入生产库。
 
-### setup.sh - 项目初始化
-首次使用时运行，自动完成：
-- 检查 Node.js 和 pnpm
-- 安装所有依赖
-- 初始化数据库
-- 创建环境变量文件
-- 创建必要的目录
-
-### start.sh - 启动项目
-在同一个终端中启动前端和后端：
-- 检查环境配置
-- 启动后端服务 (端口 8080)
-- 启动前端服务 (端口 3000)
-- Ctrl+C 停止所有服务
-
-### dev.sh - 开发模式
-在独立的终端窗口中启动服务：
-- 自动打开两个终端窗口
-- 支持热重载
-- 适合开发调试
-
-### stop.sh - 停止服务
-停止所有 Muses 相关进程：
-- 停止前端服务
-- 停止后端服务
-- 停止 Prisma Studio
-
-### build.sh - 生产构建
-构建用于部署的生产版本：
-- 编译 TypeScript
-- 构建 Next.js
-- 准备部署文件
-- 生成 PM2 配置
-
-### test.sh - 运行测试
-执行各种检查：
-- TypeScript 类型检查
-- ESLint 代码检查
-- 环境变量检查
-- API 健康检查
-- 数据库连接测试
-
-## 环境要求
-
-- Node.js 18+
-- pnpm
-- SQLite3
-
-## 常见问题
-
-### 端口被占用
-如果启动时提示端口被占用，可以：
-1. 运行 `./scripts/stop.sh` 停止之前的服务
-2. 手动修改端口：
-   - 前端: 编辑 `frontend/package.json` 中的 dev 命令
-   - 后端: 编辑 `backend/.env` 中的 PORT
-
-### 权限问题
-如果脚本无法执行，运行：
 ```bash
-chmod +x scripts/*.sh
+# 1. 在生产站登录，从 localStorage 拷贝 JWT
+# 2. 在本地跑：
+python3 scripts/migrate_local_to_remote.py --token YOUR_JWT_TOKEN
 ```
 
-### 数据库问题
-如果数据库出现问题，可以重置：
+## 待修复 / 历史遗留
+
+| 脚本 | 状态 | 说明 |
+|---|---|---|
+| `setup.sh` | 部分能用 | 装前端依赖正常；后端段已切到 `backend/` 路径，但仍假设走 `pip install`，没有 venv 流程 |
+| `start.sh` | 部分能用 | 入口逻辑已切到 Python 后端，但风格陈旧；建议直接用 `./start-python.sh` |
+| `dev.sh` | ❌ | 跑的是 `cd backend && npm run dev`，对 Python 后端无效 |
+| `stop.sh` | ❌ | `pkill ts-node / nodemon / prisma studio`，全是 Node 进程 |
+| `build.sh` | ❌ | 期望 TypeScript backend 构建产物 |
+| `test.sh` | ❌ | 跑后端的 `tsc --noEmit`，Python 后端无 ts |
+
+如果决定保留这些脚本，应改写成 Python 版本（pytest、uvicorn、`pkill -f "python.*start.py"` 等）；如果不再用，可以直接删除。
+
+## 推荐入口（替代上面这些）
+
 ```bash
-cd backend
-rm -f muses.db
-pnpm db:push
+./start-python.sh   # 一键开两窗启动前后端
+./deploy.sh         # 手动部署到 Cloud Run
 ```
+
+详细开发流程见根目录 `README.md` 与 `CLAUDE.md`。

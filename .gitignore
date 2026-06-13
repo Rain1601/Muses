@@ -31,7 +31,7 @@ yarn-error.log*
 # Local env files
 .env*.local
 .env
-backend-python/.env
+backend/.env
 frontend/.env.local
 backend-env.yaml
 
@@ -43,12 +43,12 @@ backend-env.yaml
 next-env.d.ts
 
 # Database
-backend-python/*.db
-backend-python/*.db-journal
+backend/*.db
+backend/*.db-journal
 
 # Uploads
-backend-python/uploads/
-backend-python/temp/
+backend/uploads/
+backend/temp/
 upload-files/
 venv/
 venv_deploy/
@@ -70,8 +70,8 @@ logs/
 # Cache
 .cache/
 # Python cache files
-backend-python/**/__pycache__/
-backend-python/venv_deploy/
+backend/**/__pycache__/
+backend/venv_deploy/
 
 # Node.js updates from deployment
 frontend/package-lock.json

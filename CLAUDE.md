@@ -25,14 +25,14 @@ npx tsc --noEmit           # Type checking
 
 ### Backend (port 8080)
 ```bash
-cd backend-python
+cd backend
 python3 start.py           # Start FastAPI (auto-kills existing process on same port)
 # Swagger docs at http://localhost:8080/docs
 ```
 
 ### Database
 ```bash
-cd backend-python
+cd backend
 alembic revision --autogenerate -m "description"   # Create migration
 alembic upgrade head                                # Apply migrations
 ```
@@ -118,7 +118,7 @@ All sensitive data (API keys, tokens) encrypted before storage.
 
 > Legacy tables `ChatHistory`, `MusesConfig`, `ConfigHistory`, `ConfigTemplate`, `AgentMusesConfig` still exist in the SQLite file but no longer have ORM models (Phase 6 of slimming kept the data, dropped the code). New migrations should not depend on them.
 
-## Environment Variables (backend-python/.env)
+## Environment Variables (backend/.env)
 
 ```bash
 DATABASE_URL="sqlite:///./muses.db"
@@ -159,7 +159,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 ## Deployment (Google Cloud Run)
 
 - **CI/CD**: Push to main → GitHub Actions → Build Docker images → Deploy to Cloud Run
-- **Backend**: `backend-python/Dockerfile` → Cloud Run + Cloud SQL PostgreSQL
+- **Backend**: `backend/Dockerfile` → Cloud Run + Cloud SQL PostgreSQL
 - **Frontend**: `frontend/Dockerfile` → Cloud Run (Next.js standalone)
 - **Manual deploy**: `./deploy.sh` (requires `GCP_PROJECT_ID` env var)
 - **Env config**: Copy `.env.production.template` and `backend-env.yaml.template`, fill values, do not commit
@@ -183,7 +183,7 @@ export GCP_PROJECT_ID="your-project" DB_PASSWORD="your-pass"
 ## Repository Layout
 
 ```
-backend-python/   FastAPI app (app/), Dockerfile, start.py, requirements.txt
+backend/   FastAPI app (app/), Dockerfile, start.py, requirements.txt
 frontend/         Next.js app (app/, components/, lib/), Dockerfile
 scripts/          setup.sh, start.sh, dev.sh, stop.sh, build.sh, test.sh,
                   gcp-setup.sh, migrate_local_to_remote.py

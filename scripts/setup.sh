@@ -34,7 +34,7 @@ echo ""
 
 # 安装Python后端依赖
 echo "📦 安装Python后端依赖..."
-cd backend-python
+cd backend
 
 # 检查Python和pip
 if ! command -v python3 &> /dev/null; then
@@ -54,7 +54,7 @@ pip3 install -r requirements.txt
 if [ ! -f .env ]; then
     echo "📄 创建环境变量文件..."
     cp .env.example .env
-    echo "⚠️  请编辑 backend-python/.env 文件，配置以下内容："
+    echo "⚠️  请编辑 backend/.env 文件，配置以下内容："
     echo "   - JWT_SECRET (随机字符串)"
     echo "   - GITHUB_CLIENT_ID (GitHub OAuth App ID)"
     echo "   - GITHUB_CLIENT_SECRET (GitHub OAuth App Secret)"
@@ -68,14 +68,14 @@ cd ..
 
 # 创建必要的目录
 echo "📁 创建必要的目录..."
-mkdir -p backend-python/uploads/images
-mkdir -p backend-python/logs
+mkdir -p backend/uploads/images
+mkdir -p backend/logs
 
 echo ""
 echo "✨ 初始化完成！"
 echo ""
 echo "📝 下一步："
-echo "1. 编辑 backend-python/.env 文件，填写必要的配置"
+echo "1. 编辑 backend/.env 文件，填写必要的配置"
 echo "2. 在 GitHub 创建 OAuth App："
 echo "   - 访问: https://github.com/settings/developers"
 echo "   - Authorization callback URL: http://localhost:8080/api/auth/github/callback"

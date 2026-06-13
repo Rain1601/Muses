@@ -22,7 +22,7 @@ import os
 
 # Remote API URL
 REMOTE_API = "https://muses-backend-3xt2w2bjba-de.a.run.app"
-LOCAL_DB = os.path.join(os.path.dirname(__file__), "..", "backend-python", "muses.db")
+LOCAL_DB = os.path.join(os.path.dirname(__file__), "..", "backend", "muses.db")
 
 
 def get_local_data(db_path):

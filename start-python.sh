@@ -22,7 +22,7 @@ OS="$(uname -s)"
 case "$OS" in
     Darwin*)  # macOS
         # 启动Python后端
-        osascript -e 'tell app "Terminal" to do script "cd '"$(pwd)"'/backend-python && python3 start.py"'
+        osascript -e 'tell app "Terminal" to do script "cd '"$(pwd)"'/backend && python3 start.py"'
         
         # 等待后端启动
         echo "⏳ 等待后端启动..."
@@ -34,8 +34,8 @@ case "$OS" in
         
     Linux*)   # Linux
         # 启动Python后端
-        gnome-terminal -- bash -c "cd backend-python && python3 start.py; exec bash" 2>/dev/null || \
-        xterm -e "cd backend-python && python3 start.py; bash" &
+        gnome-terminal -- bash -c "cd backend && python3 start.py; exec bash" 2>/dev/null || \
+        xterm -e "cd backend && python3 start.py; bash" &
         
         # 等待后端启动
         echo "⏳ 等待后端启动..."
@@ -48,7 +48,7 @@ case "$OS" in
         
     *)
         echo "⚠️  请手动在两个终端中运行："
-        echo "  终端1: cd backend-python && python3 start.py"
+        echo "  终端1: cd backend && python3 start.py"
         echo "  终端2: cd frontend && npm run dev"
         ;;
 esac

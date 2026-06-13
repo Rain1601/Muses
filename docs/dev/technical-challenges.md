@@ -32,7 +32,7 @@ Studio/Dashboard 中用户选中一段文字让 AI 修改时，Diff 显示全文
 
 **关键代码路径**：
 - `frontend/app/dashboard/page.tsx` — `handleSelectionChange()` + `handleArticleEdit()` + `acceptChange()`
-- `backend-python/app/api/studio.py` — `has_selection` prompt 分流
+- `backend/app/api/studio.py` — `has_selection` prompt 分流
 - `frontend/lib/tiptap-extensions/SelectionPersistence.ts` — 选区持久化 Extension
 
 ---

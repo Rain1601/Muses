@@ -22,12 +22,12 @@ FRONTEND_IMAGE="gcr.io/${PROJECT_ID}/muses-frontend"
 
 deploy_backend() {
   echo "==> Building backend..."
-  docker build -t "${BACKEND_IMAGE}:latest" backend-python/
+  docker build -t "${BACKEND_IMAGE}:latest" backend/
   docker push "${BACKEND_IMAGE}:latest"
 
   echo "==> Deploying backend to Cloud Run..."
 
-  # 从本地 backend-python/.env 读取变量（如果存在 backend-env.yaml 则优先用它）
+  # 从本地 backend/.env 读取变量（如果存在 backend-env.yaml 则优先用它）
   if [ -f backend-env.yaml ]; then
     gcloud run deploy muses-backend \
       --image "${BACKEND_IMAGE}:latest" \

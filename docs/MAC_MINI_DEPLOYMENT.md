@@ -82,7 +82,7 @@ chmod +x scripts/install-mac-mini.sh
 #### Python 后端环境配置
 ```bash
 # 创建 Python 后端环境文件
-cat > backend-python/.env << 'EOF'
+cat > backend/.env << 'EOF'
 # Python 后端环境变量
 OPENAI_API_KEY="your-openai-api-key"
 DATA_PATH="./data"
@@ -99,7 +99,7 @@ npm install
 cd ..
 
 # 安装 Python 后端依赖
-cd backend-python
+cd backend
 pip3 install -r requirements.txt
 cd ..
 ```
@@ -243,7 +243,7 @@ launchctl load ~/Library/LaunchAgents/com.muses.autosync.plist
 1. **环境变量保护**：确保 `.env` 文件权限为 600
    ```bash
    chmod 600 backend/.env
-   chmod 600 backend-python/.env
+   chmod 600 backend/.env
    ```
 
 2. **SSH 密钥保护**：确保 SSH 私钥权限正确

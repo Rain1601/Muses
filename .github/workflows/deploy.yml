@@ -51,7 +51,7 @@ jobs:
           echo "backend=true" >> "$GITHUB_OUTPUT"
           echo "frontend=true" >> "$GITHUB_OUTPUT"
         else
-          if echo "$CHANGED" | grep -q "^backend-python/"; then
+          if echo "$CHANGED" | grep -q "^backend/"; then
             echo "backend=true" >> "$GITHUB_OUTPUT"
           else
             echo "backend=false" >> "$GITHUB_OUTPUT"
@@ -81,10 +81,10 @@ jobs:
       with:
         python-version: '3.11'
         cache: 'pip'
-        cache-dependency-path: backend-python/requirements.txt
+        cache-dependency-path: backend/requirements.txt
 
     - name: Install & test
-      working-directory: backend-python
+      working-directory: backend
       env:
         DATABASE_URL: "sqlite:///./test.db"
         GITHUB_CLIENT_ID: "test"
@@ -121,7 +121,7 @@ jobs:
           --cache-from ${IMAGE}:latest \
           -t ${IMAGE}:${{ github.sha }} \
           -t ${IMAGE}:latest \
-          backend-python/
+          backend/
         docker push ${IMAGE}:${{ github.sha }}
         docker push ${IMAGE}:latest
       env:

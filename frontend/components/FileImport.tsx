@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { Upload, FileText, Image, FolderOpen, CheckCircle, XCircle, Loader2, Link as LinkIcon } from 'lucide-react';
 import { api } from '@/lib/api';
 
 interface ImportedArticle {
@@ -21,6 +20,10 @@ interface FileImportProps {
   onImportComplete?: (result: ImportResult) => void;
   onClose?: () => void;
 }
+
+// ============================================================
+// Component
+// ============================================================
 
 export function FileImport({ onImportComplete, onClose }: FileImportProps) {
   const [isDragging, setIsDragging] = useState(false);
@@ -48,28 +51,19 @@ export function FileImport({ onImportComplete, onClose }: FileImportProps) {
     const items = Array.from(e.dataTransfer.items);
     const files: File[] = [];
 
-    // 处理拖拽的文件和文件夹
     const processEntry = async (entry: any): Promise<void> => {
       if (entry.isFile) {
         return new Promise((resolve) => {
-          entry.file((file: File) => {
-            files.push(file);
-            resolve();
-          });
+          entry.file((file: File) => { files.push(file); resolve(); });
         });
       } else if (entry.isDirectory) {
         const dirReader = entry.createReader();
         return new Promise((resolve) => {
           const readEntries = () => {
             dirReader.readEntries(async (entries: any[]) => {
-              if (entries.length === 0) {
-                resolve();
-                return;
-              }
-              for (const childEntry of entries) {
-                await processEntry(childEntry);
-              }
-              readEntries(); // 继续读取更多条目
+              if (entries.length === 0) { resolve(); return; }
+              for (const childEntry of entries) await processEntry(childEntry);
+              readEntries();
             });
           };
           readEntries();
@@ -81,50 +75,19 @@ export function FileImport({ onImportComplete, onClose }: FileImportProps) {
       for (const item of items) {
         if (item.kind === 'file') {
           const entry = item.webkitGetAsEntry();
-          if (entry) {
-            await processEntry(entry);
-          }
+          if (entry) await processEntry(entry);
         }
       }
-
-      console.log('📁 Drag and drop files processed:', files.length);
-      if (files.length > 0) {
-        handleFileUpload(files);
-      }
-    } catch (error) {
-      console.error('❌ Error processing drag and drop:', error);
-      // 回退到简单文件处理
+      if (files.length > 0) handleFileUpload(files);
+    } catch (err) {
       const fallbackFiles = Array.from(e.dataTransfer.files);
-      if (fallbackFiles.length > 0) {
-        handleFileUpload(fallbackFiles);
-      }
+      if (fallbackFiles.length > 0) handleFileUpload(fallbackFiles);
     }
   }, []);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    console.log('📂 File input event triggered');
-    console.log('📊 Event target files:', e.target.files);
-    console.log('📊 Event target files length:', e.target.files?.length || 0);
-
     const files = Array.from(e.target.files || []);
-    console.log('📁 Files array created:', files.length);
-
-    // 打印每个文件的详细信息
-    files.forEach((file, index) => {
-      console.log(`📄 Raw File ${index + 1}:`, {
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        webkitRelativePath: (file as any).webkitRelativePath || 'N/A',
-        lastModified: file.lastModified
-      });
-    });
-
-    if (files.length > 0) {
-      handleFileUpload(files);
-    } else {
-      console.log('⚠️ No files selected from input');
-    }
+    if (files.length > 0) handleFileUpload(files);
   }, []);
 
   const handleFileUpload = async (files: File[]) => {
@@ -134,115 +97,48 @@ export function FileImport({ onImportComplete, onClose }: FileImportProps) {
     setUploadProgress(0);
 
     try {
-      console.log('📁 Starting file upload...');
-      console.log('📊 Files received:', files.length);
-      files.forEach((file, index) => {
-        console.log(`📄 File ${index + 1}:`, {
-          name: file.name,
-          size: file.size,
-          type: file.type,
-          webkitRelativePath: (file as any).webkitRelativePath || 'N/A'
-        });
-      });
-
-      // 过滤掉空文件和文件夹
       const validFiles = files.filter(file => {
-        // 检查文件名
-        if (!file.name || file.name.trim() === '') {
-          console.log(`⚠️ Skipping invalid filename: ${file.name}`);
-          return false;
-        }
-
-        // 跳过 .DS_Store 文件
-        if (file.name === '.DS_Store') {
-          console.log(`⚠️ Skipping .DS_Store file`);
-          return false;
-        }
-
-        // 检查文件大小（允许一些系统文件为0字节）
-        if (file.size === 0 && !file.name.toLowerCase().endsWith('.md')) {
-          console.log(`⚠️ Skipping empty file: ${file.name} (size: ${file.size})`);
-          return false;
-        }
-
-        // 检查是否是文件夹本身（这是webkitdirectory的问题）
-        if (file.type === '' && !file.name.includes('.')) {
-          console.log(`⚠️ Skipping directory: ${file.name}`);
-          return false;
-        }
-
-        // 对于文件夹上传，文件类型可能为空，但这是正常的
-        // 只要文件名是 .md 或图片格式就接受
+        if (!file.name || file.name.trim() === '') return false;
+        if (file.name === '.DS_Store') return false;
+        if (file.size === 0 && !file.name.toLowerCase().endsWith('.md')) return false;
+        if (file.type === '' && !file.name.includes('.')) return false;
         const isMarkdown = file.name.toLowerCase().endsWith('.md') || file.name.toLowerCase().endsWith('.markdown');
         const isImage = /\.(png|jpg|jpeg|gif|svg)$/i.test(file.name);
-
-        if (!isMarkdown && !isImage) {
-          console.log(`⚠️ Skipping unsupported file type: ${file.name}`);
-          return false;
-        }
-
-        console.log(`✅ Valid file: ${file.name} (${file.size} bytes, ${isMarkdown ? 'Markdown' : 'Image'})`);
-        return true;
+        return isMarkdown || isImage;
       });
 
-      console.log(`✅ Valid files: ${validFiles.length}/${files.length}`);
-
       if (validFiles.length === 0) {
-        throw new Error('没有找到有效的文件。请确保选择了包含 Markdown 文件的文件夹。');
+        throw new Error('没有找到有效的文件 — 确保选择了 Markdown 或图片文件。');
       }
 
       const formData = new FormData();
-      validFiles.forEach((file) => {
-        formData.append('files', file);
-      });
+      validFiles.forEach((file) => formData.append('files', file));
 
-      // 模拟上传进度
       const progressInterval = setInterval(() => {
-        setUploadProgress(prev => {
-          if (prev >= 90) {
-            clearInterval(progressInterval);
-            return 90;
-          }
-          return prev + 10;
-        });
+        setUploadProgress(prev => prev >= 90 ? 90 : prev + 10);
       }, 200);
 
       const response = await api.post('/api/import/upload-files', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
 
       clearInterval(progressInterval);
       setUploadProgress(100);
 
-      console.log('✅ Upload successful:', response.data);
-
       const result = response.data as ImportResult;
       setImportResult(result);
+      onImportComplete?.(result);
 
-      // 通知父组件
-      if (onImportComplete) {
-        onImportComplete(result);
-      }
-
-      setTimeout(() => {
-        setUploadProgress(0);
-      }, 1000);
-
-    } catch (error: any) {
-      console.error('❌ Upload failed:', error);
-      setError(error.response?.data?.detail || '导入失败，请重试');
+      setTimeout(() => setUploadProgress(0), 1000);
+    } catch (e: any) {
+      setError(e.response?.data?.detail || e.message || '导入失败,请重试');
     } finally {
       setIsUploading(false);
     }
   };
 
   const handleURLFetch = async () => {
-    if (!url.trim()) {
-      setError('请输入有效的URL');
-      return;
-    }
+    if (!url.trim()) { setError('请输入有效的 URL'); return; }
 
     setIsUploading(true);
     setError(null);
@@ -250,13 +146,7 @@ export function FileImport({ onImportComplete, onClose }: FileImportProps) {
 
     try {
       const progressInterval = setInterval(() => {
-        setUploadProgress(prev => {
-          if (prev >= 90) {
-            clearInterval(progressInterval);
-            return 90;
-          }
-          return prev + 10;
-        });
+        setUploadProgress(prev => prev >= 90 ? 90 : prev + 10);
       }, 200);
 
       const response = await api.post('/api/upload/fetch-url', { url });
@@ -264,300 +154,558 @@ export function FileImport({ onImportComplete, onClose }: FileImportProps) {
       clearInterval(progressInterval);
       setUploadProgress(100);
 
-      console.log('✅ URL fetch successful:', response.data);
-
-      // URL抓取成功后，显示成功信息
       const articleData = response.data.article || {
-        id: response.data.file.id,
+        id: response.data.file?.id,
         title: response.data.title,
         status: 'imported',
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
       };
-
-      setImportResult({
-        success: true,
-        imported_count: 1,
-        articles: [articleData]
-      });
-
-      if (onImportComplete) {
-        onImportComplete({
-          success: true,
-          imported_count: 1,
-          articles: [articleData]
-        });
-      }
-
-    } catch (error: any) {
-      console.error('❌ URL fetch failed:', error);
-      setError(error.response?.data?.detail || '无法获取URL内容，请检查链接是否有效');
+      const result: ImportResult = { success: true, imported_count: 1, articles: [articleData] };
+      setImportResult(result);
+      onImportComplete?.(result);
+    } catch (e: any) {
+      setError(e.response?.data?.detail || '无法获取 URL 内容,请检查链接是否有效');
     } finally {
       setIsUploading(false);
     }
   };
 
-  const resetComponent = () => {
+  const reset = () => {
     setImportResult(null);
     setError(null);
     setUploadProgress(0);
     setUrl('');
   };
 
+  // ============================================================
+  // States: success / error / uploading
+  // ============================================================
+
   if (importResult) {
     return (
-      <div className="bg-card border border-border rounded-lg p-6 max-w-md mx-auto">
-        <div className="text-center">
-          <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">
-            导入完成！
-          </h3>
-          <p className="text-muted-foreground mb-4">
-            成功导入 {importResult.imported_count} 篇文章
-          </p>
+      <Frame onClose={onClose}>
+        <Eyebrow>Done</Eyebrow>
+        <Heading>{importResult.imported_count} 篇文章已导入</Heading>
+        <p style={paragraphStyle}>已加入你的工作区。继续导入或直接关闭面板回到编辑器。</p>
 
-          <div className="space-y-2 mb-6">
-            {importResult.articles.map((article) => (
-              <div key={article.id} className="text-left p-3 bg-muted rounded-md">
-                <div className="font-medium text-sm">{article.title}</div>
-                <div className="text-xs text-muted-foreground">
-                  {new Date(article.created_at).toLocaleString()}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="flex gap-2">
-            <button
-              onClick={resetComponent}
-              className="flex-1 px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors"
-            >
-              继续导入
-            </button>
-            {onClose && (
-              <button
-                onClick={onClose}
-                className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
-              >
-                完成
-              </button>
-            )}
-          </div>
+        <div style={articleListStyle}>
+          {importResult.articles.map(a => (
+            <div key={a.id} style={articleRowStyle}>
+              <div style={articleTitleStyle}>{a.title}</div>
+              <div style={articleMetaStyle}>{new Date(a.created_at).toLocaleString('zh-CN', { hour12: false })}</div>
+            </div>
+          ))}
         </div>
-      </div>
+
+        <div style={footerStyle}>
+          <button onClick={reset} style={ghostBtnStyle}>继续导入</button>
+          {onClose && <button onClick={onClose} style={primaryBtnStyle}>完成</button>}
+        </div>
+      </Frame>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-card border border-border rounded-lg p-6 max-w-md mx-auto">
-        <div className="text-center">
-          <XCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">
-            导入失败
-          </h3>
-          <p className="text-muted-foreground mb-4">
-            {error}
-          </p>
-
-          <div className="flex gap-2">
-            <button
-              onClick={resetComponent}
-              className="flex-1 px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors"
-            >
-              重试
-            </button>
-            {onClose && (
-              <button
-                onClick={onClose}
-                className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
-              >
-                取消
-              </button>
-            )}
-          </div>
+      <Frame onClose={onClose}>
+        <Eyebrow style={{ color: '#fca5a5' }}>Failed</Eyebrow>
+        <Heading>导入未能完成</Heading>
+        <div style={errorBoxStyle}>{error}</div>
+        <div style={footerStyle}>
+          <button onClick={reset} style={ghostBtnStyle}>重试</button>
+          {onClose && <button onClick={onClose} style={primaryBtnStyle}>关闭</button>}
         </div>
-      </div>
+      </Frame>
     );
   }
 
-  return (
-    <div className="bg-card border border-border rounded-lg p-6 max-w-md mx-auto">
-      {isUploading ? (
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 text-primary mx-auto mb-4 animate-spin" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">
-            正在导入文件...
-          </h3>
-          <div className="w-full bg-secondary rounded-full h-2 mb-4">
-            <div
-              className="bg-primary h-2 rounded-full transition-all duration-300"
-              style={{ width: `${uploadProgress}%` }}
-            />
-          </div>
-          <p className="text-sm text-muted-foreground">
-            正在处理 Markdown 文件和图片...
-          </p>
+  if (isUploading) {
+    return (
+      <Frame onClose={onClose}>
+        <Eyebrow>Working</Eyebrow>
+        <Heading>{importMode === 'url' ? '正在抓取网页' : '正在导入文件'}</Heading>
+        <p style={paragraphStyle}>{importMode === 'url' ? '解析 HTML → Markdown,稍候片刻。' : '正在处理 Markdown 与图片。'}</p>
+
+        <div style={progressTrackStyle}>
+          <div style={{ ...progressBarStyle, width: `${uploadProgress}%` }} />
         </div>
+        <div style={{ fontSize: 11, color: '#57534E', marginTop: '0.5rem', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
+          {uploadProgress}%
+        </div>
+      </Frame>
+    );
+  }
+
+  // ============================================================
+  // Default state — picker
+  // ============================================================
+
+  return (
+    <Frame onClose={onClose}>
+      <Eyebrow>Add to workspace</Eyebrow>
+      <Heading>导入内容</Heading>
+      <p style={paragraphStyle}>从本地拖入文件 / 文件夹,或粘贴一个网页链接,自动转成 Markdown 加入工作区。</p>
+
+      {/* Mode tabs — quiet pill group */}
+      <div style={tabGroupStyle}>
+        <button
+          onClick={() => setImportMode('file')}
+          style={importMode === 'file' ? tabActiveStyle : tabStyle}
+        >
+          File
+        </button>
+        <button
+          onClick={() => setImportMode('url')}
+          style={importMode === 'url' ? tabActiveStyle : tabStyle}
+        >
+          URL
+        </button>
+      </div>
+
+      {importMode === 'file' ? (
+        <>
+          {/* Drop zone — the visual center */}
+          <div
+            style={isDragging ? dropZoneActiveStyle : dropZoneStyle}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={isDragging ? '#D97149' : '#78716C'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ transition: 'stroke 0.18s ease', marginBottom: '0.875rem' }}>
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+            <div style={dropTitleStyle}>{isDragging ? '松开导入' : '拖入此处'}</div>
+            <div style={dropHintStyle}>或在下方选择文件 / 文件夹</div>
+          </div>
+
+          {/* Two-button row — folder is primary, individual files is secondary */}
+          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.875rem' }}>
+            <label style={{ flex: 1, display: 'block' }}>
+              <input
+                type="file"
+                multiple
+                accept=".md,.markdown,.png,.jpg,.jpeg,.gif,.svg"
+                onChange={handleFileSelect}
+                style={{ display: 'none' }}
+                {...({ webkitdirectory: '' } as any)}
+              />
+              <div style={primaryBtnFullStyle}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                选择文件夹
+              </div>
+            </label>
+            <label style={{ flex: 1, display: 'block' }}>
+              <input
+                type="file"
+                multiple
+                accept=".md,.markdown,.png,.jpg,.jpeg,.gif,.svg"
+                onChange={handleFileSelect}
+                style={{ display: 'none' }}
+              />
+              <div style={ghostBtnFullStyle}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                选择文件
+              </div>
+            </label>
+          </div>
+
+          {/* Supported formats — quiet single-line monospace */}
+          <div style={formatLineStyle}>
+            <span style={formatLabelStyle}>Supported</span>
+            <span style={formatValueStyle}>.md  ·  .png .jpg .jpeg .gif .svg  ·  folders</span>
+          </div>
+        </>
       ) : (
         <>
-          <div className="text-center mb-6">
-            <Upload className="w-12 h-12 text-primary mx-auto mb-3" />
-            <h3 className="text-lg font-semibold text-foreground mb-2">
-              导入内容
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              支持文件上传或从URL导入
-            </p>
+          {/* URL input — input with inline submit affordance */}
+          <div style={urlInputWrapStyle}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#57534E" strokeWidth="2" strokeLinecap="round" style={urlIconStyle}>
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+            </svg>
+            <input
+              type="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://example.com/article"
+              style={urlInputStyle}
+              autoFocus
+              onKeyDown={(e) => { if (e.key === 'Enter') handleURLFetch(); }}
+            />
           </div>
 
-          {/* 导入方式切换 */}
-          <div className="flex gap-2 mb-6">
-            <button
-              onClick={() => setImportMode('file')}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md transition-colors ${
-                importMode === 'file'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-              }`}
-            >
-              <Upload className="w-4 h-4" />
-              文件上传
-            </button>
-            <button
-              onClick={() => setImportMode('url')}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md transition-colors ${
-                importMode === 'url'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-              }`}
-            >
-              <LinkIcon className="w-4 h-4" />
-              URL导入
-            </button>
+          <button onClick={handleURLFetch} disabled={!url.trim()} style={url.trim() ? primaryBtnFullStyle : primaryBtnDisabledStyle}>
+            抓取并导入
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </button>
+
+          <div style={formatLineStyle}>
+            <span style={formatLabelStyle}>Works on</span>
+            <span style={formatValueStyle}>blogs · news · docs · public pages</span>
           </div>
-
-          {importMode === 'file' ? (
-            <>
-              <div
-                className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                  isDragging
-                    ? 'border-primary bg-primary/5'
-                    : 'border-border hover:border-primary/50'
-                }`}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-              >
-                <div className="space-y-4">
-                  <div className="flex justify-center space-x-4">
-                    <FileText className="w-8 h-8 text-muted-foreground" />
-                    <Image className="w-8 h-8 text-muted-foreground" />
-                    <FolderOpen className="w-8 h-8 text-muted-foreground" />
-                  </div>
-
-                  <div>
-                    <p className="text-sm font-medium text-foreground mb-1">
-                      拖拽文件到这里
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      或点击下方按钮选择文件
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-4">
-                <label className="block">
-                  <input
-                    type="file"
-                    multiple
-                    accept=".md,.markdown,.png,.jpg,.jpeg,.gif,.svg"
-                    onChange={handleFileSelect}
-                    className="hidden"
-                    webkitdirectory=""
-                  />
-                  <div className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors cursor-pointer text-center">
-                    选择文件夹内的所有文件
-                  </div>
-                </label>
-              </div>
-
-              <div className="mt-2">
-                <label className="block">
-                  <input
-                    type="file"
-                    multiple
-                    accept=".md,.markdown,.png,.jpg,.jpeg,.gif,.svg"
-                    onChange={handleFileSelect}
-                    className="hidden"
-                  />
-                  <div className="w-full px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors cursor-pointer text-center">
-                    选择 Markdown 和图片文件
-                  </div>
-                </label>
-              </div>
-
-              <div className="mt-4 text-xs text-muted-foreground">
-                <p className="mb-1">支持的格式：</p>
-                <ul className="list-disc list-inside space-y-1">
-                  <li>Markdown 文件 (.md)</li>
-                  <li>图片文件 (.png, .jpg, .jpeg, .gif, .svg)</li>
-                  <li>包含上述文件的文件夹</li>
-                </ul>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">
-                    网页URL
-                  </label>
-                  <input
-                    type="url"
-                    value={url}
-                    onChange={(e) => setUrl(e.target.value)}
-                    placeholder="https://www.anthropic.com/engineering/multi-agent-research-system"
-                    className="w-full px-4 py-2 border border-border rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        handleURLFetch();
-                      }
-                    }}
-                  />
-                </div>
-
-                <button
-                  onClick={handleURLFetch}
-                  disabled={!url.trim()}
-                  className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  获取内容
-                </button>
-
-                <div className="text-xs text-muted-foreground">
-                  <p className="mb-1">支持的网站：</p>
-                  <ul className="list-disc list-inside space-y-1">
-                    <li>技术博客和文章</li>
-                    <li>新闻网站</li>
-                    <li>在线文档</li>
-                    <li>其他公开访问的网页</li>
-                  </ul>
-                </div>
-              </div>
-            </>
-          )}
-
-          {onClose && (
-            <button
-              onClick={onClose}
-              className="mt-4 w-full px-4 py-2 border border-border rounded-md hover:bg-muted transition-colors"
-            >
-              取消
-            </button>
-          )}
         </>
       )}
+    </Frame>
+  );
+}
+
+// ============================================================
+// Frame — provides eyebrow → heading → body → close affordance
+// ============================================================
+
+function Frame({ children, onClose }: { children: React.ReactNode; onClose?: () => void }) {
+  return (
+    <div style={frameStyle}>
+      {onClose && (
+        <button onClick={onClose} style={closeBtnStyle} title="Close" aria-label="Close">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      )}
+      {children}
     </div>
   );
 }
+
+function Eyebrow({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
+  return (
+    <div style={{ ...eyebrowStyle, ...(style || {}) }}>
+      <span style={eyebrowDotStyle} />
+      <span>{children}</span>
+    </div>
+  );
+}
+
+function Heading({ children }: { children: React.ReactNode }) {
+  return <h2 style={headingStyle}>{children}</h2>;
+}
+
+// ============================================================
+// Styles — Stone palette matched to dashboard.module.css
+// ============================================================
+
+const frameStyle: React.CSSProperties = {
+  position: 'relative',
+  padding: '2rem 2.25rem 1.875rem',
+  background: 'transparent',
+  color: '#FAFAF9',
+  fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+  WebkitFontSmoothing: 'antialiased',
+};
+
+const closeBtnStyle: React.CSSProperties = {
+  position: 'absolute',
+  top: '0.875rem',
+  right: '0.875rem',
+  width: 28,
+  height: 28,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  background: 'transparent',
+  border: 'none',
+  color: '#78716C',
+  cursor: 'pointer',
+  borderRadius: 6,
+  transition: 'color 0.15s ease, background 0.15s ease',
+};
+
+const eyebrowStyle: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '0.4375rem',
+  fontSize: '0.625rem',
+  letterSpacing: '0.14em',
+  textTransform: 'uppercase',
+  fontWeight: 500,
+  color: '#78716C',
+  marginBottom: '0.625rem',
+};
+
+const eyebrowDotStyle: React.CSSProperties = {
+  width: 5,
+  height: 5,
+  borderRadius: '999px',
+  background: '#D97149',
+  display: 'inline-block',
+};
+
+const headingStyle: React.CSSProperties = {
+  fontFamily: '"Times New Roman", Georgia, serif',
+  fontSize: '1.625rem',
+  fontWeight: 600,
+  color: '#FAFAF9',
+  letterSpacing: '-0.025em',
+  lineHeight: 1.15,
+  margin: 0,
+  marginBottom: '0.5rem',
+};
+
+const paragraphStyle: React.CSSProperties = {
+  fontSize: '0.8125rem',
+  color: '#A8A29E',
+  lineHeight: 1.6,
+  margin: 0,
+  marginBottom: '1.5rem',
+  maxWidth: '38ch',
+};
+
+// Tabs
+const tabGroupStyle: React.CSSProperties = {
+  display: 'inline-flex',
+  gap: 0,
+  background: '#292524',
+  border: '1px solid #3F3A36',
+  borderRadius: 8,
+  padding: 3,
+  marginBottom: '1.25rem',
+};
+
+const tabStyle: React.CSSProperties = {
+  fontSize: '0.6875rem',
+  letterSpacing: '0.04em',
+  padding: '0.3125rem 0.9375rem',
+  borderRadius: 5,
+  border: 'none',
+  background: 'transparent',
+  color: '#78716C',
+  cursor: 'pointer',
+  fontFamily: 'inherit',
+  fontWeight: 500,
+  transition: 'color 0.15s ease, background 0.15s ease',
+};
+
+const tabActiveStyle: React.CSSProperties = {
+  ...tabStyle,
+  background: '#3F3A36',
+  color: '#FAFAF9',
+};
+
+// Drop zone
+const dropZoneStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '2.5rem 1.5rem',
+  border: '1px dashed #3F3A36',
+  borderRadius: 10,
+  background: 'rgba(41, 37, 36, 0.25)',
+  transition: 'border-color 0.18s ease, background 0.18s ease',
+  cursor: 'default',
+};
+
+const dropZoneActiveStyle: React.CSSProperties = {
+  ...dropZoneStyle,
+  borderColor: '#D97149',
+  background: 'rgba(217, 113, 73, 0.06)',
+};
+
+const dropTitleStyle: React.CSSProperties = {
+  fontFamily: '"Times New Roman", Georgia, serif',
+  fontSize: '1.0625rem',
+  fontWeight: 600,
+  color: '#E7E5E4',
+  marginBottom: '0.25rem',
+  letterSpacing: '-0.01em',
+};
+
+const dropHintStyle: React.CSSProperties = {
+  fontSize: '0.75rem',
+  color: '#78716C',
+  letterSpacing: '0.005em',
+};
+
+// Buttons
+const primaryBtnFullStyle: React.CSSProperties = {
+  width: '100%',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: '0.4375rem',
+  fontSize: '0.75rem',
+  padding: '0.5rem 0.875rem',
+  borderRadius: 7,
+  border: '1px solid #D97149',
+  background: '#D97149',
+  color: 'white',
+  cursor: 'pointer',
+  fontFamily: 'inherit',
+  fontWeight: 500,
+  letterSpacing: '0.005em',
+  transition: 'background 0.15s ease, transform 0.15s ease',
+};
+
+const primaryBtnDisabledStyle: React.CSSProperties = {
+  ...primaryBtnFullStyle,
+  opacity: 0.4,
+  cursor: 'not-allowed',
+};
+
+const ghostBtnFullStyle: React.CSSProperties = {
+  width: '100%',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: '0.4375rem',
+  fontSize: '0.75rem',
+  padding: '0.5rem 0.875rem',
+  borderRadius: 7,
+  border: '1px solid #3F3A36',
+  background: 'transparent',
+  color: '#A8A29E',
+  cursor: 'pointer',
+  fontFamily: 'inherit',
+  fontWeight: 500,
+  transition: 'all 0.15s ease',
+};
+
+const primaryBtnStyle: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '0.375rem',
+  fontSize: '0.75rem',
+  padding: '0.5rem 1rem',
+  borderRadius: 6,
+  border: '1px solid #D97149',
+  background: '#D97149',
+  color: 'white',
+  cursor: 'pointer',
+  fontFamily: 'inherit',
+  fontWeight: 500,
+};
+
+const ghostBtnStyle: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '0.375rem',
+  fontSize: '0.75rem',
+  padding: '0.5rem 1rem',
+  borderRadius: 6,
+  border: '1px solid #3F3A36',
+  background: 'transparent',
+  color: '#A8A29E',
+  cursor: 'pointer',
+  fontFamily: 'inherit',
+};
+
+// URL input
+const urlInputWrapStyle: React.CSSProperties = {
+  position: 'relative',
+  marginBottom: '0.75rem',
+};
+
+const urlIconStyle: React.CSSProperties = {
+  position: 'absolute',
+  left: '0.75rem',
+  top: '50%',
+  transform: 'translateY(-50%)',
+};
+
+const urlInputStyle: React.CSSProperties = {
+  width: '100%',
+  background: '#1C1917',
+  border: '1px solid #3F3A36',
+  borderRadius: 7,
+  padding: '0.5625rem 0.75rem 0.5625rem 2rem',
+  color: '#FAFAF9',
+  fontSize: '0.8125rem',
+  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+  letterSpacing: '0.005em',
+  outline: 'none',
+  transition: 'border-color 0.15s ease',
+};
+
+// Format hint
+const formatLineStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'baseline',
+  gap: '0.75rem',
+  marginTop: '1.25rem',
+  paddingTop: '1rem',
+  borderTop: '1px solid #292524',
+};
+
+const formatLabelStyle: React.CSSProperties = {
+  fontSize: '0.625rem',
+  letterSpacing: '0.12em',
+  textTransform: 'uppercase',
+  color: '#57534E',
+  fontWeight: 500,
+  flexShrink: 0,
+};
+
+const formatValueStyle: React.CSSProperties = {
+  fontSize: '0.6875rem',
+  color: '#78716C',
+  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+  letterSpacing: '0.01em',
+};
+
+// Article list (success state)
+const articleListStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '0.4375rem',
+  marginBottom: '1.5rem',
+  maxHeight: 220,
+  overflowY: 'auto',
+};
+
+const articleRowStyle: React.CSSProperties = {
+  padding: '0.625rem 0.75rem',
+  background: 'rgba(41, 37, 36, 0.5)',
+  border: '1px solid #292524',
+  borderRadius: 7,
+};
+
+const articleTitleStyle: React.CSSProperties = {
+  fontSize: '0.8125rem',
+  color: '#E7E5E4',
+  fontWeight: 500,
+  marginBottom: '0.1875rem',
+  lineHeight: 1.35,
+};
+
+const articleMetaStyle: React.CSSProperties = {
+  fontSize: '0.625rem',
+  color: '#57534E',
+  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+};
+
+const footerStyle: React.CSSProperties = {
+  display: 'flex',
+  gap: '0.5rem',
+  justifyContent: 'flex-end',
+  marginTop: '0.5rem',
+};
+
+// Progress (uploading)
+const progressTrackStyle: React.CSSProperties = {
+  width: '100%',
+  height: 2,
+  background: '#292524',
+  borderRadius: 999,
+  overflow: 'hidden',
+  marginTop: '1.5rem',
+};
+
+const progressBarStyle: React.CSSProperties = {
+  height: '100%',
+  background: 'linear-gradient(90deg, #D97149, #E9A476)',
+  borderRadius: 999,
+  transition: 'width 0.3s ease',
+};
+
+// Error
+const errorBoxStyle: React.CSSProperties = {
+  padding: '0.75rem 0.875rem',
+  background: 'rgba(239, 68, 68, 0.08)',
+  border: '1px solid rgba(239, 68, 68, 0.25)',
+  borderRadius: 7,
+  color: '#fca5a5',
+  fontSize: '0.8125rem',
+  lineHeight: 1.5,
+  marginBottom: '1.25rem',
+};

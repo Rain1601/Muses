@@ -1,149 +1,137 @@
-# Muses - 智能文档生成Agent
+# Muses
 
 <div align="center">
   <img src="https://img.shields.io/badge/Next.js-14-black" alt="Next.js" />
-  <img src="https://img.shields.io/badge/TypeScript-5.0-blue" alt="TypeScript" />
-  <img src="https://img.shields.io/badge/Prisma-5.0-2D3748" alt="Prisma" />
+  <img src="https://img.shields.io/badge/FastAPI-0.110-009688" alt="FastAPI" />
+  <img src="https://img.shields.io/badge/TypeScript-5-blue" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Python-3.10+-3776AB" alt="Python" />
   <img src="https://img.shields.io/badge/License-MIT-green" alt="License" />
 </div>
 
 <div align="center">
-  <h3>🤖 AI驱动的个性化博客文章生成平台</h3>
-  <p>将PDF、Markdown、文本等素材智能转换为高质量的博客文章</p>
+  <h3>AI 驱动的写作工作台</h3>
+  <p>以 <code>/dashboard</code> 为中心的三栏式工作台 — 文章列表、Notion 风格编辑器、AI 对话面板，一处完成起草、AI 协作改稿、发布到 GitHub。</p>
 </div>
 
-## 功能特点
+## 功能
 
-- 🤖 自定义AI Agent人格和写作风格
-- 📄 支持多种输入格式（MD、PDF、对话、文本）
-- 📝 生成Markdown/MDX格式文章
-- 🔐 GitHub OAuth登录和用户隔离
-- 🚀 一键发布到GitHub仓库
-- 💾 本地SQLite存储，轻量高效
+- 单一工作台，三栏式：文章/文件侧栏 · Notion 编辑器 · AI 对话面板
+- 多素材输入：PDF、Markdown、文本、对话
+- 文本级 AI 操作：改写、扩写、摘要、翻译、润色、纠错、自定义 prompt
+- 自定义 Agent 人格 + 模型切换（Claude / GPT / Gemini / Qwen / DeepSeek）
+- 写作 Skill 库：预设 + 自定义 prompt 模板
+- 一键发布到 GitHub 仓库，发布历史持久化
+- GitHub / Google OAuth 登录
 
 ## 技术栈
 
-### 前端
-- Next.js 14 (App Router)
-- TypeScript
-- Tailwind CSS + Shadcn/ui
-- TanStack Query
-- Zustand
-
-### 后端
-- Node.js + Express
-- TypeScript
-- SQLite3 + Prisma
-- JWT认证
-- OpenAI API
+| 层 | 用 |
+|---|---|
+| Frontend | Next.js 14 (App Router) · TypeScript · Tailwind · Shadcn/ui · TanStack Query · Zustand · TipTap |
+| Backend | FastAPI · SQLAlchemy + Alembic · JWT |
+| AI | 聚合 provider：AIHubMix / OpenRouter / 百炼（统一走 OpenAI 兼容 SDK） |
+| DB | 本地 SQLite；生产可换 Cloud SQL Postgres |
 
 ## 项目结构
 
 ```
 Muses/
-├── frontend/          # 前端应用
-│   ├── src/
-│   │   ├── app/      # Next.js App Router
-│   │   ├── components/
-│   │   ├── hooks/
-│   │   ├── lib/
-│   │   └── styles/
-│   └── package.json
-├── backend/           # 后端API
-│   ├── src/
-│   │   ├── controllers/
-│   │   ├── services/
-│   │   ├── models/
-│   │   ├── middleware/
-│   │   └── utils/
-│   └── package.json
-└── README.md
+├── backend/           # FastAPI 应用（app/、start.py、Dockerfile、requirements.txt）
+├── frontend/          # Next.js 应用（app/、components/、lib/、Dockerfile）
+├── scripts/           # 安装、启动、迁移脚本
+├── docs/              # 项目文档（API、ARCHITECTURE、DEPLOYMENT、USER_GUIDE 等）
+├── deploy.sh          # 手动部署到 Google Cloud Run
+├── start-python.sh    # macOS 双终端启动（推荐）
+├── CLAUDE.md          # Claude Code 使用本仓库时的导览
+└── README.md          # 你正在看的这份
 ```
 
-## 🚀 快速开始
+> 关键代码层级见 `CLAUDE.md`（开发者向架构指南）。
 
-### 使用脚本启动（推荐）
-
-```bash
-# 1. 克隆项目
-git clone https://github.com/yourusername/muses.git
-cd muses
-
-# 2. 首次设置（自动安装依赖、初始化数据库）
-./scripts/setup.sh
-
-# 3. 配置环境变量
-# 编辑 backend/.env 文件，填入必要的配置
-
-# 4. 启动项目
-./scripts/start.sh
-```
-
-访问 http://localhost:3000 开始使用！
-
-## 📸 功能预览
-
-### 工作台
-快速访问所有功能，查看最近的文章
-
-### Agent管理
-创建个性化的AI写作助手，每个Agent都有独特的写作风格
-
-### 文章生成
-- 📄 **素材上传**：支持PDF、Markdown、TXT等格式
-- 💬 **对话生成**：通过对话方式生成文章
-- ✨ **AI优化**：智能改进已有文章
-
-### GitHub发布
-一键发布到GitHub仓库，支持自定义路径和提交信息
-
-## 🛠️ 开发指南
+## 快速开始
 
 ### 环境要求
-- Node.js >= 18
-- pnpm (推荐)
+- Node.js 18+（建议 npm，不要求 pnpm）
+- Python 3.10+
+- SQLite 自带
 
-### 安装依赖
-
+### 首次设置
 ```bash
-# 前端
-cd frontend
-pnpm install
+git clone <repo-url> Muses && cd Muses
 
-# 后端
-cd backend
-pnpm install
+# 前端依赖
+cd frontend && npm install --legacy-peer-deps && cd ..
+
+# 后端依赖（推荐用 venv）
+cd backend && python3 -m venv venv && source venv/bin/activate \
+  && pip install -r requirements.txt && cd ..
+
+# 配置后端环境变量
+cp backend/.env.example backend/.env   # 然后编辑填入下方变量
 ```
 
-### 开发模式
+### 启动
 
 ```bash
-# 前端 (端口3000)
-cd frontend
-pnpm dev
-
-# 后端 (端口8080)
-cd backend
-pnpm dev
+# 推荐：在 macOS 中各开一个 Terminal 窗口启动前后端
+./start-python.sh
 ```
 
-## 🤝 贡献
+或手动分窗口：
 
-欢迎贡献代码！请查看 [贡献指南](CONTRIBUTING.md)。
+```bash
+# 终端 1：后端 (http://localhost:8080)
+cd backend && python3 start.py
 
-## 📄 License
+# 终端 2：前端 (http://localhost:3004)
+cd frontend && npm run dev
+```
 
-MIT License - 详见 [LICENSE](LICENSE) 文件
+访问 http://localhost:3004 → GitHub/Google 登录 → 进入 `/dashboard`。
 
-## 🙏 致谢
+API Swagger 文档：http://localhost:8080/docs。
 
-- OpenAI - 提供强大的AI能力
-- Next.js - 优秀的React框架
-- Prisma - 现代化的ORM工具
-- 所有贡献者和使用者
+### 必需的环境变量（backend/.env）
 
----
+```bash
+DATABASE_URL="sqlite:///./muses.db"
+JWT_SECRET="<random-string>"
+GITHUB_CLIENT_ID="<from github oauth app>"
+GITHUB_CLIENT_SECRET="<from github oauth app>"
+ENCRYPTION_KEY="<32-char string>"
+```
 
-<div align="center">
-  <p>如果觉得有帮助，请给个 ⭐️ Star！</p>
-</div>
+> AI provider key（AIHubMix / OpenRouter / 百炼）通过登录后的设置面板逐用户配置，加密存于 User 表，不通过 env 注入。
+
+GitHub OAuth callback URL：`http://localhost:8080/api/auth/github/callback`。
+
+## 开发
+
+```bash
+# 类型检查
+cd frontend && npx tsc --noEmit
+
+# 数据库迁移
+cd backend
+alembic revision --autogenerate -m "describe change"
+alembic upgrade head
+```
+
+项目目前没有正式测试套件 — UI 改动请在浏览器实际跑一遍。
+
+## 部署
+
+走 GitHub Actions + Google Cloud Run。详见 `docs/DEPLOYMENT.md`：
+
+- `backend/Dockerfile` → Cloud Run 后端镜像
+- `frontend/Dockerfile` → Cloud Run 前端镜像
+- `./deploy.sh` — 手动触发部署（需配置 `GCP_PROJECT_ID`）
+- `./scripts/gcp-setup.sh` — 首次创建 Cloud SQL / 服务账号
+
+## 贡献
+
+PR 欢迎，请先看 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
+## License
+
+MIT — 见 [LICENSE](LICENSE)。
