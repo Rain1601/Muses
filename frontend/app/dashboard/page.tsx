@@ -29,10 +29,12 @@ const getTurndownService = async () => {
 };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+// History panel — kept the old localStorage key for migration; widths trimmed
+// to roughly match the left sidebar so the editor gets more breathing room.
 const CHAT_WIDTH_KEY = "muses-chat-panel-width";
-const CHAT_WIDTH_DEFAULT = 360;
-const CHAT_WIDTH_MIN = 280;
-const CHAT_WIDTH_MAX = 600;
+const CHAT_WIDTH_DEFAULT = 280;
+const CHAT_WIDTH_MIN = 240;
+const CHAT_WIDTH_MAX = 380;
 
 interface FileItem { name: string; path: string; size: number; modified: number; }
 interface DBArticle { id: string; title: string; summary?: string; publishStatus: string; publishedAt?: string; githubUrl?: string; createdAt: string; updatedAt: string; }
