@@ -3,6 +3,7 @@
 所有聚合 API（AIHubMix / OpenRouter / 百炼）均通过 OpenAI 兼容 SDK 调用
 """
 
+import asyncio
 from typing import Dict, List, Optional, Any
 import openai
 
@@ -78,7 +79,9 @@ class UnifiedAIClient:
             if key in kwargs:
                 params[key] = kwargs[key]
 
-        response = client.chat.completions.create(**params)
+        # 同步 OpenAI 客户端发起 HTTP 请求会阻塞 event loop —— 用 to_thread 把它扔到
+        # 线程池,uvicorn 才能在 LLM 等待期间继续服务别的请求(包括响应当前请求本身)。
+        response = await asyncio.to_thread(client.chat.completions.create, **params)
         return response.choices[0].message.content or ""
 
     @staticmethod
