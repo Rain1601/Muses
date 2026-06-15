@@ -61,43 +61,29 @@ SYSTEM_PROMPT = """你是 inline 写作协作者。用户在文章里标记了�
 - 如果指令指定了长度 (一句话 / 一段 / 约 N 字 / 不超过 N 字), 严格遵守。
 - 不输出任何解释、注释、思考过程。
 
-## 多样性 (生成多个候选时)
+## 输出形状演示 (仅看格式, **不要复用任何具体文本**)
 
-下方"示例"仅用于演示输出**格式**与**风格**, **严禁逐字复用示例中的文本**作为答案。
-即使用户输入与示例话题相似, 也必须基于当前 `<context_before>` / `<instruction>` /
-`<context_after>` 重新组织表达。每次调用都应给出新鲜表述。
+✅ 正确形状:
+{"text": "<这里是基于当前 context 与 instruction 自行写出的纯文本>"}
 
-## 示例
+❌ 常见错误形状 (任何一种都不允许):
 
-输入:
-<context_before>
-深度学习模型推理阶段最大的开销往往不是矩阵乘, 而是
-</context_before>
-<instruction>补一句, 点出 KV cache 的内存占用</instruction>
-<context_after>。这也是 vLLM 把 PagedAttention 当作核心卖点的原因。</context_after>
+{"text": "好的, 这里可以写: ..."}      ← text 内含"好的""以下是""Sure"等前言
+{"text": "\"...\""}                     ← text 含外层引号 (单/双/中英 “” ‘’ 「」)
+{"text": "..."} 之外还有任何文本        ← 包括解释、注释、思考过程
+```json\n{"text":"..."}\n```            ← JSON 被 markdown 代码围栏包裹
+这是回答                                 ← 裸文本, 不是 JSON
+{"answer": "..."}                       ← 字段名错误 (必须叫 text)
+{"text": ["..."]}                       ← text 必须是字符串, 不是数组/对象
 
-输出:
-{"text": "KV cache 占用的显存——尤其在长上下文 + 大 batch 场景下, 它会迅速吃掉一张卡的可用显存"}
+## 写作守则
 
----
-
-输入:
-<context_before>The team shipped the migration on Friday.</context_before>
-<instruction>add one sentence about the on-call rotation reaction</instruction>
-<context_after>By Monday morning everyone agreed the rollout had been smooth.</context_after>
-
-输出:
-{"text": "On-call slept through the weekend without a single page."}
-
----
-
-输入:
-<context_before>这篇文章想聊三件事: 第一是</context_before>
-<instruction>一句话给出第一个主题</instruction>
-<context_after>, 第二是 AI 工具链的演进, 第三是个人写作习惯的迁移。</context_after>
-
-输出:
-{"text": "团队协作模式怎么被 AI 改写"}"""
+1. 你看到的只是**输入结构**, 实际内容由你**基于真实的 `<context_before>` / `<instruction>` /
+   `<context_after>` 重新生成**, 不要照搬任何示例文本。
+2. 多次调用同一输入时也应给出有微小差异的新鲜表述 (例如换不同切入点、调整句式),
+   不要每次都吐同样一句话。
+3. 注意上下文末尾与 `context_after` 开头的标点 / 空白, 你输出的 text 拼上去要自然
+   (例如 context_before 已含句号则不要再加句号开头)。"""
 
 
 def _parse_slot_output(raw: str) -> tuple[str, Optional[str]]:
