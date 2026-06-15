@@ -374,7 +374,6 @@ export function NotionEditor({ initialContent = '', onChange, agentId, onSelecti
       id: 'image',
       name: '图片',
       description: '上传图片到文档',
-      icon: '📷',
       keywords: ['img', 'image', 'tp', '图片', '上传'],
       action: (editor: any) => handleFileUpload(editor),
     },
@@ -382,7 +381,6 @@ export function NotionEditor({ initialContent = '', onChange, agentId, onSelecti
       id: 'video',
       name: '视频',
       description: '插入 YouTube/Bilibili 视频',
-      icon: '🎬',
       keywords: ['video', 'youtube', 'bilibili', 'sp', '视频', 'b站'],
       action: () => {
         // 显示视频插入对话框
@@ -392,8 +390,7 @@ export function NotionEditor({ initialContent = '', onChange, agentId, onSelecti
     {
       id: 'model',
       name: '模型',
-      description: '选择AI模型',
-      icon: '🤖',
+      description: '选择 AI 模型',
       keywords: ['model', 'mx', '模型', 'ai'],
       action: () => {
         setShowModelSubmenu(true);
@@ -404,7 +401,6 @@ export function NotionEditor({ initialContent = '', onChange, agentId, onSelecti
       id: 'ai',
       name: 'AI 生成',
       description: '使用 AI 生成内容',
-      icon: '✨',
       keywords: ['ai', 'generate', '生成', '智能'],
       action: () => {}, // 暂时禁用
       disabled: true,
@@ -1194,10 +1190,10 @@ export function NotionEditor({ initialContent = '', onChange, agentId, onSelecti
         onInsert={insertVideo}
       />
 
-      {/* 斜杠命令菜单 */}
+      {/* 斜杠命令菜单 — Notion 风格列表 */}
       {showSlashMenu && (showModelSubmenu || filteredCommands.length > 0) && (
         <div
-          className="slash-menu absolute z-50 bg-popover border border-border rounded-md shadow-md p-1 min-w-[200px] max-w-[300px]"
+          className="slash-menu absolute z-50 bg-popover border border-border rounded-md shadow-md py-1 min-w-[260px] max-w-[320px]"
           style={{
             left: `${slashMenuPosition.x}px`,
             top: `${slashMenuPosition.y}px`,
@@ -1206,64 +1202,60 @@ export function NotionEditor({ initialContent = '', onChange, agentId, onSelecti
           {showModelSubmenu ? (
             // 模型子菜单
             <>
-              <div className="px-3 py-2 border-b border-border bg-muted/30 flex items-center gap-2 text-sm font-medium">
-                <span className="text-lg">🤖</span>
-                <span>选择模型</span>
+              <div className="px-3 pt-1.5 pb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                选择模型
               </div>
               {modelOptions.map((model, index) => {
                 const isSelected = index === selectedModelIndex;
                 return (
                   <button
                     key={model.id}
-                    className={`w-full text-left px-3 py-2 rounded-sm flex items-center gap-2 transition-colors ${
+                    className={`w-full text-left px-3 py-1.5 flex items-center justify-between gap-3 transition-colors ${
                       isSelected
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'hover:bg-accent hover:text-accent-foreground'
+                        ? 'bg-accent text-accent-foreground'
+                        : 'hover:bg-accent/60'
                     }`}
                     onClick={() => {
                       const view = editor?.view;
                       if (view) {
-                        // 删除斜杠命令文本
                         const { state } = view;
                         const { selection } = state;
                         const { $from } = selection;
                         const tr = state.tr.delete($from.start(), $from.pos);
                         view.dispatch(tr);
 
-                        // 隐藏所有菜单
                         setShowSlashMenu(false);
                         setShowModelSubmenu(false);
                         setSlashQuery('');
 
-                        // 这里可以添加模型选择的逻辑
                         console.log('Selected model:', model.id);
                       }
                     }}
                   >
-                    <span className="text-lg">{model.icon}</span>
-                    <div className="flex-1">
-                      <div className="font-medium">{model.name}</div>
-                      <div className="text-xs text-muted-foreground">
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-sm leading-tight truncate">{model.name}</span>
+                      <span className="text-xs text-muted-foreground leading-tight truncate">
                         {model.description}
-                      </div>
+                      </span>
                     </div>
                     {isSelected && (
-                      <span className="text-xs text-muted-foreground">Enter</span>
+                      <span className="text-[11px] text-muted-foreground shrink-0">Enter</span>
                     )}
                   </button>
                 );
               })}
-              <div className="px-3 py-1 text-xs text-muted-foreground border-t border-border mt-1">
-                <div className="flex items-center justify-between">
-                  <span>↑↓ 选择</span>
-                  <span>← 返回</span>
-                  <span>Enter 确认</span>
-                </div>
+              <div className="px-3 pt-1 pb-0.5 mt-1 border-t border-border text-[11px] text-muted-foreground flex items-center justify-between">
+                <span>↑↓ 选择</span>
+                <span>← 返回</span>
+                <span>Enter 确认</span>
               </div>
             </>
           ) : (
             // 主菜单
             <>
+              <div className="px-3 pt-1.5 pb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                插入
+              </div>
               {filteredCommands.map((command, index) => {
                 const isSelected = index === selectedCommandIndex;
                 const matchedKeyword = command.keywords.find(keyword =>
@@ -1273,10 +1265,10 @@ export function NotionEditor({ initialContent = '', onChange, agentId, onSelecti
                 return (
                   <button
                     key={command.id}
-                    className={`w-full text-left px-3 py-2 rounded-sm flex items-center gap-2 transition-colors ${
+                    className={`w-full text-left px-3 py-1.5 flex items-center justify-between gap-3 transition-colors ${
                       isSelected
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'hover:bg-accent hover:text-accent-foreground'
+                        ? 'bg-accent text-accent-foreground'
+                        : 'hover:bg-accent/60'
                     } ${command.disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                     onClick={() => {
                       if (!command.disabled) {
@@ -1284,7 +1276,6 @@ export function NotionEditor({ initialContent = '', onChange, agentId, onSelecti
                           setShowModelSubmenu(true);
                           setSelectedModelIndex(0);
                         } else if (command.id === 'video') {
-                          // 视频命令：删除斜杠文本，显示对话框
                           const view = editor?.view;
                           if (view) {
                             const { state } = view;
@@ -1298,7 +1289,6 @@ export function NotionEditor({ initialContent = '', onChange, agentId, onSelecti
                           setSlashQuery('');
                           setShowVideoInput(true);
                         } else {
-                          // 其他命令：删除斜杠文本，执行命令，隐藏菜单
                           const view = editor?.view;
                           if (view) {
                             const { state } = view;
@@ -1310,7 +1300,6 @@ export function NotionEditor({ initialContent = '', onChange, agentId, onSelecti
                             setShowSlashMenu(false);
                             setSlashQuery('');
 
-                            // 执行命令
                             command.action(editor);
                           }
                         }
@@ -1318,23 +1307,20 @@ export function NotionEditor({ initialContent = '', onChange, agentId, onSelecti
                     }}
                     disabled={command.disabled}
                   >
-                    <span className="text-lg">{command.icon}</span>
-                    <div className="flex-1">
-                      <div className="font-medium flex items-center gap-1">
-                        {command.name}
-                        {matchedKeyword && slashQuery && (
-                          <span className="text-xs px-1 py-0.5 bg-muted rounded text-muted-foreground">
-                            {matchedKeyword}
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-sm leading-tight truncate">{command.name}</span>
+                      <span className="text-xs text-muted-foreground leading-tight truncate">
                         {command.description}
-                      </div>
+                      </span>
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-2 shrink-0">
+                      {matchedKeyword && slashQuery && (
+                        <span className="text-[11px] text-muted-foreground font-mono">
+                          /{matchedKeyword}
+                        </span>
+                      )}
                       {isSelected && (
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-[11px] text-muted-foreground">
                           {command.id === 'model' ? '→' : 'Enter'}
                         </span>
                       )}
@@ -1344,12 +1330,10 @@ export function NotionEditor({ initialContent = '', onChange, agentId, onSelecti
               })}
 
               {/* 底部提示 */}
-              <div className="px-3 py-1 text-xs text-muted-foreground border-t border-border mt-1">
-                <div className="flex items-center justify-between">
-                  <span>↑↓ 选择</span>
-                  <span>→ 展开</span>
-                  <span>Enter 确认</span>
-                </div>
+              <div className="px-3 pt-1 pb-0.5 mt-1 border-t border-border text-[11px] text-muted-foreground flex items-center justify-between">
+                <span>↑↓ 选择</span>
+                <span>→ 展开</span>
+                <span>Enter 确认</span>
               </div>
             </>
           )}
