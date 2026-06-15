@@ -1,0 +1,48 @@
+/* Notion 风格行级 drag handle (⋮⋮) — 由 @tiptap/extension-drag-handle 渲染 */
+
+.notion-drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 24px;
+  border-radius: 4px;
+  cursor: grab;
+  color: hsl(var(--muted-foreground));
+  opacity: 0;
+  transition: opacity 120ms ease, background-color 120ms ease;
+  /* 让 handle 不挡选区 */
+  user-select: none;
+  -webkit-user-select: none;
+  /* drag-handle 扩展会用 floating-ui 定位; 这里只控外观 */
+}
+
+/* 鼠标在编辑器内移动时, 扩展自动把 handle 移到光标所在块旁;
+   visible 状态用 hover 直接控制 — drag-handle ext 会在 unhovered 时移除 */
+.notion-drag-handle:hover {
+  opacity: 1;
+  background-color: hsl(var(--accent));
+}
+
+/* 鼠标进入编辑器区域时显式淡入 */
+.ProseMirror:hover ~ .notion-drag-handle,
+.notion-drag-handle:focus,
+.notion-drag-handle[data-dragging='true'] {
+  opacity: 0.6;
+}
+
+.notion-drag-handle[data-dragging='true'] {
+  cursor: grabbing;
+  opacity: 1;
+  background-color: hsl(var(--accent));
+}
+
+.notion-drag-handle svg {
+  display: block;
+  pointer-events: none;
+}
+
+/* drag-handle 扩展的容器层 — 保证浮在内容之上 */
+[data-tiptap-drag-handle] {
+  z-index: 30;
+}

@@ -9,6 +9,7 @@ import '../styles/video-responsive.css';
 import '../styles/editor-selection-persist.css';
 import '../styles/collapsible-code.css';
 import '../styles/editor-line-numbers.css';
+import '../styles/notion-drag-handle.css';
 import StarterKit from '@tiptap/starter-kit';
 import { SlotDecorations, AiSource } from '@/lib/tiptap-extensions/PromptSlot';
 import type { SlotState } from '@/lib/tiptap-extensions/PromptSlot';
@@ -20,6 +21,7 @@ import BilibiliVideo from '@/lib/tiptap-extensions/BilibiliVideo';
 import SelectionPersistence from '@/lib/tiptap-extensions/SelectionPersistence';
 import { LineNumbers } from '@/lib/tiptap-extensions/LineNumbers';
 import Youtube from '@tiptap/extension-youtube';
+import DragHandle from '@tiptap/extension-drag-handle';
 // Dropcursor 已包含在 StarterKit 中，无需单独导入
 import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
@@ -976,6 +978,25 @@ export function NotionEditor({ initialContent = '', onChange, agentId, onSelecti
         },
       }),
       LineNumbers,
+      DragHandle.configure({
+        render: () => {
+          const el = document.createElement('div');
+          el.className = 'notion-drag-handle';
+          el.setAttribute('aria-label', '拖拽块');
+          // 6 个小圆点 (Notion ⋮⋮ 标志)
+          el.innerHTML = `
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">
+              <circle cx="4" cy="3" r="1.2"/>
+              <circle cx="10" cy="3" r="1.2"/>
+              <circle cx="4" cy="7" r="1.2"/>
+              <circle cx="10" cy="7" r="1.2"/>
+              <circle cx="4" cy="11" r="1.2"/>
+              <circle cx="10" cy="11" r="1.2"/>
+            </svg>
+          `;
+          return el;
+        },
+      }),
     ],
     content: initialContent || '',
     onUpdate: ({ editor, transaction }) => {
