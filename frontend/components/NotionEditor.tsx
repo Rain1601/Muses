@@ -368,30 +368,137 @@ export function NotionEditor({ initialContent = '', onChange, agentId, onSelecti
     }
   }, []);
 
-  // 定义斜杠命令列表
-  const slashCommands = [
+  // 定义斜杠命令列表 (Notion 风格分组)
+  const slashCommands: Array<{
+    id: string;
+    name: string;
+    description: string;
+    group: string;
+    keywords: string[];
+    action: (editor: any) => void;
+    disabled?: boolean;
+  }> = [
+    // 基础块
+    {
+      id: 'h1',
+      name: '标题 1',
+      description: '一级大标题',
+      group: '基础块',
+      keywords: ['h1', 'heading1', '标题1', 'biaoti1', 'bt1'],
+      action: (editor) => editor.chain().focus().toggleHeading({ level: 1 }).run(),
+    },
+    {
+      id: 'h2',
+      name: '标题 2',
+      description: '二级中等标题',
+      group: '基础块',
+      keywords: ['h2', 'heading2', '标题2', 'biaoti2', 'bt2'],
+      action: (editor) => editor.chain().focus().toggleHeading({ level: 2 }).run(),
+    },
+    {
+      id: 'h3',
+      name: '标题 3',
+      description: '三级小标题',
+      group: '基础块',
+      keywords: ['h3', 'heading3', '标题3', 'biaoti3', 'bt3'],
+      action: (editor) => editor.chain().focus().toggleHeading({ level: 3 }).run(),
+    },
+    {
+      id: 'quote',
+      name: '引用',
+      description: '引用文本块',
+      group: '基础块',
+      keywords: ['quote', 'yy', '引用', 'yinyong'],
+      action: (editor) => editor.chain().focus().toggleBlockquote().run(),
+    },
+    {
+      id: 'divider',
+      name: '分割线',
+      description: '插入水平分割线',
+      group: '基础块',
+      keywords: ['divider', 'hr', 'fgx', '分割线', 'fenge'],
+      action: (editor) => editor.chain().focus().setHorizontalRule().run(),
+    },
+    {
+      id: 'code',
+      name: '代码块',
+      description: '语法高亮 + 可折叠',
+      group: '基础块',
+      keywords: ['code', 'codeblock', 'dm', '代码', 'daima'],
+      action: (editor) => editor.chain().focus().toggleCodeBlock().run(),
+    },
+
+    // 列表
+    {
+      id: 'todo',
+      name: '待办列表',
+      description: '可勾选的复选框',
+      group: '列表',
+      keywords: ['todo', 'task', 'db', '待办', 'daiban', 'checkbox'],
+      action: (editor) => editor.chain().focus().toggleTaskList().run(),
+    },
+    {
+      id: 'bullet',
+      name: '无序列表',
+      description: '项目符号列表',
+      group: '列表',
+      keywords: ['bullet', 'ul', 'wxlb', '无序', 'wuxu', 'list'],
+      action: (editor) => editor.chain().focus().toggleBulletList().run(),
+    },
+    {
+      id: 'ordered',
+      name: '有序列表',
+      description: '编号列表',
+      group: '列表',
+      keywords: ['ordered', 'ol', 'yxlb', '有序', 'youxu', 'numbered'],
+      action: (editor) => editor.chain().focus().toggleOrderedList().run(),
+    },
+
+    // 高级
+    {
+      id: 'table',
+      name: '表格',
+      description: '插入 3×3 表格',
+      group: '高级',
+      keywords: ['table', 'bg', '表格', 'biaoge'],
+      action: (editor) => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
+    },
+    {
+      id: 'highlight',
+      name: '文字高亮',
+      description: '黄色背景高亮',
+      group: '高级',
+      keywords: ['highlight', 'gl', '高亮', 'gaoliang', 'mark'],
+      action: (editor) => editor.chain().focus().toggleHighlight().run(),
+    },
+
+    // 插入
     {
       id: 'image',
       name: '图片',
       description: '上传图片到文档',
-      keywords: ['img', 'image', 'tp', '图片', '上传'],
+      group: '插入',
+      keywords: ['img', 'image', 'tp', '图片', '上传', 'tupian'],
       action: (editor: any) => handleFileUpload(editor),
     },
     {
       id: 'video',
       name: '视频',
-      description: '插入 YouTube/Bilibili 视频',
-      keywords: ['video', 'youtube', 'bilibili', 'sp', '视频', 'b站'],
+      description: '插入 YouTube / Bilibili',
+      group: '插入',
+      keywords: ['video', 'youtube', 'bilibili', 'sp', '视频', 'b站', 'shipin'],
       action: () => {
-        // 显示视频插入对话框
         setShowVideoInput(true);
       },
     },
+
+    // AI
     {
       id: 'model',
       name: '模型',
       description: '选择 AI 模型',
-      keywords: ['model', 'mx', '模型', 'ai'],
+      group: 'AI',
+      keywords: ['model', 'mx', '模型', 'moxing'],
       action: () => {
         setShowModelSubmenu(true);
         setSelectedModelIndex(0);
@@ -401,8 +508,9 @@ export function NotionEditor({ initialContent = '', onChange, agentId, onSelecti
       id: 'ai',
       name: 'AI 生成',
       description: '使用 AI 生成内容',
-      keywords: ['ai', 'generate', '生成', '智能'],
-      action: () => {}, // 暂时禁用
+      group: 'AI',
+      keywords: ['ai', 'generate', '生成', 'shengcheng'],
+      action: () => {},
       disabled: true,
     },
   ];
@@ -1251,83 +1359,87 @@ export function NotionEditor({ initialContent = '', onChange, agentId, onSelecti
               </div>
             </>
           ) : (
-            // 主菜单
+            // 主菜单 — 分组列表 (Notion 风格)
             <>
-              <div className="px-3 pt-1.5 pb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                插入
-              </div>
-              {filteredCommands.map((command, index) => {
-                const isSelected = index === selectedCommandIndex;
-                const matchedKeyword = command.keywords.find(keyword =>
-                  keyword.toLowerCase().includes(slashQuery.toLowerCase())
-                );
+              {(() => {
+                // 按 group 分组, 保留原 flatIndex 给键盘导航
+                const grouped: Array<[string, Array<{ cmd: typeof filteredCommands[number]; flatIndex: number }>]> = [];
+                const groupMap = new Map<string, Array<{ cmd: typeof filteredCommands[number]; flatIndex: number }>>();
+                filteredCommands.forEach((cmd, flatIndex) => {
+                  const g = cmd.group || '其他';
+                  if (!groupMap.has(g)) {
+                    groupMap.set(g, []);
+                    grouped.push([g, groupMap.get(g)!]);
+                  }
+                  groupMap.get(g)!.push({ cmd, flatIndex });
+                });
 
-                return (
-                  <button
-                    key={command.id}
-                    className={`w-full text-left px-3 py-1.5 flex items-center justify-between gap-3 transition-colors ${
-                      isSelected
-                        ? 'bg-accent text-accent-foreground'
-                        : 'hover:bg-accent/60'
-                    } ${command.disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    onClick={() => {
-                      if (!command.disabled) {
-                        if (command.id === 'model') {
-                          setShowModelSubmenu(true);
-                          setSelectedModelIndex(0);
-                        } else if (command.id === 'video') {
-                          const view = editor?.view;
-                          if (view) {
+                return grouped.map(([groupName, items]) => (
+                  <div key={groupName} className="mb-0.5 last:mb-0">
+                    <div className="px-3 pt-1.5 pb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                      {groupName}
+                    </div>
+                    {items.map(({ cmd: command, flatIndex }) => {
+                      const isSelected = flatIndex === selectedCommandIndex;
+                      const matchedKeyword = command.keywords.find(keyword =>
+                        keyword.toLowerCase().includes(slashQuery.toLowerCase())
+                      );
+
+                      return (
+                        <button
+                          key={command.id}
+                          className={`w-full text-left px-3 py-1.5 flex items-center justify-between gap-3 transition-colors ${
+                            isSelected
+                              ? 'bg-accent text-accent-foreground'
+                              : 'hover:bg-accent/60'
+                          } ${command.disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          onClick={() => {
+                            if (command.disabled) return;
+                            if (command.id === 'model') {
+                              setShowModelSubmenu(true);
+                              setSelectedModelIndex(0);
+                              return;
+                            }
+                            const view = editor?.view;
+                            if (!view) return;
                             const { state } = view;
-                            const { selection } = state;
-                            const { $from } = selection;
+                            const { $from } = state.selection;
                             const tr = state.tr.delete($from.start(), $from.pos);
                             view.dispatch(tr);
-                          }
-
-                          setShowSlashMenu(false);
-                          setSlashQuery('');
-                          setShowVideoInput(true);
-                        } else {
-                          const view = editor?.view;
-                          if (view) {
-                            const { state } = view;
-                            const { selection } = state;
-                            const { $from } = selection;
-                            const tr = state.tr.delete($from.start(), $from.pos);
-                            view.dispatch(tr);
-
                             setShowSlashMenu(false);
                             setSlashQuery('');
-
-                            command.action(editor);
-                          }
-                        }
-                      }
-                    }}
-                    disabled={command.disabled}
-                  >
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-sm leading-tight truncate">{command.name}</span>
-                      <span className="text-xs text-muted-foreground leading-tight truncate">
-                        {command.description}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {matchedKeyword && slashQuery && (
-                        <span className="text-[11px] text-muted-foreground font-mono">
-                          /{matchedKeyword}
-                        </span>
-                      )}
-                      {isSelected && (
-                        <span className="text-[11px] text-muted-foreground">
-                          {command.id === 'model' ? '→' : 'Enter'}
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
+                            if (command.id === 'video') {
+                              setShowVideoInput(true);
+                            } else {
+                              command.action(editor);
+                            }
+                          }}
+                          disabled={command.disabled}
+                        >
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-sm leading-tight truncate">{command.name}</span>
+                            <span className="text-xs text-muted-foreground leading-tight truncate">
+                              {command.description}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {matchedKeyword && slashQuery && (
+                              <span className="text-[11px] text-muted-foreground font-mono">
+                                /{matchedKeyword}
+                              </span>
+                            )}
+                            {isSelected && (
+                              <span className="text-[11px] text-muted-foreground">
+                                {command.id === 'model' ? '→' : 'Enter'}
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ));
+              })()}
 
               {/* 底部提示 */}
               <div className="px-3 pt-1 pb-0.5 mt-1 border-t border-border text-[11px] text-muted-foreground flex items-center justify-between">
