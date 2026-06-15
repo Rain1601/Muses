@@ -76,7 +76,8 @@ backend/venv_deploy/
 # Node.js updates from deployment
 frontend/package-lock.json
 
-# Build artifacts  
+# Build artifacts
 .cursor/
+.claude/
 
 *.pyc
