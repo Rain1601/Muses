@@ -40,6 +40,11 @@ class Settings(BaseSettings):
     aihubmix_api_key: Optional[str] = None
     aihubmix_base_url: str = "https://aihubmix.com/v1"
 
+    # DeepSeek direct API — used by slot-fill when provider="deepseek".
+    # Falls back to per-user encrypted key if/when added; env wins for now.
+    deepseek_api_key: Optional[str] = None
+    deepseek_base_url: str = "https://api.deepseek.com/v1"
+
     # Studio
     enable_studio: bool = True
 

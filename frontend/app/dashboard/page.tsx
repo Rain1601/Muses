@@ -726,9 +726,11 @@ export default function Dashboard() {
   }, []);
 
   // ===== Prompt-driven task system (brackets + ⌘K selection) =====
+  // 中文写作场景下默认走 DeepSeek 直连（OpenAI 兼容,环境变量 DEEPSEEK_API_KEY）。
+  // 旧的 local:claude / sonnet 仍可在配置中切换，但默认不再启动本地 Claude CLI。
   const slotEngine = useSlotEngine(editorState, {
-    provider: "local:claude",
-    model: "sonnet",
+    provider: "deepseek",
+    model: "deepseek-chat",
     autoFireBrackets: true,
   });
   // Stable accessor used by the SlotDecorations plugin to read the map.

@@ -7,23 +7,27 @@ import asyncio
 from typing import Dict, List, Optional, Any
 import openai
 
+from ..config import settings
 from ..models import User
 from ..utils.security import decrypt
 from ..utils.exceptions import ValidationError
 from ..models_config import get_default_model
 
-# 聚合 API base URLs
+# 聚合 API base URLs（含直连 DeepSeek）
 PROVIDER_BASE_URLS = {
     "aihubmix": "https://aihubmix.com/v1",
     "openrouter": "https://openrouter.ai/api/v1",
     "bailian": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "deepseek": settings.deepseek_base_url,
 }
 
 # Provider → User model key field
+# DeepSeek 暂未加用户列；走 env 后备（见 _get_api_key）。
 PROVIDER_KEY_FIELDS = {
     "aihubmix": "aihubmixKey",
     "openrouter": "openrouterKey",
     "bailian": "bailianKey",
+    "deepseek": None,  # env-only for now
 }
 
 
@@ -33,7 +37,7 @@ class UnifiedAIClient:
     @classmethod
     async def call(
         cls,
-        user: User,
+        user: Optional[User],
         messages: List[Dict[str, str]],
         provider: str = None,
         model: str = None,
@@ -75,7 +79,7 @@ class UnifiedAIClient:
         }
 
         # 传递额外参数
-        for key in ["top_p", "frequency_penalty", "presence_penalty"]:
+        for key in ["top_p", "frequency_penalty", "presence_penalty", "response_format", "stop"]:
             if key in kwargs:
                 params[key] = kwargs[key]
 
@@ -85,11 +89,28 @@ class UnifiedAIClient:
         return response.choices[0].message.content or ""
 
     @staticmethod
-    def _get_api_key(user: User, provider: str) -> str:
-        """获取并解密用户的 API key"""
-        field = PROVIDER_KEY_FIELDS.get(provider)
-        if not field:
+    def _get_api_key(user: Optional[User], provider: str) -> str:
+        """获取并解密用户的 API key（DeepSeek 走 env 后备）"""
+        if provider == "deepseek":
+            # 优先用户级（如果以后加上 user.deepseekKey 字段），否则 env。
+            if user is not None:
+                user_key = getattr(user, "deepseekKey", None)
+                if user_key:
+                    return decrypt(user_key)
+            if settings.deepseek_api_key:
+                return settings.deepseek_api_key
+            raise ValidationError(
+                "未配置 DeepSeek API Key，请在 backend/.env 中设置 DEEPSEEK_API_KEY"
+            )
+
+        if provider not in PROVIDER_KEY_FIELDS:
             raise ValidationError(f"Unknown provider: {provider}")
+
+        field = PROVIDER_KEY_FIELDS[provider]
+        if not field:
+            raise ValidationError(f"Provider {provider} has no key field configured")
+        if user is None:
+            raise ValidationError(f"{provider} 需要登录后使用")
 
         encrypted_key = getattr(user, field, None)
         if not encrypted_key:
