@@ -101,6 +101,16 @@ class TextActionRequest(BaseModel):
     provider: Optional[str] = Field(None, description="AI provider to use (openai, claude, gemini)")
     model: Optional[str] = Field(None, description="Specific model to use (gpt-5, claude-sonnet-4-20250514, etc)")
 
+    # ── 文档上下文注入 (Context Injection) ──
+    # 前端可选传入: 文章全文 + 选区位置 + 编辑历史 + 配置, 后端 ContextBuilder 据此拼上下文段。
+    # 都为 None 时退化为旧行为 (仅 system+text+instruction, 无文档上下文)。
+    articleTitle: Optional[str] = Field(None, description="文章标题")
+    articleContent: Optional[str] = Field(None, description="文章全文 plain text (来自 editor.getText())")
+    selectionStart: Optional[int] = Field(None, description="选区起点字符偏移 (含)")
+    selectionEnd: Optional[int] = Field(None, description="选区终点字符偏移 (不含)")
+    editHistory: Optional[List[dict]] = Field(None, description="最近 AI 编辑历史 [{action, summary, accepted?}]")
+    contextConfig: Optional[dict] = Field(None, description="ContextConfig dict (camelCase, 与前端 schema 对齐)")
+
 
 class TextActionResponse(BaseModel):
     actionType: str = Field(..., description="Type of action performed")

@@ -152,6 +152,7 @@ class PromptBuilder:
                         text: str,
                         agent_context: Optional[AgentContext] = None,
                         instruction: Optional[str] = None,
+                        document_context: Optional[str] = None,
                         **kwargs) -> tuple[str, str]:
         """
         为文本操作构建完整的prompt
@@ -161,6 +162,8 @@ class PromptBuilder:
             text: 要处理的文本
             agent_context: Agent上下文
             instruction: 用户的额外指令
+            document_context: 文档上下文 block (由 ContextBuilder 产出, 已是
+                              "# 文档上下文 ..." 完整段落, 直接拼到 user prompt 顶部)
             **kwargs: 其他参数
 
         Returns:
@@ -171,6 +174,11 @@ class PromptBuilder:
 
         # 构建user prompt
         user_sections = []
+
+        # 文档上下文（如有）—— 放在最前面, 让模型先建立文档背景再看选区
+        if document_context:
+            user_sections.append(document_context)
+            user_sections.append("")  # blank line
 
         # 添加待处理文本
         user_sections.append("# 待处理文本")

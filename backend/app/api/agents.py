@@ -337,7 +337,14 @@ async def perform_text_action(
             language=request.language,
             provider=request.provider,
             model=request.model,
-            instruction=request.context  # 将context作为用户指令
+            instruction=request.context,  # 将context作为用户指令
+            # Context Injection (可选)
+            article_title=request.articleTitle,
+            article_content=request.articleContent,
+            selection_start=request.selectionStart,
+            selection_end=request.selectionEnd,
+            edit_history=request.editHistory,
+            context_config=request.contextConfig,
         )
 
         return TextActionResponse(**result)

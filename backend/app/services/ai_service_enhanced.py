@@ -3,11 +3,17 @@
 使用新的prompt系统
 """
 
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, List
 import time
 from ..models import User, Agent
 from ..agent.prompts import PromptBuilder, AgentContext
 from ..agent.prompts.action_config import get_action_by_alias, is_action_enabled, get_default_instruction
+from ..agent.context_builder import (
+    BuildInput,
+    ContextConfig,
+    EditRecord,
+    build_context,
+)
 from .ai_service import AIService
 from ..utils.agent_logger import agent_logger
 
@@ -26,7 +32,14 @@ class EnhancedAIService(AIService):
         language: Optional[str] = None,
         provider: str = None,
         model: str = None,
-        instruction: Optional[str] = None
+        instruction: Optional[str] = None,
+        # ── Context Injection (可选, 全 None 时不注入文档上下文) ──
+        article_title: Optional[str] = None,
+        article_content: Optional[str] = None,
+        selection_start: Optional[int] = None,
+        selection_end: Optional[int] = None,
+        edit_history: Optional[List[dict]] = None,
+        context_config: Optional[dict] = None,
     ) -> Dict[str, Any]:
         """
         执行文本操作（使用新的prompt系统）
@@ -101,6 +114,30 @@ class EnhancedAIService(AIService):
         if task == "translate" and language:
             kwargs["target_language"] = language
 
+        # ── 构建文档上下文 (Context Injection) ──
+        # 只有前端传了 articleContent + 选区位置时才注入; 否则保持旧行为。
+        document_context: Optional[str] = None
+        ctx_mode = "none"
+        ctx_chars = 0
+        if article_content is not None and selection_start is not None and selection_end is not None:
+            try:
+                cfg = ContextConfig.from_dict(context_config)
+                history_records = [EditRecord.from_dict(h) for h in (edit_history or [])]
+                build_result = build_context(BuildInput(
+                    article_title=article_title,
+                    article_content=article_content,
+                    selection_start=selection_start,
+                    selection_end=selection_end,
+                    edit_history=history_records,
+                    config=cfg,
+                ))
+                document_context = build_result.context_block or None
+                ctx_mode = build_result.mode
+                ctx_chars = build_result.chars_injected
+            except Exception as ctx_err:
+                # 上下文构建失败不能阻塞主流程, 记录后回退到旧行为
+                print(f"⚠️ ContextBuilder failed (falling back to no context): {ctx_err}")
+
         # 使用PromptBuilder构建prompt
         prompt_start = time.time()
         system_prompt, user_prompt = PromptBuilder.build_for_action(
@@ -108,6 +145,7 @@ class EnhancedAIService(AIService):
             text=text,
             agent_context=agent_context,
             instruction=final_instruction,
+            document_context=document_context,
             **kwargs
         )
 
@@ -130,7 +168,9 @@ class EnhancedAIService(AIService):
                 "user_instruction": instruction or context,
                 "default_instruction": get_default_instruction(actual_action),
                 "has_user_input": bool(instruction or context),
-                "text_length": len(text)
+                "text_length": len(text),
+                "context_mode": ctx_mode,
+                "context_chars_injected": ctx_chars,
             },
             execution_time=time.time() - prompt_start
         )
