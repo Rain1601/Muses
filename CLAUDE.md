@@ -52,8 +52,12 @@ alembic upgrade head                                # Apply migrations
 The app intentionally has only two user-facing pages:
 
 - `app/page.tsx` — landing + GitHub/Google login (also: "browse as guest" → /dashboard)
-- `app/dashboard/page.tsx` — the entire product (~1400 lines, three-panel workspace)
+- `app/dashboard/page.tsx` — the entire product (~1750 lines, three-panel workspace)
 - `app/auth/callback/` — OAuth callback
+
+Two dev-only prototype routes also exist and are not part of the shipped UX:
+- `app/dashboard-cc/` — Claude Code subprocess prototype (backed by `/api/claude-code`, gated by `enable_studio`)
+- `app/dashboard-pw/` — Prompt Writing / Slot prototype (backed by `/api/slot-fill`)
 
 **API Client** (`lib/api.ts`): Axios instance with auto JWT injection from localStorage. Environment-aware — uses prod API for `muses.ink`, dev API otherwise. 30s timeout, auto-logout on 401. Next.js rewrites `/api/*` to the backend (`next.config.js`), so the frontend uses relative URLs.
 
@@ -61,13 +65,14 @@ The app intentionally has only two user-facing pages:
 - Server state: TanStack Query (`staleTime: 60s`, `refetchOnWindowFocus: false`)
 - Client state: Zustand stores in `store/` — `user.ts` (auth), `aiAssistant.ts` (AI toggle)
 
-**TipTap Editor** (`components/NotionEditor.tsx`, ~52 KB): tables, task lists, syntax-highlighted code blocks, KaTeX math, YouTube/Bilibili embeds, resizable images, collapsible code blocks. Extensions live in `lib/tiptap-extensions/`.
+**TipTap Editor** (`components/NotionEditor.tsx`, ~1240 lines): tables, task lists, syntax-highlighted code blocks, KaTeX math, YouTube/Bilibili embeds, resizable images, collapsible code blocks. Custom extensions in `lib/tiptap-extensions/` — notably `PromptSlot/` (typed slot tokens used by the Prompt Writing prototype + `useSlotEngine`/`CandidatePopover`).
 
 **Text Actions System**: `useTextActions` hook (`lib/hooks/`) provides unified AI text operations (improve, expand, summarize, translate, fix-grammar, brainstorm, custom-prompt). Posts to `/api/agents/text-action`. Gated by AI Assistant toggle.
 
 **Dashboard-embedded components** (everything routes through `app/dashboard/page.tsx`):
-- `studio/ChatPanel` + `studio/SettingsPanel` — right-side AI chat with model picker
+- `studio/SettingsPanel` — model + provider picker (the old `studio/ChatPanel` was removed; the right rail is now history-focused)
 - `studio/DiffView` — accept/reject pane for AI-proposed edits
+- `EditHistoryPanel` + `useEditHistory` hook — in-session AI edit log on the right rail
 - `PublishHistoryPanel` — publish-to-GitHub history (reads `SyncHistory`)
 - `SkillLibrary` — writing skill picker (CRUD against `/api/skills`)
 - `TaskCenter` — background task tracker
@@ -75,7 +80,7 @@ The app intentionally has only two user-facing pages:
 
 ### Backend Architecture
 
-**Router registration** (`app/main.py`): `auth`, `users`, `agents`, `agents_actions`, `articles`, `upload`, `publish`, `image_upload`, `import_files`, `skills`. `studio` is conditionally registered when `settings.enable_studio=True` (off in production — depends on local filesystem).
+**Router registration** (`app/main.py`): always-on — `auth`, `users`, `agents`, `agents_actions`, `articles`, `upload`, `publish`, `image_upload`, `import_files`, `skills`. Gated behind `settings.enable_studio=True` (off in production, all share the local-filesystem requirement): `studio`, `claude_code` (subprocess-driven), `slot_fill` (prompt-slot prototype backend).
 
 **Startup**: `start.py` uses `psutil` to kill existing processes on the port before launching uvicorn. Settings come from `app/config.py` (env vars).
 
@@ -144,7 +149,8 @@ GitHub OAuth callback URL: `http://localhost:8080/api/auth/github/callback`
 - `/api/publish/` — Publish to GitHub repos (+ `/history` reads `SyncHistory`)
 - `/api/upload-image` — GitHub-based image hosting
 - `/api/skills/` — Writing skill library (CRUD + preset seeding)
-- `/api/studio/*` — Dashboard chat + file workspace (dev only)
+- `/api/studio/*` — Dashboard chat + file workspace (dev only, `enable_studio` gate)
+- `/api/claude-code/*`, `/api/slot-fill/*` — Prototype routers, same `enable_studio` gate
 
 ## Git Commit Guidelines
 
