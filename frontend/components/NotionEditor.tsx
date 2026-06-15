@@ -36,7 +36,8 @@ import { VideoInsertDialog } from './VideoInsertDialog';
 import { useImageViewer } from './ImageViewer';
 import TextActionToolbar, { TextActionType, ModelConfig } from './TextActionToolbar';
 import AIDisabledTooltip from './AIDisabledTooltip';
-import { useTextActions } from '@/lib/hooks/useTextActions';
+import { useTextActions, TextActionEditRecord } from '@/lib/hooks/useTextActions';
+import { getContextConfig } from '@/components/ContextConfigPanel';
 import { useAIAssistantStore } from '@/store/aiAssistant';
 // import { SelectionHighlight } from '@/lib/tiptap-extensions/SelectionHighlight';  // 移除装饰系统
 
@@ -59,9 +60,13 @@ interface NotionEditorProps {
    * inert. Both PromptSlot and AiSource are otherwise always loaded.
    */
   getSlotState?: () => Map<string, SlotState>;
+  /** 当前文章标题 — 注入到文档上下文 header */
+  articleTitle?: string;
+  /** 本文最近 AI 编辑记录 — 后端 ContextBuilder 据此拼"最近 N 次编辑"段 */
+  editHistory?: TextActionEditRecord[];
 }
 
-export function NotionEditor({ initialContent = '', onChange, agentId, onSelectionChange, onEditorReady, getSlotState }: NotionEditorProps) {
+export function NotionEditor({ initialContent = '', onChange, agentId, onSelectionChange, onEditorReady, getSlotState, articleTitle, editHistory }: NotionEditorProps) {
   // Component initialized with agentId
   const { isEnabled: aiAssistantEnabled } = useAIAssistantStore();
 
@@ -115,10 +120,35 @@ export function NotionEditor({ initialContent = '', onChange, agentId, onSelecti
         console.log('Selected model config:', modelConfig);
       }
 
+      // ── Context Injection: 从 editor 抽出文档全文 + 选区位置 ──
+      // editor 由 useEditor 创建, 此处通过闭包访问 (调用时已初始化)。
+      // 失败回退到旧行为(不注入文档上下文), 不影响主流程。
+      let articleContent: string | undefined;
+      let selectionStart: number | undefined;
+      let selectionEnd: number | undefined;
+      try {
+        if (editor) {
+          const blockSep = '\n\n';
+          articleContent = editor.getText({ blockSeparator: blockSep });
+          const { from, to } = editor.state.selection;
+          selectionStart = editor.state.doc.textBetween(0, from, blockSep).length;
+          selectionEnd = editor.state.doc.textBetween(0, to, blockSep).length;
+        }
+      } catch (extractErr) {
+        console.warn('Failed to extract editor context (falling back to no doc context):', extractErr);
+        articleContent = undefined;
+      }
+
       const result = await executeAction(agentId, text, actionType, {
         provider: modelConfig?.provider,
         model: modelConfig?.modelId,
-        context: additionalInput
+        context: additionalInput,
+        articleTitle,
+        articleContent,
+        selectionStart,
+        selectionEnd,
+        editHistory,
+        contextConfig: getContextConfig() as unknown as Record<string, unknown>,
       });
 
       return result;
@@ -126,7 +156,10 @@ export function NotionEditor({ initialContent = '', onChange, agentId, onSelecti
       console.error('Text action failed:', error);
       throw error;
     }
-  }, [agentId, executeAction]);
+    // editor 由 useEditor 内部 ref 管理, 此处闭包访问即可; 不加入 deps 避免每次
+    // 编辑器内部刷新都重建 callback (TextActionToolbar 也会跟着 re-mount)。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agentId, executeAction, articleTitle, editHistory]);
 
   // 处理文本替换
   // 注意：这个函数依赖于 editor 实例，但 editor 是由 useEditor hook 创建的

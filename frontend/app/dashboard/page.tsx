@@ -1721,6 +1721,15 @@ export default function Dashboard() {
                   onSelectionChange={handleSelectionChange}
                   onEditorReady={handleEditorReady}
                   getSlotState={getSlotState}
+                  articleTitle={activeDbArticle?.title || activeFile || undefined}
+                  editHistory={editHistory.records
+                    .filter(r => !r.reverted)
+                    .slice(0, 10)
+                    .map(r => ({
+                      action: r.source === "bracket" ? "bracket-fill" : `selection-${r.mode}`,
+                      summary: (r.instruction || r.promptKey || r.newText.slice(0, 40)).slice(0, 100),
+                      accepted: !r.reverted,
+                    }))}
                 />
               </div>
             </div>

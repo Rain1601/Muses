@@ -3,6 +3,13 @@ import { toast } from 'sonner';
 
 export type TextActionType = 'improve' | 'explain' | 'expand' | 'summarize' | 'translate' | 'rewrite';
 
+// 编辑历史条目 — 与后端 EditRecord schema 对齐
+export interface TextActionEditRecord {
+  action: string;
+  summary: string;
+  accepted?: boolean;
+}
+
 interface TextActionRequest {
   agentId: string;
   text: string;
@@ -11,6 +18,14 @@ interface TextActionRequest {
   language?: string;
   provider?: string;
   model?: string;
+
+  // ── Context Injection (可选, 全 undefined 时后端不注入文档上下文) ──
+  articleTitle?: string;
+  articleContent?: string;
+  selectionStart?: number;
+  selectionEnd?: number;
+  editHistory?: TextActionEditRecord[];
+  contextConfig?: Record<string, unknown>;
 }
 
 interface TextActionResponse {
@@ -69,7 +84,19 @@ export const useTextActions = () => {
     agentId: string,
     text: string,
     actionType: TextActionType,
-    options?: { context?: string; language?: string; provider?: string; model?: string }
+    options?: {
+      context?: string;
+      language?: string;
+      provider?: string;
+      model?: string;
+      // Context Injection
+      articleTitle?: string;
+      articleContent?: string;
+      selectionStart?: number;
+      selectionEnd?: number;
+      editHistory?: TextActionEditRecord[];
+      contextConfig?: Record<string, unknown>;
+    }
   ): Promise<TextActionResponse> => {
     return mutation.mutateAsync({
       agentId,
@@ -79,6 +106,12 @@ export const useTextActions = () => {
       language: options?.language,
       provider: options?.provider,
       model: options?.model,
+      articleTitle: options?.articleTitle,
+      articleContent: options?.articleContent,
+      selectionStart: options?.selectionStart,
+      selectionEnd: options?.selectionEnd,
+      editHistory: options?.editHistory,
+      contextConfig: options?.contextConfig,
     });
   };
 

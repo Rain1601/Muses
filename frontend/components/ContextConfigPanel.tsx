@@ -72,6 +72,15 @@ function loadConfig(): ContextConfig {
   }
 }
 
+/**
+ * 外部调用: 同步读取当前持久化的配置。
+ * useTextActions / NotionEditor 在每次 AI 触发时调用此函数, 把结果作为
+ * `contextConfig` 字段塞进 text-action 请求。
+ */
+export function getContextConfig(): ContextConfig {
+  return loadConfig();
+}
+
 // 估算单次注入的字数上限（便于用户判断 token 预算）
 function estimateMaxChars(c: ContextConfig): number {
   const surrounding = c.surrounding.maxCharsPerSide * 2;
