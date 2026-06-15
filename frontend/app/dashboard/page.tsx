@@ -1724,6 +1724,7 @@ export default function Dashboard() {
                   onEditorReady={handleEditorReady}
                   getSlotState={getSlotState}
                   articleTitle={activeDbArticle?.title || activeFile || undefined}
+                  onTitleChange={activeDbArticle ? (t) => renameArticle(activeDbArticle.id, t) : undefined}
                   editHistory={editHistory.records
                     .filter(r => !r.reverted)
                     .slice(0, 10)

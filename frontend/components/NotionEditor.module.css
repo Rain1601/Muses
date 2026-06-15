@@ -180,6 +180,37 @@
   font-size: 0.875em;
 }
 
+/* 编辑区顶部可编辑大标题 (Notion 风格) */
+.docTitleWrap {
+  /* 与 ProseMirror 主体共享内边距, 让标题左缘对齐正文 H1 */
+  padding: 2rem 0 0 0;
+  margin-bottom: 0.25rem;
+}
+
+.docTitle {
+  display: block;
+  width: 100%;
+  font-family: inherit;
+  font-size: 2.5rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: hsl(var(--foreground));
+  background: transparent;
+  border: none;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  padding: 0;
+  margin: 0;
+  /* 跟随父容器宽度自适应换行 */
+  word-break: break-word;
+}
+
+.docTitle::placeholder {
+  color: hsl(var(--muted-foreground));
+  opacity: 0.5;
+}
+
 /* 标题样式 */
 .notionEditor h1 {
   font-size: 2.5rem;

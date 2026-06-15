@@ -60,13 +60,18 @@ interface NotionEditorProps {
    * inert. Both PromptSlot and AiSource are otherwise always loaded.
    */
   getSlotState?: () => Map<string, SlotState>;
-  /** 当前文章标题 — 注入到文档上下文 header */
+  /** 当前文章标题 — 注入到文档上下文 header；同时在编辑区顶部展示为可编辑大标题 */
   articleTitle?: string;
+  /**
+   * 标题变化回调 (trim 后非空才触发, debounce 700ms + onBlur flush)。
+   * 不传 → 编辑区顶部标题区不渲染 (例如 Studio Markdown 文件场景)。
+   */
+  onTitleChange?: (title: string) => void;
   /** 本文最近 AI 编辑记录 — 后端 ContextBuilder 据此拼"最近 N 次编辑"段 */
   editHistory?: TextActionEditRecord[];
 }
 
-export function NotionEditor({ initialContent = '', onChange, agentId, onSelectionChange, onEditorReady, getSlotState, articleTitle, editHistory }: NotionEditorProps) {
+export function NotionEditor({ initialContent = '', onChange, agentId, onSelectionChange, onEditorReady, getSlotState, articleTitle, onTitleChange, editHistory }: NotionEditorProps) {
   // Component initialized with agentId
   const { isEnabled: aiAssistantEnabled } = useAIAssistantStore();
 
@@ -78,6 +83,88 @@ export function NotionEditor({ initialContent = '', onChange, agentId, onSelecti
   const [showModelSubmenu, setShowModelSubmenu] = useState(false);
   const [selectedModelIndex, setSelectedModelIndex] = useState(0);
   const [showVideoInput, setShowVideoInput] = useState(false);
+
+  // ── 编辑区顶部可编辑大标题 ───────────────────────────────
+  // non-controlled with seed: 切文章时父组件用 key 触发 remount, 自然 re-seed。
+  const [titleDraft, setTitleDraft] = useState<string>(articleTitle ?? '');
+  const titleRef = useRef<HTMLTextAreaElement | null>(null);
+  const titleDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const titleLastSavedRef = useRef<string>(articleTitle ?? '');
+  const titleFocusedRef = useRef<boolean>(false);
+
+  // textarea 自动撑高
+  const resizeTitleTextarea = useCallback(() => {
+    const el = titleRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, []);
+
+  // 同文章被 sidebar 重命名时 key 不变 → 非聚焦下回填到 textarea, 聚焦时不动以免抢用户输入
+  useEffect(() => {
+    if (articleTitle === undefined) return;
+    if (titleFocusedRef.current) return;
+    if (articleTitle === titleDraft) return;
+    setTitleDraft(articleTitle);
+    titleLastSavedRef.current = articleTitle;
+    // 下一帧再 resize, 等 React 把新值刷进 DOM
+    requestAnimationFrame(resizeTitleTextarea);
+  }, [articleTitle]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 首次 mount 后撑高一次 (长标题)
+  useEffect(() => { resizeTitleTextarea(); }, [resizeTitleTextarea]);
+
+  const flushTitle = useCallback((value: string) => {
+    if (!onTitleChange) return;
+    const trimmed = value.trim();
+    if (!trimmed) return;  // 空标题不提交, 保留原值; placeholder 占位
+    if (trimmed === titleLastSavedRef.current) return;
+    titleLastSavedRef.current = trimmed;
+    onTitleChange(trimmed);
+  }, [onTitleChange]);
+
+  const handleTitleInput = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const v = e.target.value;
+    setTitleDraft(v);
+    resizeTitleTextarea();
+    if (titleDebounceRef.current) clearTimeout(titleDebounceRef.current);
+    titleDebounceRef.current = setTimeout(() => flushTitle(v), 700);
+  }, [flushTitle, resizeTitleTextarea]);
+
+  const handleTitleBlur = useCallback(() => {
+    titleFocusedRef.current = false;
+    if (titleDebounceRef.current) {
+      clearTimeout(titleDebounceRef.current);
+      titleDebounceRef.current = null;
+    }
+    flushTitle(titleDraft);
+  }, [flushTitle, titleDraft]);
+
+  const handleTitleFocus = useCallback(() => {
+    titleFocusedRef.current = true;
+  }, []);
+
+  const handleTitleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // IME 候选 Enter 不能误触发失焦
+    if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+      e.preventDefault();
+      titleRef.current?.blur();
+    }
+  }, []);
+
+  // unmount 时 flush 未保存改动, 防止切文章时丢
+  useEffect(() => {
+    return () => {
+      if (titleDebounceRef.current) {
+        clearTimeout(titleDebounceRef.current);
+        titleDebounceRef.current = null;
+      }
+      const trimmed = titleDraft.trim();
+      if (onTitleChange && trimmed && trimmed !== titleLastSavedRef.current) {
+        onTitleChange(trimmed);
+      }
+    };
+  }, []);  // eslint-disable-line react-hooks/exhaustive-deps
 
   // 文本操作工具栏状态
   const [showTextActionToolbar, setShowTextActionToolbar] = useState(false);
@@ -1073,6 +1160,23 @@ export function NotionEditor({ initialContent = '', onChange, agentId, onSelecti
 
   return (
     <div className={`w-full ${styles.notionEditor} relative`}>
+      {articleTitle !== undefined && onTitleChange && (
+        <div className={styles.docTitleWrap}>
+          <textarea
+            ref={titleRef}
+            className={styles.docTitle}
+            value={titleDraft}
+            placeholder="Untitled"
+            rows={1}
+            maxLength={200}
+            spellCheck={false}
+            onChange={handleTitleInput}
+            onBlur={handleTitleBlur}
+            onFocus={handleTitleFocus}
+            onKeyDown={handleTitleKeyDown}
+          />
+        </div>
+      )}
       <ImageViewerContext.Provider value={{ openViewer }}>
         <EditorContent
           editor={editor}
