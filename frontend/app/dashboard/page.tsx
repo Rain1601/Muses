@@ -8,6 +8,7 @@ import { NotionEditor } from "@/components/NotionEditor";
 import SettingsPanel from "@/components/studio/SettingsPanel";
 import PublishHistoryPanel from "@/components/PublishHistoryPanel";
 import SkillLibrary from "@/components/SkillLibrary";
+import ContextConfigPanel from "@/components/ContextConfigPanel";
 import { TaskCenter } from "@/components/TaskCenter";
 import { FileImport } from "@/components/FileImport";
 import { persistSelection, clearPersistedSelection } from "@/lib/tiptap-extensions/SelectionPersistence";
@@ -123,6 +124,28 @@ export default function Dashboard() {
   const [fileMenuOpen, setFileMenuOpen] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [sidebarTab, setSidebarTab] = useState<"article" | "agent" | "skill">("article");
+
+  // ── URL hash <-> sidebarTab 双向同步 ──
+  // /dashboard#article / #agent / #skill 直达，浏览器前进/后退也跟着切
+  const goToTab = useCallback((tab: "article" | "agent" | "skill") => {
+    setSidebarTab(tab);
+    if (typeof window !== "undefined" && window.location.hash !== `#${tab}`) {
+      history.pushState(null, "", `#${tab}`);
+    }
+  }, []);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const valid = ["article", "agent", "skill"] as const;
+    const apply = () => {
+      const h = window.location.hash.slice(1);
+      if ((valid as readonly string[]).includes(h)) {
+        setSidebarTab(h as typeof valid[number]);
+      }
+    };
+    apply();
+    window.addEventListener("hashchange", apply);
+    return () => window.removeEventListener("hashchange", apply);
+  }, []);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const darkMode = true; // Dark-only UI — warm minimalist design
   const [showSettings, setShowSettings] = useState(false);
@@ -624,7 +647,7 @@ export default function Dashboard() {
       // ⌘⇧N — new article.
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === "n" || e.key === "N")) {
         e.preventDefault();
-        setSidebarTab("article");
+        goToTab("article");
         startCreateFile();
         return;
       }
@@ -1186,7 +1209,7 @@ export default function Dashboard() {
         <div className={s.topbarCenter}>
           <div className={s.topTabGroup}>
             {(["article", "agent", "skill"] as const).map(tab => (
-              <button key={tab} onClick={() => setSidebarTab(tab)} className={sidebarTab === tab ? s.topTabActive : s.topTab}>
+              <button key={tab} onClick={() => goToTab(tab)} className={sidebarTab === tab ? s.topTabActive : s.topTab}>
                 {tab === "article" ? "Article" : tab === "agent" ? "Agent" : "Skill"}
               </button>
             ))}
@@ -1346,11 +1369,8 @@ export default function Dashboard() {
       {/* Main */}
       <div className={s.main}>
         {sidebarTab === "agent" ? (
-          <div className={s.fullPlaceholder}>
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#3F3A36" strokeWidth="1.5"><path d="M12 2a4 4 0 0 1 4 4v2a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4z"/><path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/></svg>
-            <p className={s.fullPlaceholderTitle}>Agent Management</p>
-            <p className={s.fullPlaceholderDesc}>Create and manage AI writing agents with custom tones, styles, and prompts.</p>
-            <p className={s.fullPlaceholderSub}>Coming soon</p>
+          <div style={{ flex: 1, overflowY: "auto" }}>
+            <ContextConfigPanel />
           </div>
         ) : sidebarTab === "skill" ? (
           <SkillLibrary />
