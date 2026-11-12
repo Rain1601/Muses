@@ -77,6 +77,8 @@ Two dev-only prototype routes also exist and are not part of the shipped UX:
 - `studio/SettingsPanel` — model + provider picker (`studio/ChatPanel.tsx` still exists on disk but is no longer mounted)
 - `docs/CommentsPanel` — the right rail: open suggestions + comment threads. Claude's edits never go straight into the text: they land as suggestions (`lib/tiptap-extensions/Suggestion.ts`, `<del>`/`<ins data-suggestion-id>` marks, derived by scanning the doc via `useSuggestions`) that are accepted/rejected in place, one undo step each. ⌘K on a selection opens a Claude thread on it (`useComments.createThread`)
 - `docs/DocWriterBar` + `PendingBlock` — outline-first drafting
+- Chips + charts (`lib/tiptap-extensions/Chips.tsx`, `ChartBlock.tsx`) — inline `dateChip` / `statusChip` atoms and a `chartBlock` drawn as SVG from CSV rows (bar/line, ≤ 6 series, colors = validated dark categorical slots; "用上方表格" or `/图表` right under a table takes its rows). All serialise to plain-reading HTML (`<span>` value, `<figure data-chart>` + `<table>`). Slash menu opens at line start, after whitespace or after CJK punctuation
+- `docs/ExportMenu` + `lib/export.ts` — browser-side export of the open tab to Markdown (GFM tables), standalone HTML, or PDF via the print dialog; open suggestions export as not accepted
 - `PublishHistoryPanel` — publish-to-GitHub history (reads `SyncHistory`)
 - `SkillLibrary` — writing skill picker (CRUD against `/api/skills`)
 - `TaskCenter` — background task tracker

@@ -1,6 +1,6 @@
 # Muses × Claude Docs 重构提案
 
-状态：范围已确认（交互 + 数据 + 后端），P1–P4 已完成（2026-11-12）。P4 偏离：正文仍存 HTML，未改 TipTap JSON（发布/翻译/导入都读 HTML，P5 需要块 id 时再议）；主 tab = Article.content，额外 tab 存 ArticleTab。dashboard-pw 原型仍引用 PromptSlot / useSlotEngine / CandidatePopover / SelectionTaskMenu，这些文件留到 P6 与原型一起删
+状态：范围已确认（交互 + 数据 + 后端），P1–P5 已完成（2026-11-12）。P5 偏离：导出在浏览器里完成（无后端接口），PDF 走打印对话框；状态 chip 的选项固定为 4 个，没有 @人 chip（单用户）。P4 偏离：正文仍存 HTML，未改 TipTap JSON（发布/翻译/导入都读 HTML，P5 需要块 id 时再议）；主 tab = Article.content，额外 tab 存 ArticleTab。dashboard-pw 原型仍引用 PromptSlot / useSlotEngine / CandidatePopover / SelectionTaskMenu，这些文件留到 P6 与原型一起删
 
 ## 1. "Artifacts 里的 doc" 是什么
 

@@ -20,6 +20,7 @@ import { useComments } from "@/lib/hooks/useComments";
 import { useSuggestions } from "@/lib/hooks/useSuggestions";
 import DocTabs, { type DocTab } from "@/components/docs/DocTabs";
 import VersionHistory from "@/components/docs/VersionHistory";
+import ExportMenu from "@/components/docs/ExportMenu";
 import { createPortal } from "react-dom";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import s from "./dashboard.module.css";
@@ -31,9 +32,11 @@ const getTurndownService = async () => {
   // Pending blocks (outline placeholders) stay as raw HTML so a .md round-trip
   // keeps them editable; marked passes the <div> through on load.
   // Same for comment anchors (<span data-comment-id>) and open suggestions
-  // (<ins>/<del data-suggestion-id>), so threads and suggestions survive.
+  // (<ins>/<del data-suggestion-id>), charts and chips, so they all survive.
   (td as any).keep((node: HTMLElement) =>
     (node.nodeName === "DIV" && node.hasAttribute("data-pending-block")) ||
+    (node.nodeName === "FIGURE" && node.hasAttribute("data-chart")) ||
+    (node.nodeName === "SPAN" && (node.hasAttribute("data-date-chip") || node.hasAttribute("data-status-chip"))) ||
     (node.nodeName === "SPAN" && node.hasAttribute("data-comment-id")) ||
     ((node.nodeName === "INS" || node.nodeName === "DEL") && node.hasAttribute("data-suggestion-id")));
   return td;
@@ -1607,7 +1610,20 @@ export default function Dashboard() {
                     onToggleHistory={() => setShowHistory(v => !v)}
                   />
                 )}
-                {editorState && <DocWriterBar key={`${activeFile || activeDbArticle?.id || "empty"}:${activeTabId}`} editor={editorState} title={activeDbArticle?.title || activeFile || undefined} />}
+                {editorState && (
+                  <div className="doc-toolbar">
+                    <div className="doc-toolbar-main">
+                      <DocWriterBar key={`${activeFile || activeDbArticle?.id || "empty"}:${activeTabId}`} editor={editorState} title={activeDbArticle?.title || activeFile || undefined} />
+                    </div>
+                    <ExportMenu
+                      editor={editorState}
+                      title={[
+                        activeDbArticle?.title || activeFile?.replace(/\.md$/, "") || "muses-doc",
+                        activeTabId !== "main" ? tabs.find(t => t.id === activeTabId)?.name : null,
+                      ].filter(Boolean).join(" - ")}
+                    />
+                  </div>
+                )}
                 <NotionEditor
                   key={`${activeFile || activeDbArticle?.id || "empty"}:${activeTabId}:${editorEpoch}`}
                   initialContent={content}

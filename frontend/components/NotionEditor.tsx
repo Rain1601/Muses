@@ -12,6 +12,7 @@ import '../styles/editor-line-numbers.css';
 import '../styles/notion-drag-handle.css';
 import '../styles/pending-block.css';
 import '../styles/comments.css';
+import '../styles/chips-charts.css';
 import StarterKit from '@tiptap/starter-kit';
 import { SlotDecorations, AiSource } from '@/lib/tiptap-extensions/PromptSlot';
 import type { SlotState } from '@/lib/tiptap-extensions/PromptSlot';
@@ -27,6 +28,8 @@ import DragHandle from '@tiptap/extension-drag-handle';
 import PendingBlock from '@/lib/tiptap-extensions/PendingBlock';
 import CommentAnchor from '@/lib/tiptap-extensions/CommentAnchor';
 import { SuggestionInsert, SuggestionDelete, proposeReplacement } from '@/lib/tiptap-extensions/Suggestion';
+import { DateChip, StatusChip } from '@/lib/tiptap-extensions/Chips';
+import ChartBlock, { tableNodeToCsv } from '@/lib/tiptap-extensions/ChartBlock';
 // Dropcursor 已包含在 StarterKit 中，无需单独导入
 import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
@@ -369,6 +372,17 @@ export function NotionEditor({ initialContent = '', onChange, agentId, onSelecti
     }
   }, []);
 
+  // "/" opens the menu at line start, after whitespace, or after CJK punctuation
+  // ("状态：/日期"), so inline chips can be inserted mid-line. Returns where the
+  // "/query" text starts so a command deletes just that, not the whole line.
+  const slashTrigger = (state: any): { from: number; query: string } | null => {
+    const { $from } = state.selection;
+    if (!state.selection.empty || !$from.parent.isTextblock) return null;
+    const line = state.doc.textBetween($from.start(), $from.pos, undefined, '\ufffc');
+    const m = line.match(/(?:^|[\s，。：；、！？（）【】「」])\/([^\s/]*)$/);
+    return m ? { from: $from.pos - m[1].length - 1, query: m[1] } : null;
+  };
+
   // 定义斜杠命令列表 (Notion 风格分组)
   const slashCommands: Array<{
     id: string;
@@ -474,6 +488,37 @@ export function NotionEditor({ initialContent = '', onChange, agentId, onSelecti
     },
 
     // 插入
+    {
+      id: 'date',
+      name: '日期',
+      description: '可点选修改的日期（截止、评审…）',
+      group: '插入',
+      keywords: ['date', 'rq', '日期', 'riqi', 'deadline', '截止'],
+      action: (editor) => editor.chain().focus().insertDateChip().run(),
+    },
+    {
+      id: 'status',
+      name: '状态',
+      description: '未开始 / 进行中 / 已完成 / 受阻',
+      group: '插入',
+      keywords: ['status', 'zt', '状态', 'zhuangtai', 'dropdown', '下拉'],
+      action: (editor) => editor.chain().focus().insertStatusChip().run(),
+    },
+    {
+      id: 'chart',
+      name: '图表',
+      description: '柱状 / 折线图；紧跟在表格下方时用表格的数据',
+      group: '插入',
+      keywords: ['chart', 'tb', '图表', 'tubiao', 'graph', 'bar', 'line', '柱状', '折线'],
+      action: (editor) => {
+        // Right under a table → draw that table's rows.
+        const { $from } = editor.state.selection;
+        const blockStart = $from.depth >= 1 ? $from.before(1) : $from.pos;
+        const above = editor.state.doc.resolve(blockStart).nodeBefore;
+        const csv = above?.type.name === 'table' ? tableNodeToCsv(above) : undefined;
+        editor.chain().focus().insertChart(csv ? { csv } : {}).run();
+      },
+    },
     {
       id: 'image',
       name: '图片',
@@ -683,11 +728,11 @@ export function NotionEditor({ initialContent = '', onChange, agentId, onSelecti
         return true;
       }
 
-      const currentLine = state.doc.textBetween($from.start(), $from.pos);
+      const trigger = slashTrigger(state);
 
       // 更新查询字符串（仅在主菜单时）
-      if (currentLine.startsWith('/') && !slashMenuState.current.showModelSubmenu) {
-        const query = currentLine.substring(1);
+      if (trigger && !slashMenuState.current.showModelSubmenu) {
+        const query = trigger.query;
         setTimeout(() => setSlashQuery(query), 0);
       }
 
@@ -730,11 +775,17 @@ export function NotionEditor({ initialContent = '', onChange, agentId, onSelecti
 
       // Enter 执行选中的命令
       if (event.key === 'Enter') {
-        event.preventDefault();
-
         const filteredCmds = slashMenuState.current.filteredCommands;
         const selectedIndex = slashMenuState.current.selectedCommandIndex;
         const selectedCommand = filteredCmds[selectedIndex];
+        // No matching command (e.g. "和/或" typed as prose) → close the menu, keep Enter.
+        if (!selectedCommand && !slashMenuState.current.showModelSubmenu) {
+          setShowSlashMenu(false);
+          setSlashQuery('');
+          return false;
+        }
+        event.preventDefault();
+        const slashFrom = slashTrigger(state)?.from ?? $from.start();
 
         if (selectedCommand && !selectedCommand.disabled) {
           if (selectedCommand.id === 'model') {
@@ -743,15 +794,15 @@ export function NotionEditor({ initialContent = '', onChange, agentId, onSelecti
             setSelectedModelIndex(0);
           } else if (selectedCommand.id === 'video') {
             // 视频命令：删除斜杠文本，显示对话框
-            const tr = state.tr.delete($from.start(), $from.pos);
+            const tr = state.tr.delete(slashFrom, $from.pos);
             view.dispatch(tr);
 
             setShowSlashMenu(false);
             setSlashQuery('');
             setShowVideoInput(true);
           } else {
-            // 其他命令：删除斜杠文本，执行命令，隐藏菜单
-            const tr = state.tr.delete($from.start(), $from.pos);
+            // 其他命令：删除 "/query" 文本，执行命令，隐藏菜单
+            const tr = state.tr.delete(slashFrom, $from.pos);
             view.dispatch(tr);
 
             setShowSlashMenu(false);
@@ -948,6 +999,9 @@ export function NotionEditor({ initialContent = '', onChange, agentId, onSelecti
       CommentAnchor,
       SuggestionInsert,
       SuggestionDelete,
+      DateChip,
+      StatusChip,
+      ChartBlock,
       ...(getSlotState ? [SlotDecorations({ getState: getSlotState })] : []),
       Highlight,
       CollapsibleCodeBlock,
@@ -1023,12 +1077,12 @@ export function NotionEditor({ initialContent = '', onChange, agentId, onSelecti
       const { state } = editor;
       const { selection } = state;
       const { $from } = selection;
-      const currentLine = state.doc.textBetween($from.start(), $from.pos);
+      const trigger = slashTrigger(state);
 
-      // 检查当前行是否以斜杠开头
-      if (currentLine.startsWith('/')) {
+      // 光标前是一个 "/query"（行首、空白或中文标点之后）
+      if (trigger) {
         // 如果只是斜杠，显示菜单
-        if (currentLine === '/') {
+        if (trigger.query === '') {
           // 计算菜单位置
           const coords = editor.view.coordsAtPos($from.pos);
           const editorRect = editor.view.dom.getBoundingClientRect();
@@ -1044,7 +1098,7 @@ export function NotionEditor({ initialContent = '', onChange, agentId, onSelecti
         }
         // 如果斜杠后面有内容，更新查询
         else {
-          setSlashQuery(currentLine.substring(1));
+          setSlashQuery(trigger.query);
           // 确保菜单仍然显示
           if (!showSlashMenu) {
             const coords = editor.view.coordsAtPos($from.pos);
@@ -1058,7 +1112,7 @@ export function NotionEditor({ initialContent = '', onChange, agentId, onSelecti
           }
         }
       }
-      // 如果当前行不以斜杠开头，隐藏菜单
+      // 光标前没有 "/query"，隐藏菜单
       else {
         if (showSlashMenu) {
           setShowSlashMenu(false);
@@ -1438,7 +1492,7 @@ export function NotionEditor({ initialContent = '', onChange, agentId, onSelecti
                             if (!view) return;
                             const { state } = view;
                             const { $from } = state.selection;
-                            const tr = state.tr.delete($from.start(), $from.pos);
+                            const tr = state.tr.delete(slashTrigger(state)?.from ?? $from.start(), $from.pos);
                             view.dispatch(tr);
                             setShowSlashMenu(false);
                             setSlashQuery('');
