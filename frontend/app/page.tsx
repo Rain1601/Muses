@@ -136,7 +136,7 @@ function GoogleIcon({ className }: { className?: string }) {
 }
 
 export default function HomePage() {
-  const { user, isLoading, login, loginWithGoogle, checkAuth } = useUserStore();
+  const { user, isLoading, login, loginWithGoogle, checkAuth, enterGuestMode } = useUserStore();
   const router = useRouter();
 
   useEffect(() => { checkAuth(); }, [checkAuth]);
@@ -170,7 +170,7 @@ export default function HomePage() {
         </button>
         <p className={s.subtitle}>开始您的创作之旅</p>
         <div className={s.guestRow}>
-          <button onClick={() => router.push("/dashboard")} className={s.guestLink}>
+          <button onClick={() => { enterGuestMode(); router.push("/dashboard"); }} className={s.guestLink}>
             以访客身份浏览
           </button>
         </div>

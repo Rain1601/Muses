@@ -44,15 +44,15 @@ interface FolderNode { name: string; path: string; files: FileItem[]; folders: F
 
 export default function Dashboard() {
   const router = useRouter();
-  const { user, isLoading, isAuthenticated, checkAuth } = useUserStore();
+  const { user, isLoading, isAuthenticated, isGuest, checkAuth } = useUserStore();
   useEffect(() => { checkAuth(); }, [checkAuth]);
 
-  // Redirect to login if not authenticated
+  // Redirect to login unless authenticated or browsing as guest
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    if (!isLoading && !isAuthenticated && !isGuest) {
       router.replace("/");
     }
-  }, [isLoading, isAuthenticated, router]);
+  }, [isLoading, isAuthenticated, isGuest, router]);
 
   const [files, setFiles] = useState<FileItem[]>([]);
   const [dbArticles, setDbArticles] = useState<DBArticle[]>([]);
@@ -1011,7 +1011,7 @@ export default function Dashboard() {
   const openSlotState = openSlot ? slotEngine.slots.get(openSlot.key) : undefined;
 
   // Show nothing while checking auth (prevents flash before redirect)
-  if (isLoading || !isAuthenticated) {
+  if (isLoading || (!isAuthenticated && !isGuest)) {
     return <div className={s.shell} />;
   }
 
@@ -1482,7 +1482,7 @@ export default function Dashboard() {
                                 )}
                                 {folderFiles.map(f => (
                                   <div key={f.path} className={s.fileRow} style={{ paddingLeft: "2.25rem" }}>
-                                    <button onClick={() => openFile(f.path)} className={activeFile === f.path ? s.fileItemActive : s.fileItem}>
+                                    <button onClick={() => openFile(f.path)} title={f.name.replace(/\.md$/, "")} className={activeFile === f.path ? s.fileItemActive : s.fileItem}>
                                       <svg className={s.fileIcon} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                                       <span className={s.fileInfo}>
                                         <span className={s.fileTitle}>{f.name.replace(/\.md$/, "")}</span>
@@ -1525,7 +1525,7 @@ export default function Dashboard() {
                       })}
                       {files.filter(f => !f.path.includes("/")).map(f => (
                         <div key={f.path} className={s.fileRow}>
-                          <button onClick={() => openFile(f.path)} className={activeFile === f.path ? s.fileItemActive : s.fileItem}>
+                          <button onClick={() => openFile(f.path)} title={f.name.replace(/\.md$/, "")} className={activeFile === f.path ? s.fileItemActive : s.fileItem}>
                             <svg className={s.fileIcon} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                             <span className={s.fileInfo}>
                               <span className={s.fileTitle}>{f.name.replace(/\.md$/, "")}</span>
@@ -1619,7 +1619,7 @@ export default function Dashboard() {
                                   />
                                 </div>
                               ) : (
-                                <button onClick={() => openDbArticle(a)} className={isActive ? s.fileItemActive : s.fileItem}>
+                                <button onClick={() => openDbArticle(a)} title={a.title} className={isActive ? s.fileItemActive : s.fileItem}>
                                   <svg className={s.fileIcon} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                                   <span className={s.fileInfo}>
                                     <span className={s.fileTitle}>{a.title}</span>
