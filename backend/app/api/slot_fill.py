@@ -38,12 +38,12 @@ LOCAL_CLAUDE_MODELS = ["sonnet", "opus", "haiku"]
 LOCAL_CODEX_MODELS = ["(default)"]  # codex default model is picked by user's ~/.codex/config
 
 # Aggregated provider model whitelist — surface only the most useful ones in the picker.
-# DeepSeek direct uses its native model IDs (deepseek-chat = V3, deepseek-reasoner = R1).
+# DeepSeek direct uses the official Flash and Pro model IDs.
 AGG_MODELS_BY_PROVIDER = {
     "aihubmix":   ["claude-sonnet-4-5-20250929", "claude-opus-4-1-20250805", "gpt-4o", "gemini-2.5-pro", "deepseek-chat"],
     "openrouter": ["claude-sonnet-4-5-20250929", "gpt-4o", "deepseek-chat"],
     "bailian":    ["qwen-max", "qwen-plus", "deepseek-chat"],
-    "deepseek":   ["deepseek-chat", "deepseek-reasoner"],
+    "deepseek":   ["deepseek-flash", "deepseek-v4-pro"],
 }
 
 SYSTEM_PROMPT = """你是 inline 写作协作者。用户在文章里标记了一个 TODO 位置, 给你前后文 + 一条短指令, 要你产出"应填入该位置的文本"。

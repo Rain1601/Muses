@@ -22,12 +22,12 @@ PROVIDER_BASE_URLS = {
 }
 
 # Provider → User model key field
-# DeepSeek 暂未加用户列；走 env 后备（见 _get_api_key）。
+# DeepSeek 支持用户密钥，并保留本地环境变量后备。
 PROVIDER_KEY_FIELDS = {
     "aihubmix": "aihubmixKey",
     "openrouter": "openrouterKey",
     "bailian": "bailianKey",
-    "deepseek": None,  # env-only for now
+    "deepseek": "deepseekKey",
 }
 
 
@@ -68,7 +68,7 @@ class UnifiedAIClient:
         if not base_url:
             raise ValidationError(f"Unsupported provider: {provider}")
 
-        client = openai.OpenAI(api_key=api_key, base_url=base_url)
+        client = openai.OpenAI(api_key=api_key, base_url=base_url, timeout=60.0, max_retries=0)
 
         # 构建请求参数
         params = {
@@ -78,6 +78,9 @@ class UnifiedAIClient:
             "max_tokens": max_tokens,
         }
 
+        if provider == "deepseek":
+            params["extra_body"] = {"thinking": {"type": "disabled"}}
+
         # 传递额外参数
         for key in ["top_p", "frequency_penalty", "presence_penalty", "response_format", "stop"]:
             if key in kwargs:
@@ -85,14 +88,17 @@ class UnifiedAIClient:
 
         # 同步 OpenAI 客户端发起 HTTP 请求会阻塞 event loop —— 用 to_thread 把它扔到
         # 线程池,uvicorn 才能在 LLM 等待期间继续服务别的请求(包括响应当前请求本身)。
-        response = await asyncio.to_thread(client.chat.completions.create, **params)
-        return response.choices[0].message.content or ""
+        try:
+            response = await asyncio.to_thread(client.chat.completions.create, **params)
+            return response.choices[0].message.content or ""
+        finally:
+            client.close()
 
     @staticmethod
     def _get_api_key(user: Optional[User], provider: str) -> str:
         """获取并解密用户的 API key（DeepSeek 走 env 后备）"""
         if provider == "deepseek":
-            # 优先用户级（如果以后加上 user.deepseekKey 字段），否则 env。
+            # 优先用户级密钥，否则使用本地环境变量。
             if user is not None:
                 user_key = getattr(user, "deepseekKey", None)
                 if user_key:
@@ -100,7 +106,7 @@ class UnifiedAIClient:
             if settings.deepseek_api_key:
                 return settings.deepseek_api_key
             raise ValidationError(
-                "未配置 DeepSeek API Key，请在 backend/.env 中设置 DEEPSEEK_API_KEY"
+                "未配置 DeepSeek API Key，请在设置 → 模型中添加"
             )
 
         if provider not in PROVIDER_KEY_FIELDS:
@@ -129,9 +135,11 @@ class UnifiedAIClient:
             return "openrouter"
         elif user.bailianKey:
             return "bailian"
+        elif user.deepseekKey or settings.deepseek_api_key:
+            return "deepseek"
         else:
             raise ValidationError(
-                "未配置任何 AI API Key，请在设置中添加 AIHubMix、OpenRouter 或百炼的 API Key"
+                "未配置任何 AI API Key，请在设置中添加 DeepSeek、AIHubMix、OpenRouter 或百炼的 API Key"
             )
 
 

@@ -20,6 +20,7 @@ import CandidatePopover, { type AcceptMode } from "@/components/CandidatePopover
 import SelectionTaskMenu from "@/components/SelectionTaskMenu";
 import EditHistoryPanel from "@/components/EditHistoryPanel";
 import { createPortal } from "react-dom";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import s from "./dashboard.module.css";
 
 // HTML → Markdown converter (lazy loaded)
@@ -163,13 +164,15 @@ export default function Dashboard() {
   const [qsQuery, setQsQuery] = useState("");
   const [qsIndex, setQsIndex] = useState(0);
   const [showTranslate, setShowTranslate] = useState(false);
+  const [translateModel, setTranslateModel] = useState("");
   const [translateLang, setTranslateLang] = useState("en");
   const [translateMode, setTranslateMode] = useState<"translated" | "bilingual">("translated");
   const [translating, setTranslating] = useState(false);
   const [hasRunningTasks, setHasRunningTasks] = useState(false);
   const [publishingFile, setPublishingFile] = useState<string | null>(null);
   const [publishStatus, setPublishStatus] = useState<{ type: "success" | "error" | "info"; msg: string } | null>(null);
-  const translatePopoverRef = useRef<HTMLDivElement>(null);
+  const [translateError, setTranslateError] = useState<string | null>(null);
+  const translationPending = useRef(false);
   const runningTaskIdsRef = useRef<Set<string>>(new Set());
   const createInputRef = useRef<HTMLInputElement>(null);
 
@@ -230,29 +233,31 @@ export default function Dashboard() {
     return () => { clearInterval(interval); window.removeEventListener("muses-task-update", onUpdate); };
   }, []);
 
-  // ===== Click outside closes translate popover =====
-  useEffect(() => {
-    if (!showTranslate) return;
-    const handler = (e: MouseEvent) => {
-      if (translatePopoverRef.current && !translatePopoverRef.current.contains(e.target as Node)) {
-        setShowTranslate(false);
-      }
-    };
-    setTimeout(() => window.addEventListener("click", handler), 0);
-    return () => window.removeEventListener("click", handler);
-  }, [showTranslate]);
-
   // ===== Trigger translation =====
   const doTranslate = useCallback(async () => {
-    if (!activeDbArticle) return;
+    if (!activeDbArticle || translationPending.current) return;
+    translationPending.current = true;
     setTranslating(true);
+    setTranslateError(null);
     try {
       const token = localStorage.getItem("token");
-      if (!token) return;
+      if (!token) throw new Error("请先登录后再翻译");
+      const snapshot = contentRef.current;
+      if (snapshot !== savedContentRef.current) {
+        const saved = await fetch(`${API_BASE}/api/articles/${activeDbArticle.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ content: snapshot }),
+          signal: AbortSignal.timeout(30000),
+        });
+        if (!saved.ok) throw new Error("文章保存失败，请重试后再翻译");
+        setSavedContent(snapshot);
+      }
       const res = await fetch(`${API_BASE}/api/articles/${activeDbArticle.id}/translate`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ targetLanguage: translateLang, mode: translateMode }),
+        body: JSON.stringify({ targetLanguage: translateLang, mode: translateMode, model: translateModel || undefined }),
+        signal: AbortSignal.timeout(30000),
       });
       const result = await res.json();
       if (res.ok && result.taskId) {
@@ -279,17 +284,17 @@ export default function Dashboard() {
         setPublishStatus({ type: "info", msg: "翻译任务已启动 — 在任务中心查看进度" });
         setTimeout(() => setPublishStatus(null), 3500);
         setShowTranslate(false);
+        setShowTaskCenter(true);
       } else {
-        setPublishStatus({ type: "error", msg: result.detail || "翻译启动失败" });
-        setTimeout(() => setPublishStatus(null), 3500);
+        setTranslateError(result.detail || "翻译启动失败");
       }
     } catch (e: any) {
-      setPublishStatus({ type: "error", msg: e.message || "翻译启动失败" });
-      setTimeout(() => setPublishStatus(null), 3500);
+      setTranslateError(e.name === "TimeoutError" ? "请求超时，请先在任务中心确认是否已创建任务" : e.message || "翻译启动失败");
     } finally {
+      translationPending.current = false;
       setTranslating(false);
     }
-  }, [activeDbArticle, translateLang]);
+  }, [activeDbArticle, translateLang, translateMode, translateModel]);
 
   // ===== File operations =====
   const loadFiles = useCallback(async () => {
@@ -1223,9 +1228,10 @@ export default function Dashboard() {
               <button onClick={() => saveFile()} className={s.btnGhost}>Save</button>
 
               {/* Translate — only enabled for DB articles */}
-              <div style={{ position: "relative" }} ref={translatePopoverRef}>
+              <Popover modal open={showTranslate} onOpenChange={(open) => { setShowTranslate(open); if (open) setTranslateError(null); }}>
+                <PopoverTrigger asChild>
                 <button
-                  onClick={(e) => { e.stopPropagation(); activeDbArticle && setShowTranslate(v => !v); }}
+                  aria-label="翻译文章"
                   disabled={!activeDbArticle}
                   className={s.iconBtn}
                   title={activeDbArticle ? "翻译这篇文章(异步,任务中心查进度)" : "选中文章后可翻译"}
@@ -1239,21 +1245,25 @@ export default function Dashboard() {
                     <path d="M14 18h6"/>
                   </svg>
                 </button>
-                {showTranslate && activeDbArticle && (
-                  <div
-                    onClick={(e) => e.stopPropagation()}
+                </PopoverTrigger>
+                {activeDbArticle && (
+                  <PopoverContent
+                    align="end" sideOffset={8} collisionPadding={12}
+                    aria-labelledby="translate-title"
+                    aria-describedby="translate-description"
+                    className={s.translatePopover}
                     style={{
-                      position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 100,
-                      width: 280, padding: "0.875rem",
+                      zIndex: 400, width: "min(320px, calc(100vw - 24px))", padding: "0.875rem",
+                      maxHeight: "var(--radix-popover-content-available-height)", overflowY: "auto",
                       background: "#1C1917", border: "1px solid #3F3A36", borderRadius: 10,
                       boxShadow: "0 12px 32px rgba(0,0,0,0.5)",
                     }}
                   >
-                    <div style={{ fontSize: "0.625rem", letterSpacing: "0.12em", textTransform: "uppercase", color: "#78716C", marginBottom: "0.5rem", fontWeight: 500 }}>
-                      Translate this article
+                    <div id="translate-title" style={{ fontSize: "0.625rem", letterSpacing: "0.12em", textTransform: "uppercase", color: "#78716C", marginBottom: "0.5rem", fontWeight: 500 }}>
+                      翻译文章
                     </div>
-                    <div style={{ fontSize: "0.75rem", color: "#A8A29E", marginBottom: "0.75rem", lineHeight: 1.5 }}>
-                      异步生成新文章,可在任务中心查看进度。
+                    <div id="translate-description" style={{ fontSize: "0.75rem", color: "#A8A29E", marginBottom: "0.75rem", lineHeight: 1.5 }}>
+                      保存当前内容并生成新文章，原文保留。提交后可在任务中心查看进度。
                     </div>
 
                     <label style={{ display: "block", fontSize: "0.625rem", letterSpacing: "0.02em", color: "#78716C", marginBottom: "0.375rem" }}>
@@ -1267,6 +1277,8 @@ export default function Dashboard() {
                         <button
                           key={opt.v}
                           onClick={() => setTranslateMode(opt.v)}
+                          aria-pressed={translateMode === opt.v}
+                          disabled={translating}
                           style={{
                             flex: 1,
                             display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
@@ -1290,6 +1302,8 @@ export default function Dashboard() {
                       目标语言
                     </label>
                     <select
+                      aria-label="目标语言"
+                      disabled={translating}
                       value={translateLang}
                       onChange={(e) => setTranslateLang(e.target.value)}
                       style={{
@@ -1307,6 +1321,19 @@ export default function Dashboard() {
                       <option value="de">Deutsch</option>
                       <option value="es">Español</option>
                     </select>
+                    <label htmlFor="translation-model" style={{ display: "block", fontSize: "0.625rem", color: "#78716C", marginBottom: "0.375rem" }}>翻译模型</label>
+                    <select
+                      id="translation-model"
+                      value={translateModel}
+                      onChange={(e) => setTranslateModel(e.target.value)}
+                      disabled={translating}
+                      style={{ width: "100%", background: "#292524", border: "1px solid #3F3A36", borderRadius: 6, padding: "0.4375rem 0.5rem", color: "#FAFAF9", fontSize: "0.75rem", marginBottom: "0.75rem" }}
+                    >
+                      <option value="">自动（已配置的服务商）</option>
+                      <option value="deepseek-flash">DeepSeek V4.1 Flash</option>
+                      <option value="deepseek-v4-pro">DeepSeek V4 Pro</option>
+                    </select>
+                    {translateError && <p role="alert" className={s.translateError}>{translateError}</p>}
                     <div style={{ display: "flex", gap: "0.4375rem" }}>
                       <button
                         onClick={doTranslate}
@@ -1331,9 +1358,9 @@ export default function Dashboard() {
                         取消
                       </button>
                     </div>
-                  </div>
+                  </PopoverContent>
                 )}
-              </div>
+              </Popover>
 
               <button
                 onClick={() => setShowTaskCenter(true)}

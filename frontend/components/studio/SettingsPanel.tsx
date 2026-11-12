@@ -11,6 +11,13 @@ interface Props {
 
 const PROVIDERS = [
   {
+    key: "deepseek",
+    name: "DeepSeek 官方",
+    desc: "使用 DeepSeek 官方 Key，支持 V4.1 Flash 和 V4 Pro",
+    placeholder: "sk-...",
+    link: "https://platform.deepseek.com/api_keys",
+  },
+  {
     key: "aihubmix",
     name: "AIHubMix",
     desc: "推荐 · 国内直连，支持 Claude / GPT / Gemini 等主流模型",
@@ -46,6 +53,7 @@ export default function SettingsPanel({ onClose }: Props) {
     aihubmixKey: "",
     openrouterKey: "",
     bailianKey: "",
+    deepseekKey: "",
     githubToken: "",
     defaultRepoUrl: "",
     language: "zh-CN",
@@ -62,6 +70,7 @@ export default function SettingsPanel({ onClose }: Props) {
     aihubmix: { loading: false, result: null },
     openrouter: { loading: false, result: null },
     bailian: { loading: false, result: null },
+    deepseek: { loading: false, result: null },
   });
 
   useEffect(() => {
@@ -85,6 +94,7 @@ export default function SettingsPanel({ onClose }: Props) {
         aihubmixKey: "",
         openrouterKey: "",
         bailianKey: "",
+        deepseekKey: "",
         githubToken: "",
         defaultRepoUrl: userData.defaultRepoUrl || "",
         language: userData.settings?.language || "zh-CN",
@@ -96,6 +106,7 @@ export default function SettingsPanel({ onClose }: Props) {
       if (userData.hasAihubmixKey) keyTypes.push({ type: "aihubmix", field: "aihubmixKey" });
       if (userData.hasOpenrouterKey) keyTypes.push({ type: "openrouter", field: "openrouterKey" });
       if (userData.hasBailianKey) keyTypes.push({ type: "bailian", field: "bailianKey" });
+      if (userData.hasDeepseekKey) keyTypes.push({ type: "deepseek", field: "deepseekKey" });
       if (userData.hasGitHubToken) keyTypes.push({ type: "github", field: "githubToken" });
 
       const keyPromises = keyTypes.map(async ({ type, field }) => {
@@ -233,9 +244,7 @@ export default function SettingsPanel({ onClose }: Props) {
 
     setTestStates((prev) => ({ ...prev, [providerKey]: { loading: true, result: null } }));
     try {
-      const res = await api.post("/api/user/verify-api-key", null, {
-        params: { provider: providerKey, key: keyValue },
-      });
+      const res = await api.post("/api/user/verify-api-key", { provider: providerKey, key: keyValue });
       setTestStates((prev) => ({ ...prev, [providerKey]: { loading: false, result: res.data.valid } }));
     } catch {
       setTestStates((prev) => ({ ...prev, [providerKey]: { loading: false, result: false } }));
@@ -342,7 +351,7 @@ export default function SettingsPanel({ onClose }: Props) {
         {activeTab === "models" && (
           <div className={s.section}>
             <p className={s.hint} style={{ marginBottom: 16 }}>
-              配置聚合 API Key，即可调用 Claude / GPT / Gemini / 通义千问等模型。只需配置一个即可。
+              填写对应服务商的 API Key，测试通过后保存。DeepSeek 官方 Key 请填在 DeepSeek 一栏。
             </p>
             {PROVIDERS.map((p) => {
               const fieldKey = `${p.key}Key` as keyof typeof formData;
@@ -356,6 +365,7 @@ export default function SettingsPanel({ onClose }: Props) {
                   <div className={s.inputRow}>
                     <input
                       type="password"
+                      aria-label={`${p.name} API Key`}
                       value={formData[fieldKey]}
                       onChange={(e) => setFormData({ ...formData, [fieldKey]: e.target.value })}
                       className={s.input}

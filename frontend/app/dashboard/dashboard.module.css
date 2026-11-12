@@ -1426,3 +1426,13 @@
     opacity: 1;
   }
 }
+
+/* Portalled translation controls remain above the editor and inside the viewport. */
+.translatePopover { color: #FAFAF9; font-family: Inter, sans-serif; }
+.translatePopover button:focus-visible,
+.translatePopover select:focus-visible { outline: 2px solid #D97149; outline-offset: 2px; }
+.translatePopover button:hover:not(:disabled) { filter: brightness(1.12); }
+.translatePopover button:active:not(:disabled) { transform: translateY(1px); }
+.translatePopover button:disabled,
+.translatePopover select:disabled { opacity: 0.6; cursor: not-allowed; }
+.translateError { color: #FCA5A5; font-size: 0.75rem; line-height: 1.5; margin: 0 0 0.75rem; }

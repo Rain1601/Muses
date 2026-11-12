@@ -54,6 +54,7 @@ class User(UserBase):
     hasAihubmixKey: bool = False
     hasOpenrouterKey: bool = False
     hasBailianKey: bool = False
+    hasDeepseekKey: bool = False
     hasOpenAIKey: bool = False
     hasClaudeKey: bool = False
     hasGeminiKey: bool = False
@@ -77,6 +78,7 @@ class UserSettingsRequest(BaseModel):
     aihubmixKey: Optional[str] = None
     openrouterKey: Optional[str] = None
     bailianKey: Optional[str] = None
+    deepseekKey: Optional[str] = None
     openaiKey: Optional[str] = None
     claudeKey: Optional[str] = None
     geminiKey: Optional[str] = None
@@ -123,4 +125,8 @@ class GetApiKeyRequest(BaseModel):
 
 class GetApiKeyResponse(BaseModel):
     """获取API Key响应"""
+    key: str
+
+class VerifyApiKeyRequest(BaseModel):
+    provider: str
     key: str

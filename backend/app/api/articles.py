@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, BackgroundTasks, Body
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, func, or_
-from typing import Optional
+from typing import Literal, Optional
 from datetime import datetime
 import logging
 from bs4 import BeautifulSoup
@@ -363,6 +363,7 @@ class TranslateRequest(BaseModel):
     targetLanguage: str = "zh-CN"
     # "translated" → 整篇译文(默认);"bilingual" → 原文+译文交错对照
     mode: str = "translated"
+    model: Optional[Literal["deepseek-flash", "deepseek-v4-pro"]] = None
 
 
 # 检测某段文字是否含有"被压平的 markdown 标记" —— 这种情况是因为原文导入时
@@ -403,6 +404,8 @@ async def _translate_article_background(
     user_id: str,
     target_language: str,
     mode: str = "translated",
+    provider: Optional[str] = None,
+    model: Optional[str] = None,
 ):
     """
     后台翻译任务
@@ -448,6 +451,7 @@ async def _translate_article_background(
         # 语言映射
         language_map = {
             "zh-CN": "简体中文",
+            "zh-TW": "繁體中文",
             "en": "English",
             "ja": "日本語",
             "ko": "한국어",
@@ -498,18 +502,20 @@ async def _translate_article_background(
                 )
 
                 # 使用 translate action 翻译文本
-                # provider 留空,由 UnifiedAIClient 按用户配置的聚合 provider 自动选择
-                # (post-bf83d84 只支持 aihubmix/openrouter/bailian);默认模型在各 provider
-                # 的 DEFAULT_MODELS 里指定(目前是 Claude Sonnet 4.5)
+                # 使用任务提交时确定的服务商和模型。
                 result = await EnhancedAIService.perform_text_action(
                     user=user,
                     agent=agent,
                     text=element['text'],
                     action_type='translate',
                     language=language_name,
+                    provider=provider,
+                    model=model,
                 )
 
-                translated_text = result.get('processedText', element['text'])
+                translated_text = result.get('processedText')
+                if not isinstance(translated_text, str) or not translated_text.strip():
+                    raise ValueError("模型未返回译文")
 
                 translated_elements.append({
                     'original': element,
@@ -522,11 +528,7 @@ async def _translate_article_background(
 
             except Exception as e:
                 logger.error(f"❌ [Task {task_id}] Error translating element {i+1}: {str(e)}")
-                # 翻译失败时使用原文
-                translated_elements.append({
-                    'original': element,
-                    'translation': element['text']
-                })
+                raise RuntimeError(f"第 {i+1}/{total} 段翻译失败：{e}") from e
 
         # 构建译文 HTML — 两种模式
         out_html: list[str] = []
@@ -646,6 +648,18 @@ async def translate_article(
     if not article:
         raise HTTPNotFoundError("文章不存在")
 
+    from ..services.unified_ai import UnifiedAIClient
+    from ..models_config import get_default_model
+    from ..utils.exceptions import ValidationError
+
+    model = request.model if request else None
+    try:
+        provider = "deepseek" if model else UnifiedAIClient._determine_provider(current_user)
+        UnifiedAIClient._get_api_key(current_user, provider)
+    except (ValidationError, ValueError) as exc:
+        raise HTTPValidationError(str(exc)) from exc
+    model = model or get_default_model(provider)
+
     target_language = request.targetLanguage if request else "zh-CN"
     mode = (request.mode if request else "translated") or "translated"
     if mode not in ("translated", "bilingual"):
@@ -658,6 +672,8 @@ async def translate_article(
         user_id=current_user.id,
         target_language=target_language,
         mode=mode,
+        provider=provider,
+        model=model,
     )
 
     logger.info(f"🚀 Created translation task {task_id} for article {article_id} (mode={mode})")
@@ -671,6 +687,8 @@ async def translate_article(
             current_user.id,
             target_language,
             mode,
+            provider,
+            model,
         )
     )
 

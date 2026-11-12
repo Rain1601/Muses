@@ -50,7 +50,7 @@ def run_migrations():
         return
 
     existing = {c["name"] for c in insp.get_columns("User")}
-    new_cols = ["aihubmixKey", "openrouterKey", "bailianKey"]
+    new_cols = ["aihubmixKey", "openrouterKey", "bailianKey", "deepseekKey"]
     with engine.begin() as conn:
         for col in new_cols:
             if col not in existing:

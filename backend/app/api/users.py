@@ -7,7 +7,7 @@ from ..models import User, UserSettings
 from ..schemas.user import (
     UserProfile, UserSettingsRequest,
     UserSettings as UserSettingsSchema,
-    GetApiKeyRequest, GetApiKeyResponse
+    GetApiKeyRequest, GetApiKeyResponse, VerifyApiKeyRequest
 )
 from ..schemas.auth import SuccessResponse
 from ..dependencies import get_current_user, get_current_user_db
@@ -16,12 +16,7 @@ from ..utils.exceptions import HTTPValidationError
 
 router = APIRouter()
 
-# 聚合 API provider base URLs
-PROVIDER_BASE_URLS = {
-    "aihubmix": "https://aihubmix.com/v1",
-    "openrouter": "https://openrouter.ai/api/v1",
-    "bailian": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-}
+from ..services.unified_ai import PROVIDER_BASE_URLS
 
 
 @router.get("/profile", response_model=UserProfile)
@@ -43,6 +38,7 @@ async def get_user_profile(
         "hasAihubmixKey": bool(current_user_db.aihubmixKey),
         "hasOpenrouterKey": bool(current_user_db.openrouterKey),
         "hasBailianKey": bool(current_user_db.bailianKey),
+        "hasDeepseekKey": bool(current_user_db.deepseekKey),
         "hasOpenAIKey": bool(current_user_db.openaiKey),
         "hasClaudeKey": bool(current_user_db.claudeKey),
         "hasGeminiKey": bool(current_user_db.geminiKey),
@@ -82,6 +78,7 @@ async def update_user_settings(
             ("aihubmixKey", request.aihubmixKey),
             ("openrouterKey", request.openrouterKey),
             ("bailianKey", request.bailianKey),
+            ("deepseekKey", request.deepseekKey),
             ("openaiKey", request.openaiKey),
             ("claudeKey", request.claudeKey),
             ("geminiKey", request.geminiKey),
@@ -121,15 +118,19 @@ async def update_user_settings(
 
 
 @router.post("/verify-api-key")
-async def verify_api_key(provider: str, key: str):
+async def verify_api_key(request: VerifyApiKeyRequest | None = None, provider: str | None = None, key: str | None = None):
     """验证聚合 API Key（通过 OpenAI 兼容接口 list models）"""
+    if request is not None:
+        provider, key = request.provider, request.key
+    if not provider or not key:
+        raise HTTPValidationError("请提供服务商和 API Key")
     base_url = PROVIDER_BASE_URLS.get(provider)
     if not base_url:
         return {"valid": False, "error": f"Unknown provider: {provider}"}
 
     try:
-        client = openai.OpenAI(api_key=key, base_url=base_url)
-        client.models.list()
+        async with openai.AsyncOpenAI(api_key=key, base_url=base_url, timeout=15.0, max_retries=0) as client:
+            await client.models.list()
         return {"valid": True}
     except Exception as e:
         return {"valid": False, "error": str(e)}
@@ -145,6 +146,7 @@ async def get_api_key(
         "aihubmix": current_user_db.aihubmixKey,
         "openrouter": current_user_db.openrouterKey,
         "bailian": current_user_db.bailianKey,
+        "deepseek": current_user_db.deepseekKey,
         "openai": current_user_db.openaiKey,
         "claude": current_user_db.claudeKey,
         "gemini": current_user_db.geminiKey,

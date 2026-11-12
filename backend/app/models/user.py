@@ -22,6 +22,7 @@ class User(Base):
     aihubmixKey = Column(String, nullable=True)
     openrouterKey = Column(String, nullable=True)
     bailianKey = Column(String, nullable=True)
+    deepseekKey = Column(String, nullable=True)
     # Legacy keys (kept for backward compat during migration)
     openaiKey = Column(String, nullable=True)
     claudeKey = Column(String, nullable=True)

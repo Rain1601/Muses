@@ -53,6 +53,16 @@ MODELS = {
         "description": "Google 最强推理模型",
         "max_tokens": 100000,
     },
+    "deepseek-flash": {
+        "name": "DeepSeek V4.1 Flash",
+        "provider_origin": "deepseek",
+        "description": "DeepSeek 官方 Flash 模型",
+    },
+    "deepseek-v4-pro": {
+        "name": "DeepSeek V4 Pro",
+        "provider_origin": "deepseek",
+        "description": "DeepSeek 官方 Pro 模型",
+    },
     # 国产模型（百炼专属）
     "qwen-max": {
         "name": "通义千问 Max",
@@ -79,6 +89,7 @@ DEFAULT_MODELS = {
     "aihubmix": "claude-sonnet-4-5-20250929",
     "openrouter": "claude-sonnet-4-5-20250929",
     "bailian": "qwen-max",
+    "deepseek": "deepseek-flash",
 }
 
 
