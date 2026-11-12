@@ -430,7 +430,18 @@ async def fetch_url_content(
                 ).first()
 
             if not default_agent:
-                raise HTTPValidationError("未找到可用的 Agent，请先创建一个 Agent")
+                default_agent = Agent(
+                    userId=current_user.id,
+                    name="导入助手",
+                    description="用于导入文件的默认助手",
+                    language="chinese",
+                    tone="professional",
+                    lengthPreference="medium",
+                    targetAudience="general",
+                    isDefault=True
+                )
+                db.add(default_agent)
+                db.flush()
 
             print(f"📝 Using agent: {default_agent.id} - {default_agent.name}")
 
