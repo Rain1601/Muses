@@ -7,7 +7,7 @@ from .database import create_tables, run_migrations
 from .config import settings
 
 # Import routers
-from .api import auth, users, agents, agents_actions, articles, upload, publish, image_upload, import_files, skills, claude_code, slot_fill
+from .api import auth, users, agents, agents_actions, articles, upload, publish, image_upload, import_files, skills, docs, comments, doc_tabs, claude_code, slot_fill
 
 
 @asynccontextmanager
@@ -51,11 +51,14 @@ app.include_router(users.router, prefix="/api/user", tags=["users"])
 app.include_router(agents.router, prefix="/api/agents", tags=["agents"])
 app.include_router(agents_actions.router, prefix="/api/agents", tags=["agent-actions"])
 app.include_router(articles.router, prefix="/api/articles", tags=["articles"])
+app.include_router(doc_tabs.router, prefix="/api/articles", tags=["article-tabs"])
 app.include_router(upload.router, prefix="/api/upload", tags=["upload"])
 app.include_router(publish.router, prefix="/api/publish", tags=["publish"])
 app.include_router(image_upload.router, prefix="/api", tags=["image-upload"])
 app.include_router(import_files.router, prefix="/api/import", tags=["import"])
 app.include_router(skills.router, prefix="/api/skills", tags=["skills"])
+app.include_router(docs.router, prefix="/api/docs", tags=["docs"])
+app.include_router(comments.router, prefix="/api/comments", tags=["comments"])
 
 # Studio: 条件注册（依赖本地文件系统，生产环境可关闭）
 if settings.enable_studio:

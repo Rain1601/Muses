@@ -38,6 +38,7 @@ class Article(Base):
     # 元数据
     sourceFiles = Column(Text, nullable=True)  # 原始素材文件信息JSON字符串
     article_metadata = Column(Text, nullable=True)  # 其他元数据JSON字符串
+    mainTabName = Column(String, nullable=True)  # 主 tab（即 content）的显示名; 额外 tab 见 ArticleTab
     
     createdAt = Column(DateTime, default=func.now())
     updatedAt = Column(DateTime, default=func.now(), onupdate=func.now())

@@ -10,6 +10,8 @@ import '../styles/editor-selection-persist.css';
 import '../styles/collapsible-code.css';
 import '../styles/editor-line-numbers.css';
 import '../styles/notion-drag-handle.css';
+import '../styles/pending-block.css';
+import '../styles/comments.css';
 import StarterKit from '@tiptap/starter-kit';
 import { SlotDecorations, AiSource } from '@/lib/tiptap-extensions/PromptSlot';
 import type { SlotState } from '@/lib/tiptap-extensions/PromptSlot';
@@ -22,6 +24,9 @@ import SelectionPersistence from '@/lib/tiptap-extensions/SelectionPersistence';
 import { LineNumbers } from '@/lib/tiptap-extensions/LineNumbers';
 import Youtube from '@tiptap/extension-youtube';
 import DragHandle from '@tiptap/extension-drag-handle';
+import PendingBlock from '@/lib/tiptap-extensions/PendingBlock';
+import CommentAnchor from '@/lib/tiptap-extensions/CommentAnchor';
+import { SuggestionInsert, SuggestionDelete, proposeReplacement } from '@/lib/tiptap-extensions/Suggestion';
 // Dropcursor 已包含在 StarterKit 中，无需单独导入
 import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
@@ -261,22 +266,16 @@ export function NotionEditor({ initialContent = '', onChange, agentId, onSelecti
     const state = view.state;
     const { from, to } = state.selection;
 
-    // 替换选中的文本
-    const transaction = state.tr.replaceRangeWith(
-      from,
-      to,
-      state.schema.text(newText)
-    );
-
-    view.dispatch(transaction);
+    // AI 结果以建议的形式落地（划掉原文 + 插入新文），由用户接受或拒绝
+    proposeReplacement(editor, { from, to }, newText, { author: 'claude' });
 
     // 清除选择状态
     setSelectedText('');
     setSelectionRange(null);
     setShowTextActionToolbar(false);
 
-    // 设置光标位置到替换文本的末尾，保持焦点
-    const newCursorPos = from + newText.length;
+    // 光标放到建议插入文字的末尾 (原文 + 新文)，保持焦点
+    const newCursorPos = to + newText.length;
     editor.chain()
       .focus()
       .setTextSelection(newCursorPos)
@@ -508,12 +507,21 @@ export function NotionEditor({ initialContent = '', onChange, agentId, onSelecti
     },
     {
       id: 'ai',
-      name: 'AI 生成',
-      description: '使用 AI 生成内容',
+      name: '让 Claude 写',
+      description: '先列大纲，再逐节写',
       group: 'AI',
-      keywords: ['ai', 'generate', '生成', 'shengcheng'],
-      action: () => {},
-      disabled: true,
+      keywords: ['ai', 'claude', 'generate', 'write', '生成', 'shengcheng', '写', 'xie'],
+      action: () => {
+        window.dispatchEvent(new CustomEvent('muses:open-doc-writer'));
+      },
+    },
+    {
+      id: 'pending',
+      name: '占位块',
+      description: '写下这一节要写什么，稍后让 Claude 写',
+      group: 'AI',
+      keywords: ['pending', 'placeholder', 'zw', '占位', 'zhanwei', 'outline', '大纲'],
+      action: (editor) => editor.chain().focus().insertPendingBlock().run(),
     },
   ];
 
@@ -751,8 +759,9 @@ export function NotionEditor({ initialContent = '', onChange, agentId, onSelecti
 
             // 执行命令
             setTimeout(() => {
-              const editorFromView = (view as any).editor;
-              selectedCommand.action(editorFromView || view);
+              // TipTap puts the editor on view.dom, not on the view itself.
+              const editorFromView = (view.dom as any).editor || editorRef.current;
+              selectedCommand.action(editorFromView);
             }, 10);
           }
         }
@@ -935,6 +944,10 @@ export function NotionEditor({ initialContent = '', onChange, agentId, onSelecti
         link: false,
       }),
       AiSource,
+      PendingBlock,
+      CommentAnchor,
+      SuggestionInsert,
+      SuggestionDelete,
       ...(getSlotState ? [SlotDecorations({ getState: getSlotState })] : []),
       Highlight,
       CollapsibleCodeBlock,

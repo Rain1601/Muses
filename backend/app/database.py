@@ -49,10 +49,17 @@ def run_migrations():
     if "User" not in insp.get_table_names():
         return
 
-    existing = {c["name"] for c in insp.get_columns("User")}
-    new_cols = ["aihubmixKey", "openrouterKey", "bailianKey", "deepseekKey"]
+    new_cols = {
+        "User": ["aihubmixKey", "openrouterKey", "bailianKey", "deepseekKey"],
+        "Article": ["mainTabName"],
+    }
+    tables = set(insp.get_table_names())
     with engine.begin() as conn:
-        for col in new_cols:
-            if col not in existing:
-                conn.execute(text(f'ALTER TABLE "User" ADD COLUMN "{col}" VARCHAR'))
-                print(f"Migration: added column {col} to User table")
+        for table, cols in new_cols.items():
+            if table not in tables:
+                continue
+            existing = {c["name"] for c in insp.get_columns(table)}
+            for col in cols:
+                if col not in existing:
+                    conn.execute(text(f'ALTER TABLE "{table}" ADD COLUMN "{col}" VARCHAR'))
+                    print(f"Migration: added column {col} to {table} table")

@@ -74,9 +74,9 @@ Two dev-only prototype routes also exist and are not part of the shipped UX:
 **Text Actions System**: `useTextActions` hook (`lib/hooks/`) provides unified AI text operations (improve, expand, summarize, translate, fix-grammar, brainstorm, custom-prompt). Posts to `/api/agents/text-action`. Gated by AI Assistant toggle.
 
 **Dashboard-embedded components** (everything routes through `app/dashboard/page.tsx`):
-- `studio/SettingsPanel` — model + provider picker (`studio/ChatPanel.tsx` still exists on disk but is no longer mounted; the right rail is now history-focused)
-- `studio/DiffView` — accept/reject pane for AI-proposed edits
-- `EditHistoryPanel` + `useEditHistory` hook — in-session AI edit log on the right rail
+- `studio/SettingsPanel` — model + provider picker (`studio/ChatPanel.tsx` still exists on disk but is no longer mounted)
+- `docs/CommentsPanel` — the right rail: open suggestions + comment threads. Claude's edits never go straight into the text: they land as suggestions (`lib/tiptap-extensions/Suggestion.ts`, `<del>`/`<ins data-suggestion-id>` marks, derived by scanning the doc via `useSuggestions`) that are accepted/rejected in place, one undo step each. ⌘K on a selection opens a Claude thread on it (`useComments.createThread`)
+- `docs/DocWriterBar` + `PendingBlock` — outline-first drafting
 - `PublishHistoryPanel` — publish-to-GitHub history (reads `SyncHistory`)
 - `SkillLibrary` — writing skill picker (CRUD against `/api/skills`)
 - `TaskCenter` — background task tracker
@@ -84,7 +84,7 @@ Two dev-only prototype routes also exist and are not part of the shipped UX:
 
 ### Backend Architecture
 
-**Router registration** (`app/main.py`): always-on — `auth`, `users`, `agents`, `agents_actions`, `articles`, `upload`, `publish`, `image_upload`, `import_files`, `skills`. Gated behind `settings.enable_studio=True` (off in production, all share the local-filesystem requirement): `studio`, `claude_code` (subprocess-driven), `slot_fill` (prompt-slot prototype backend).
+**Router registration** (`app/main.py`): always-on — `auth`, `users`, `agents`, `agents_actions`, `articles`, `upload`, `publish`, `image_upload`, `import_files`, `skills`, `docs`, `comments`, `doc_tabs` (mounted under `/api/articles`). Gated behind `settings.enable_studio=True` (off in production, all share the local-filesystem requirement): `studio`, `claude_code` (subprocess-driven), `slot_fill` (prompt-slot prototype backend).
 
 **Startup**: `start.py` uses `psutil` to kill existing processes on the port before launching uvicorn. Settings come from `app/config.py` (env vars).
 
@@ -99,7 +99,7 @@ File-based writing workspace at `~/muses-workspace`. The endpoints back the righ
 - `WS /api/studio/filewatcher` — WebSocket for real-time file diffs
 - File CRUD: `GET/POST/PUT/DELETE /api/studio/files/{filename}`
 
-**Frontend**: `components/studio/{ChatPanel,DiffView,SettingsPanel}`. Differential sync — tracks file snapshots and computes diffs with accept/reject UI.
+**Frontend**: `components/studio/{ChatPanel,SettingsPanel}` (ChatPanel unmounted).
 
 ### Skill Library (`app/api/skills.py`, `Skill` model)
 
@@ -121,7 +121,7 @@ User-owned library of writing-prompt templates. Each Skill is `{name, descriptio
 
 ## Database Schema
 
-Active models: `User` (OAuth + encrypted API keys), `UserSettings`, `Agent` (AI writing assistants), `Article` (content + publish state), `Skill` (prompt templates), `SyncHistory` (publish log).
+Active models: `User` (OAuth + encrypted API keys), `UserSettings`, `Agent` (AI writing assistants), `Article` (content + publish state), `Skill` (prompt templates), `SyncHistory` (publish log), `Comment` (anchored comment threads), `ArticleTab` + `ArticleRevision` (tabs, version history).
 
 All sensitive data (API keys, tokens) encrypted before storage via `backend/app/utils/security.py` (AES-GCM, Scrypt KDF from `ENCRYPTION_KEY`/`ENCRYPTION_SALT`, format `nonce[12] || ciphertext || tag[16]`). `frontend/lib/crypto.ts` is a byte-compatible TS port (Phase 0 of a planned TS backend migration) — change both together and re-run the parity script.
 
@@ -153,6 +153,9 @@ GitHub OAuth callback URL: `http://localhost:8080/api/auth/github/callback`
 - `/api/publish/` — Publish to GitHub repos (+ `/history` reads `SyncHistory`)
 - `/api/upload-image` — GitHub-based image hosting
 - `/api/skills/` — Writing skill library (CRUD + preset seeding)
+- `/api/docs/outline`, `/api/docs/fill` — Claude-Docs-style drafting: outline as `PendingBlock`s, then one section at a time (`useDocWriter`, `components/docs/DocWriterBar`); plan in `docs/dev/claude-docs-refactor-plan.md`
+- `/api/comments` — comment threads anchored to doc text (`Comment` model, `docKey` = `article:<id>` owner-only or `file:<path>` behind `enable_studio`); `POST /threads/{id}/claude` has Claude reply in the thread and optionally return a `replacement` for the anchored words, which the frontend proposes as a suggestion.
+- `/api/articles/{id}/tabs`, `/api/articles/{id}/revisions` — tabs + version history of a DB article. `Article.content` is the main tab (`id: "main"`, name in `Article.mainTabName`); extra tabs are `ArticleTab` rows. Every content write (incl. the existing `PUT /api/articles/{id}`) goes through `services/revisions.record_revision`: first edit stores a `baseline`, saves within 10 min fold into one revision, restores start a new one. Comment `docKey` for an extra tab is `article:<id>#<tabId>`. Workspace `.md` files have no tabs/history. DB articles now autosave (3 s) like files Frontend: `CommentAnchor` mark, `useComments`, `components/docs/CommentsPanel` (right rail, ⌘⇧M)
 - `/api/studio/*` — Dashboard chat + file workspace (dev only, `enable_studio` gate)
 - `/api/claude-code/*`, `/api/slot-fill/*` — Prototype routers, same `enable_studio` gate
 

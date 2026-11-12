@@ -1,0 +1,199 @@
+/* PendingBlock (lib/tiptap-extensions/PendingBlock.tsx) + DocWriterBar */
+
+.pending-block {
+  margin: 1rem 0;
+  padding: 0.75rem 0.9rem;
+  border: 1px dashed hsl(var(--border));
+  border-radius: 8px;
+  background: hsl(var(--foreground) / 0.025);
+  transition: border-color 150ms ease, background-color 150ms ease;
+}
+.pending-block:hover,
+.pending-block.ProseMirror-selectednode {
+  border-color: #d9714980;
+}
+.pending-block.is-filling {
+  border-style: solid;
+  border-color: #d97149;
+  background: #d9714910;
+}
+.pending-block.is-error {
+  border-color: hsl(0 70% 55% / 0.6);
+}
+
+.pending-block-body {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+}
+.pending-block-mark {
+  flex: none;
+  width: 16px;
+  margin-top: 2px;
+  color: #d97149;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.pending-block-text {
+  min-width: 0;
+}
+.pending-block-heading {
+  font-weight: 600;
+  font-size: 1rem;
+  color: hsl(var(--foreground));
+}
+.pending-block-intent {
+  margin-top: 2px;
+  font-size: 0.875rem;
+  color: hsl(var(--muted-foreground));
+}
+.pending-block-status {
+  margin-top: 6px;
+  font-size: 0.8rem;
+  color: #d97149;
+}
+.pending-block-status.error {
+  color: hsl(0 70% 65%);
+}
+
+.pending-block-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 0.6rem;
+  padding-left: calc(16px + 0.6rem);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.pending-block:hover .pending-block-actions,
+.pending-block.is-error .pending-block-actions,
+.pending-block.ProseMirror-selectednode .pending-block-actions,
+.pending-block-form .pending-block-actions {
+  opacity: 1;
+}
+.pending-block-form .pending-block-actions {
+  padding-left: 0;
+}
+
+.pending-block-btn {
+  padding: 3px 10px;
+  font-size: 12px;
+  border-radius: 5px;
+  border: 1px solid hsl(var(--border));
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+}
+.pending-block-btn:hover:not(:disabled) {
+  color: hsl(var(--foreground));
+  background: hsl(var(--foreground) / 0.06);
+}
+.pending-block-btn.primary {
+  border-color: #d97149;
+  color: #f0a988;
+}
+.pending-block-btn.primary:hover:not(:disabled) {
+  background: #d9714920;
+  color: #ffd2bd;
+}
+.pending-block-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.pending-block-spinner {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border: 1.5px solid #d9714955;
+  border-top-color: #d97149;
+  border-radius: 50%;
+  animation: pending-spin 0.8s linear infinite;
+}
+@keyframes pending-spin {
+  to { transform: rotate(360deg); }
+}
+
+.pending-block-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pending-block-heading-input,
+.pending-block-intent-input,
+.doc-writer-input {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font: inherit;
+  font-size: 0.875rem;
+  resize: vertical;
+  outline: none;
+}
+.pending-block-heading-input {
+  font-weight: 600;
+}
+.pending-block-heading-input:focus,
+.pending-block-intent-input:focus,
+.doc-writer-input:focus {
+  border-color: #d97149;
+}
+
+/* ── DocWriterBar ─────────────────────────────── */
+.doc-writer {
+  margin: 0 0 1.25rem;
+}
+.doc-writer-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid hsl(var(--border));
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+  cursor: pointer;
+}
+.doc-writer-trigger:hover {
+  color: #f0a988;
+  border-color: #d97149;
+}
+.doc-writer-trigger .spark {
+  color: #d97149;
+}
+.doc-writer-panel {
+  padding: 0.75rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 10px;
+  background: hsl(var(--foreground) / 0.03);
+}
+.doc-writer-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.doc-writer-select {
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-size: 12px;
+  max-width: 220px;
+}
+.doc-writer-spacer {
+  flex: 1;
+}
+.doc-writer-hint {
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
+}
+.doc-writer-error {
+  font-size: 12px;
+  color: hsl(0 70% 65%);
+}

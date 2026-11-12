@@ -17,6 +17,7 @@ from ..schemas.auth import SuccessResponse
 from ..dependencies import get_current_user_db
 from ..utils.exceptions import HTTPNotFoundError, HTTPValidationError
 from ..utils.task_tracker import task_tracker, TaskStatus
+from ..services.revisions import record_revision
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -221,9 +222,12 @@ async def update_article(
     
     try:
         update_data = article_data.dict(exclude_unset=True)
+        old_content = article.content
         for field, value in update_data.items():
             setattr(article, field, value)
-        
+        if "content" in update_data and update_data["content"] is not None:
+            record_revision(db, article.id, "main", old_content, article.content, title=article.title)
+
         db.commit()
         db.refresh(article)
         

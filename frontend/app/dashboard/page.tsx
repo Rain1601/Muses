@@ -13,12 +13,13 @@ import { TaskCenter } from "@/components/TaskCenter";
 import { FileImport } from "@/components/FileImport";
 import { persistSelection, clearPersistedSelection } from "@/lib/tiptap-extensions/SelectionPersistence";
 import { getLineContent } from "@/lib/tiptap-extensions/LineNumbers";
-import { isCodeContext, registerSlotRange, unregisterSlotRange, getSlotRange } from "@/lib/tiptap-extensions/PromptSlot";
-import { useSlotEngine } from "@/lib/hooks/useSlotEngine";
-import { useEditHistory, newEditId } from "@/lib/hooks/useEditHistory";
-import CandidatePopover, { type AcceptMode } from "@/components/CandidatePopover";
 import SelectionTaskMenu from "@/components/SelectionTaskMenu";
-import EditHistoryPanel from "@/components/EditHistoryPanel";
+import DocWriterBar from "@/components/docs/DocWriterBar";
+import CommentsPanel from "@/components/docs/CommentsPanel";
+import { useComments } from "@/lib/hooks/useComments";
+import { useSuggestions } from "@/lib/hooks/useSuggestions";
+import DocTabs, { type DocTab } from "@/components/docs/DocTabs";
+import VersionHistory from "@/components/docs/VersionHistory";
 import { createPortal } from "react-dom";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import s from "./dashboard.module.css";
@@ -27,6 +28,14 @@ import s from "./dashboard.module.css";
 const getTurndownService = async () => {
   const TurndownService = (await import("turndown")).default;
   const td = new TurndownService({ headingStyle: "atx", codeBlockStyle: "fenced" });
+  // Pending blocks (outline placeholders) stay as raw HTML so a .md round-trip
+  // keeps them editable; marked passes the <div> through on load.
+  // Same for comment anchors (<span data-comment-id>) and open suggestions
+  // (<ins>/<del data-suggestion-id>), so threads and suggestions survive.
+  (td as any).keep((node: HTMLElement) =>
+    (node.nodeName === "DIV" && node.hasAttribute("data-pending-block")) ||
+    (node.nodeName === "SPAN" && node.hasAttribute("data-comment-id")) ||
+    ((node.nodeName === "INS" || node.nodeName === "DEL") && node.hasAttribute("data-suggestion-id")));
   return td;
 };
 
@@ -65,6 +74,13 @@ export default function Dashboard() {
   });
   const [activeFile, setActiveFile] = useState<string | null>(null);
   const [activeDbArticle, setActiveDbArticle] = useState<DBArticle | null>(null);
+  // Tabs of the open DB article ("main" = Article.content) + version history panel.
+  const [tabs, setTabs] = useState<DocTab[]>([]);
+  const [activeTabId, setActiveTabId] = useState("main");
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyKey, setHistoryKey] = useState(0);
+  // Bumped to remount the editor when its content is replaced from outside (restore).
+  const [editorEpoch, setEditorEpoch] = useState(0);
   const [content, setContent] = useState("");
   const [savedContent, setSavedContent] = useState("");
   const [markdownContent, setMarkdownContent] = useState("");
@@ -396,6 +412,9 @@ export default function Dashboard() {
       const htmlContent = await marked(md);
       setActiveFile(filePath);
       setActiveDbArticle(null);
+      setTabs([]);
+      setActiveTabId("main");
+      setShowHistory(false);
       setContent(htmlContent);
       setSavedContent(htmlContent);
       setMarkdownContent(md);
@@ -429,6 +448,12 @@ export default function Dashboard() {
       }
       setActiveFile(null);
       setActiveDbArticle(article);
+      setActiveTabId("main");
+      setTabs([{ id: "main", name: "正文", order: "a0", isMain: true }]);
+      fetch(`${API_BASE}/api/articles/${article.id}/tabs`, { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => (r.ok ? r.json() : null))
+        .then(t => { if (Array.isArray(t)) setTabs(t); })
+        .catch(() => {});
       setContent(htmlContent);
       setSavedContent(htmlContent);
       setMarkdownContent(md);
@@ -444,12 +469,20 @@ export default function Dashboard() {
         // Save DB article via API
         const token = localStorage.getItem("token");
         if (!token) return;
-        await fetch(`${API_BASE}/api/articles/${activeDbArticle.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ content: html }),
-        });
+        const res = activeTabId === "main"
+          ? await fetch(`${API_BASE}/api/articles/${activeDbArticle.id}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+              body: JSON.stringify({ content: html }),
+            })
+          : await fetch(`${API_BASE}/api/articles/${activeDbArticle.id}/tabs/${activeTabId}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+              body: JSON.stringify({ content: html }),
+            });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         setSavedContent(html);
+        setHistoryKey(k => k + 1);
       } else if (activeFile) {
         // Save Studio file
         const td = await getTurndownService();
@@ -462,7 +495,59 @@ export default function Dashboard() {
         setSavedContent(html);
       }
     } catch (e) { console.error("Save failed:", e); }
-  }, [activeFile, activeDbArticle]);
+  }, [activeFile, activeDbArticle, activeTabId]);
+
+  // ===== Tabs of a DB article =====
+  const tabApi = useCallback(async (path: string, init?: RequestInit) => {
+    const token = localStorage.getItem("token");
+    if (!token || !activeDbArticle) throw new Error("not logged in");
+    const res = await fetch(`${API_BASE}/api/articles/${activeDbArticle.id}${path}`, {
+      ...init,
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }, [activeDbArticle]);
+
+  const selectTab = useCallback(async (tabId: string) => {
+    if (!activeDbArticle || tabId === activeTabId) return;
+    if (contentRef.current !== savedContentRef.current) await saveFile();
+    try {
+      const t = await tabApi(`/tabs/${tabId}`);
+      setActiveTabId(tabId);
+      setContent(t.content || "");
+      setSavedContent(t.content || "");
+      setSelection("");
+    } catch (e) { console.error("Open tab failed:", e); }
+  }, [activeDbArticle, activeTabId, saveFile, tabApi]);
+
+  const addTab = useCallback(async () => {
+    try {
+      const t = await tabApi("/tabs", { method: "POST", body: JSON.stringify({ name: `新 tab ${tabs.length}` }) });
+      setTabs(ts => [...ts, t]);
+      await selectTab(t.id);
+    } catch (e) { console.error("Add tab failed:", e); }
+  }, [selectTab, tabApi, tabs.length]);
+
+  const renameTab = useCallback(async (tabId: string, name: string) => {
+    try {
+      await tabApi(`/tabs/${tabId}`, { method: "PATCH", body: JSON.stringify({ name }) });
+      setTabs(ts => ts.map(t => (t.id === tabId ? { ...t, name } : t)));
+    } catch (e) { console.error("Rename tab failed:", e); }
+  }, [tabApi]);
+
+  const deleteTab = useCallback(async (tabId: string) => {
+    try {
+      await tabApi(`/tabs/${tabId}`, { method: "DELETE" });
+      setTabs(ts => ts.filter(t => t.id !== tabId));
+      if (tabId === activeTabId) {
+        const t = await tabApi("/tabs/main");
+        setActiveTabId("main");
+        setContent(t.content || "");
+        setSavedContent(t.content || "");
+      }
+    } catch (e) { console.error("Delete tab failed:", e); }
+  }, [activeTabId, tabApi]);
 
   const createFile = useCallback(async (name: string) => {
     const filename = name.endsWith(".md") ? name : `${name}.md`;
@@ -503,13 +588,14 @@ export default function Dashboard() {
   }, [activeFile, loadFiles]);
 
   // ===== Auto-save =====
+  // Living docs: DB articles autosave too (version history groups the saves).
   useEffect(() => {
-    if (!activeFile) return;
+    if (!activeFile && !activeDbArticle) return;
     autoSaveRef.current = setInterval(() => {
       if (contentRef.current !== savedContentRef.current) saveFile();
     }, 3000);
     return () => { if (autoSaveRef.current) clearInterval(autoSaveRef.current); };
-  }, [activeFile, saveFile]);
+  }, [activeFile, activeDbArticle, saveFile]);
 
   // Close file menu on outside click
   useEffect(() => {
@@ -730,81 +816,42 @@ export default function Dashboard() {
     setEditorState(editor);
   }, []);
 
-  // ===== Prompt-driven task system (brackets + ⌘K selection) =====
-  // 中文写作场景下默认走 DeepSeek 直连（OpenAI 兼容,环境变量 DEEPSEEK_API_KEY）。
-  // 旧的 local:claude / sonnet 仍可在配置中切换，但默认不再启动本地 Claude CLI。
-  const slotEngine = useSlotEngine(editorState, {
-    provider: "deepseek",
-    model: "deepseek-chat",
-    autoFireBrackets: true,
-  });
-  // Stable accessor used by the SlotDecorations plugin to read the map.
-  const slotEngineRef = useRef(slotEngine);
-  useEffect(() => { slotEngineRef.current = slotEngine; }, [slotEngine]);
-  const getSlotState = useCallback(() => slotEngineRef.current.getStateRef(), []);
-
-  // ===== AI edit history (per article) =====
-  // Keyed by the live article id; switching articles loads its own log.
-  const editHistory = useEditHistory(activeDbArticle?.id ?? activeFile ?? "untitled");
-
-  // Force decoration re-render when slot map changes (dispatch a no-op tx).
+  // ===== Comment threads (Claude Docs model, right rail) =====
+  const docKey = activeDbArticle
+    ? `article:${activeDbArticle.id}${activeTabId === "main" ? "" : `#${activeTabId}`}`
+    : activeFile ? `file:${activeFile}` : null;
+  const comments = useComments(docKey, editorState);
+  const beginComment = comments.begin;
+  // ⌘⇧M with a selection → start a comment thread on it.
   useEffect(() => {
-    if (!editorState) return;
-    editorState.view.dispatch(editorState.view.state.tr.setMeta("slot-redraw", true));
-  }, [slotEngine.slots, editorState]);
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || !e.shiftKey || e.key.toLowerCase() !== "m") return;
+      if (!beginComment()) return;
+      e.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [beginComment]);
 
-  // Open candidate popover.
-  const [openSlot, setOpenSlot] = useState<{
-    key: string;
-    anchor: { top: number; left: number };
-    headerText: string;
-    isSelectionTask: boolean;
-  } | null>(null);
+  // ===== Suggestions (Claude's proposed edits, accepted or rejected in place) =====
+  const suggestions = useSuggestions(editorState);
 
-  // Selection-task menu state.
+  // ===== ⌘K on a selection → ask Claude about it in a new comment thread =====
+  // Claude replies in the thread; a requested rewrite lands as a suggestion.
   const [selMenu, setSelMenu] = useState<{
     anchor: { top: number; left: number };
     selectedText: string;
     range: { from: number; to: number };
   } | null>(null);
 
-  // Click handler on slot status dots — open candidate popover.
-  useEffect(() => {
-    if (!editorState) return;
-    const root = editorState.view.dom;
-    const onClick = (e: MouseEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (!t) return;
-      const dot = t.closest("[data-slot-key]") as HTMLElement | null;
-      if (!dot) return;
-      const key = dot.getAttribute("data-slot-key") || "";
-      const isSelectionTask = !!getSlotRange(editorState.view, key);
-      const slot = slotEngineRef.current?.slots.get(key);
-      const rect = dot.getBoundingClientRect();
-      setOpenSlot({
-        key,
-        anchor: {
-          top: rect.bottom + 6,
-          left: Math.min(window.innerWidth - 440, rect.left - 12),
-        },
-        headerText: isSelectionTask ? (slot?.instruction ?? key) : key,
-        isSelectionTask,
-      });
-      e.stopPropagation();
-    };
-    root.addEventListener("click", onClick);
-    return () => root.removeEventListener("click", onClick);
-  }, [editorState]);
-
-  // ⌘K with a selection → open SelectionTaskMenu. When there's no selection,
-  // fall through to the legacy behavior (focus chat with current selection).
-  // We intercept at capture phase so we win over the existing keydown listener.
+  // We intercept at capture phase so we win over the existing dashboard ⌘K
+  // listener (no selection → that one focuses the chat as before).
   useEffect(() => {
     if (!editorState) return;
     const onKey = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey) || e.key !== "k") return;
+      if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.key !== "k") return;
       const { from, to } = editorState.state.selection;
-      if (from === to) return;  // no selection → let existing chat-focus handler win
+      if (from === to) return;
       const text = editorState.state.doc.textBetween(from, to, " ");
       if (!text.trim()) return;
       e.preventDefault();
@@ -819,196 +866,16 @@ export default function Dashboard() {
         range: { from, to },
       });
     };
-    // Capture phase ensures this fires before the existing dashboard ⌘K listener.
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
   }, [editorState]);
 
-  // Submit a selection task: stash range + instruction on the slot, fire backend.
-  // Submit a selection task: register the range with the plugin (so the
-  // inline decoration tracks it through later edits) and fire the backend.
-  // The popover does NOT auto-open — user clicks the green dot when ready.
   const submitSelectionTask = useCallback(async (input: { instruction: string; selectedText: string }) => {
-    if (!editorState || !selMenu) return;
-    const key = `sel:${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    if (!selMenu) return;
     const { range } = selMenu;
-    const fullText = editorState.getText();
-    const occIdx = fullText.indexOf(input.selectedText);
-    const CTX = 400;
-    const ctxFrom = occIdx >= 0 ? occIdx : 0;
-    const ctxTo = occIdx >= 0 ? occIdx + input.selectedText.length : 0;
-    const before = fullText.slice(Math.max(0, ctxFrom - CTX), ctxFrom);
-    const after = fullText.slice(ctxTo, Math.min(fullText.length, ctxTo + CTX));
-
-    registerSlotRange(editorState.view, key, range.from, range.to);
-    slotEngine.updateSlot(key, {
-      status: "pending",
-      range,
-      originalText: input.selectedText,
-      instruction: input.instruction,
-    });
     setSelMenu(null);
-
-    const prompt = `${input.instruction}\n\n原文：\n${input.selectedText}`;
-    await slotEngine.fireSlot(key, { prompt, contextBefore: before, contextAfter: after });
-  }, [editorState, selMenu, slotEngine]);
-
-  // Accept handler — replace bracket / selection with chosen text (with AiSource mark
-  // carrying a fresh editId), and log a history record for revert.
-  const acceptForSlot = useCallback((key: string, text: string, mode: AcceptMode) => {
-    if (!editorState) return;
-    const editId = newEditId();
-    const slot = slotEngine.slots.get(key);
-    const cand = slot?.candidates?.find(c => c.text === text);
-    const tracked = getSlotRange(editorState.view, key);
-
-    if (tracked) {
-      // Selection task.
-      const { from, to } = tracked;
-      const originalText = mode === "replace"
-        ? editorState.state.doc.textBetween(from, to, " ")
-        : "";
-      if (mode === "replace") {
-        editorState.chain().focus()
-          .insertContentAt({ from, to }, [
-            { type: "text", text, marks: [{ type: "aiSource", attrs: { editId } }] },
-          ])
-          .run();
-      } else {
-        // Mark BOTH the leading space and the AI text so revert removes them together.
-        editorState.chain().focus()
-          .insertContentAt(to, [
-            { type: "text", text: " ", marks: [{ type: "aiSource", attrs: { editId } }] },
-            { type: "text", text, marks: [{ type: "aiSource", attrs: { editId } }] },
-          ])
-          .run();
-      }
-      unregisterSlotRange(editorState.view, key);
-      editHistory.addRecord({
-        source: "selection",
-        instruction: slot?.instruction,
-        originalText: originalText || (slot?.originalText ?? ""),
-        newText: text,
-        mode,
-        model: cand?.model,
-        costUsd: cand?.cost_usd ?? undefined,
-      });
-    } else {
-      // Bracket slot — find 【key】 by content + replace.
-      let from = -1, to = -1;
-      editorState.state.doc.descendants((node: any, pos: number, parent: any) => {
-        if (!node.isText || !node.text) return;
-        if (isCodeContext(node, parent)) return;
-        const idx = node.text.indexOf(`【${key}】`);
-        if (idx !== -1 && from === -1) {
-          from = pos + idx;
-          to = from + key.length + 2;
-          return false;
-        }
-      });
-      if (from === -1) return;
-      editorState.chain().focus()
-        .insertContentAt({ from, to }, [
-          { type: "text", text, marks: [{ type: "aiSource", attrs: { editId } }] },
-        ])
-        .run();
-      editHistory.addRecord({
-        source: "bracket",
-        promptKey: key,
-        originalText: `【${key}】`,
-        newText: text,
-        mode: "replace",
-        model: cand?.model,
-        costUsd: cand?.cost_usd ?? undefined,
-      });
-    }
-    slotEngine.clearSlot(key);
-    setOpenSlot(null);
-  }, [editorState, slotEngine, editHistory]);
-
-  // Revert a logged AI edit by finding the matching AiSource span (by editId
-  // attribute) and either restoring the original text or deleting the span.
-  const revertEdit = useCallback((id: string) => {
-    if (!editorState) return;
-    const rec = editHistory.records.find(r => r.id === id);
-    if (!rec || rec.reverted) return;
-
-    // Collect contiguous runs whose aiSource mark carries this editId.
-    const ranges: { from: number; to: number }[] = [];
-    let curStart = -1, curEnd = -1;
-    editorState.state.doc.descendants((node: any, pos: number) => {
-      if (!node.isText || !node.text) return;
-      const m = node.marks?.find((mk: any) => mk.type.name === "aiSource" && mk.attrs.editId === id);
-      const nodeFrom = pos;
-      const nodeTo = pos + node.nodeSize;
-      if (m) {
-        if (curStart === -1) { curStart = nodeFrom; curEnd = nodeTo; }
-        else if (nodeFrom === curEnd) { curEnd = nodeTo; }
-        else { ranges.push({ from: curStart, to: curEnd }); curStart = nodeFrom; curEnd = nodeTo; }
-      } else if (curStart !== -1) {
-        ranges.push({ from: curStart, to: curEnd });
-        curStart = -1; curEnd = -1;
-      }
-    });
-    if (curStart !== -1) ranges.push({ from: curStart, to: curEnd });
-
-    if (ranges.length === 0) {
-      // Span already gone (user manually deleted). Mark as reverted in the log
-      // anyway since there's nothing left to undo.
-      editHistory.markReverted(id);
-      return;
-    }
-
-    if (rec.mode === "replace") {
-      // Replace the bounding extent with original text — single chain step.
-      const from = ranges[0].from;
-      const to = ranges[ranges.length - 1].to;
-      editorState.chain().focus()
-        .insertContentAt({ from, to }, [{ type: "text", text: rec.originalText, marks: [] }])
-        .run();
-    } else {
-      // Append — delete the marked spans, in reverse order so positions stay valid.
-      let chain = editorState.chain().focus();
-      for (let i = ranges.length - 1; i >= 0; i--) {
-        chain = chain.deleteRange(ranges[i]);
-      }
-      chain.run();
-    }
-    editHistory.markReverted(id);
-  }, [editorState, editHistory]);
-
-  const regenerateForSlot = useCallback(async (key: string) => {
-    const st = slotEngine.slots.get(key);
-    if (!editorState || !st) return;
-    const fullText = editorState.getText();
-    const CTX = 500;
-    if (st.instruction && st.originalText) {
-      const occIdx = fullText.indexOf(st.originalText);
-      const ctxFrom = occIdx >= 0 ? occIdx : 0;
-      const ctxTo = occIdx >= 0 ? occIdx + st.originalText.length : 0;
-      const before = fullText.slice(Math.max(0, ctxFrom - CTX), ctxFrom);
-      const after = fullText.slice(ctxTo, Math.min(fullText.length, ctxTo + CTX));
-      const prompt = `${st.instruction}\n\n原文：\n${st.originalText}`;
-      await slotEngine.fireSlot(key, { prompt, contextBefore: before, contextAfter: after });
-    } else {
-      const occIdx = fullText.indexOf(`【${key}】`);
-      const ctxFrom = occIdx >= 0 ? occIdx : 0;
-      const ctxTo = occIdx >= 0 ? occIdx + key.length + 2 : 0;
-      const before = fullText.slice(Math.max(0, ctxFrom - CTX), ctxFrom);
-      const after = fullText.slice(ctxTo, Math.min(fullText.length, ctxTo + CTX));
-      await slotEngine.fireSlot(key, { prompt: key, contextBefore: before, contextAfter: after });
-    }
-  }, [editorState, slotEngine]);
-
-  const discardSlot = useCallback((key: string) => {
-    if (editorState && getSlotRange(editorState.view, key)) {
-      unregisterSlotRange(editorState.view, key);
-    }
-    slotEngine.clearSlot(key);
-    setOpenSlot(null);
-  }, [editorState, slotEngine]);
-
-  const openSlotState = openSlot ? slotEngine.slots.get(openSlot.key) : undefined;
+    await comments.createThread({ ...range, text: input.selectedText.trim() }, input.instruction, true);
+  }, [comments, selMenu]);
 
   // Show nothing while checking auth (prevents flash before redirect)
   if (isLoading || (!isAuthenticated && !isGuest)) {
@@ -1031,21 +898,6 @@ export default function Dashboard() {
           selectedText={selMenu.selectedText}
           onSubmit={submitSelectionTask}
           onClose={() => setSelMenu(null)}
-        />,
-        document.body,
-      )}
-      {/* Candidate popover (bracket + selection tasks share this) */}
-      {openSlot && openSlotState && typeof window !== "undefined" && createPortal(
-        <CandidatePopover
-          slotKey={openSlot.key}
-          state={openSlotState}
-          anchor={openSlot.anchor}
-          headerText={openSlot.headerText}
-          hasAppendMode={openSlot.isSelectionTask}
-          onAccept={(text, mode) => acceptForSlot(openSlot.key, text, mode)}
-          onRegenerate={() => regenerateForSlot(openSlot.key)}
-          onDiscard={() => discardSlot(openSlot.key)}
-          onClose={() => setOpenSlot(null)}
         />,
         document.body,
       )}
@@ -1743,23 +1595,27 @@ export default function Dashboard() {
           ) : (activeFile || activeDbArticle) ? (
             <div className={s.editorScroll}>
               <div className={s.editorInner}>
+                {activeDbArticle && (
+                  <DocTabs
+                    tabs={tabs}
+                    activeId={activeTabId}
+                    onSelect={selectTab}
+                    onAdd={addTab}
+                    onRename={renameTab}
+                    onDelete={deleteTab}
+                    historyOpen={showHistory}
+                    onToggleHistory={() => setShowHistory(v => !v)}
+                  />
+                )}
+                {editorState && <DocWriterBar key={`${activeFile || activeDbArticle?.id || "empty"}:${activeTabId}`} editor={editorState} title={activeDbArticle?.title || activeFile || undefined} />}
                 <NotionEditor
-                  key={activeFile || activeDbArticle?.id || "empty"}
+                  key={`${activeFile || activeDbArticle?.id || "empty"}:${activeTabId}:${editorEpoch}`}
                   initialContent={content}
                   onChange={setContent}
                   onSelectionChange={handleSelectionChange}
                   onEditorReady={handleEditorReady}
-                  getSlotState={getSlotState}
                   articleTitle={activeDbArticle?.title || activeFile || undefined}
                   onTitleChange={activeDbArticle ? (t) => renameArticle(activeDbArticle.id, t) : undefined}
-                  editHistory={editHistory.records
-                    .filter(r => !r.reverted)
-                    .slice(0, 10)
-                    .map(r => ({
-                      action: r.source === "bracket" ? "bracket-fill" : `selection-${r.mode}`,
-                      summary: (r.instruction || r.promptKey || r.newText.slice(0, 40)).slice(0, 100),
-                      accepted: !r.reverted,
-                    }))}
                 />
               </div>
             </div>
@@ -1778,13 +1634,21 @@ export default function Dashboard() {
           <div className={s.resizeHandleLine} />
         </div>
 
-        {/* AI Edit History — replaces the legacy ChatPanel */}
+        {/* Right rail: suggestions + comment threads (Claude Docs model) */}
         <div className={s.chatPanel} style={{ width: chatWidth }}>
-          <EditHistoryPanel
-            records={editHistory.records}
-            onRevert={revertEdit}
-            onClear={editHistory.clear}
-          />
+          {showHistory && activeDbArticle ? (
+            <VersionHistory
+              articleId={activeDbArticle.id}
+              tabId={activeTabId}
+              tabName={tabs.find(t => t.id === activeTabId)?.name || "正文"}
+              refreshKey={historyKey}
+              beforeRestore={async () => { if (contentRef.current !== savedContentRef.current) await saveFile(); }}
+              onRestored={(html) => { setContent(html); setSavedContent(html); setEditorEpoch(n => n + 1); }}
+              onClose={() => setShowHistory(false)}
+            />
+          ) : (
+            <CommentsPanel api={comments} suggestions={suggestions} enabled={!!docKey && !!editorState} />
+          )}
         </div>
         </>
         )}
