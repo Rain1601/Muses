@@ -1613,7 +1613,7 @@ export default function Dashboard() {
                 {editorState && (
                   <div className="doc-toolbar">
                     <div className="doc-toolbar-main">
-                      <DocWriterBar key={`${activeFile || activeDbArticle?.id || "empty"}:${activeTabId}`} editor={editorState} title={activeDbArticle?.title || activeFile || undefined} />
+                      <DocWriterBar key={`${activeFile || activeDbArticle?.id || "empty"}:${activeTabId}`} editor={editorState} title={activeDbArticle?.title || activeFile || undefined} insertTitle={!activeDbArticle} />
                     </div>
                     <ExportMenu
                       editor={editorState}

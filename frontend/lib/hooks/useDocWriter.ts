@@ -58,7 +58,7 @@ function setStatus(editor: any, id: string, status: string, error = '') {
   return true;
 }
 
-export function useDocWriter(editor: any, opts: { title?: string }) {
+export function useDocWriter(editor: any, opts: { title?: string; insertTitle?: boolean }) {
   const [state, setState] = useState<DocWriterState>({ busy: false, phase: 'idle', done: 0, total: 0, error: null });
   const topicRef = useRef<string>('');
   const skillRef = useRef<string | undefined>(undefined);
@@ -135,7 +135,10 @@ export function useDocWriter(editor: any, opts: { title?: string }) {
         attrs: { id: newPendingId(), heading: s.heading, intent: s.intent },
       }));
       const ids = blocks.map((b) => b.attrs.id);
-      const content = existingText ? blocks : [{ type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: outline.title }] }, ...blocks];
+      // A DB article already shows its title above the editor; only title-less
+      // docs (workspace .md files) get the outline's title as a heading.
+      const withTitle = !existingText && opts.insertTitle !== false;
+      const content = withTitle ? [{ type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: outline.title }] }, ...blocks] : blocks;
       if (existingText) {
         editor.chain().insertContentAt(editor.state.doc.content.size, content).run();
       } else {

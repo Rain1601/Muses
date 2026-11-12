@@ -18,8 +18,8 @@ interface SkillOption {
 
 export const OPEN_DOC_WRITER_EVENT = 'muses:open-doc-writer';
 
-export default function DocWriterBar({ editor, title }: { editor: any; title?: string }) {
-  const writer = useDocWriter(editor, { title });
+export default function DocWriterBar({ editor, title, insertTitle = true }: { editor: any; title?: string; insertTitle?: boolean }) {
+  const writer = useDocWriter(editor, { title, insertTitle });
   const [open, setOpen] = useState(false);
   const [topic, setTopic] = useState('');
   const [skillId, setSkillId] = useState('');
