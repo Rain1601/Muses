@@ -30,14 +30,18 @@ python3 start.py           # Start FastAPI (auto-kills existing process on same 
 # Swagger docs at http://localhost:8080/docs
 ```
 
-### Database
+### Tests
 ```bash
 cd backend
-alembic revision --autogenerate -m "description"   # Create migration
-alembic upgrade head                                # Apply migrations
+venv/bin/python -m pytest tests -q                                  # Backend suite (pytest + pytest-asyncio)
+venv/bin/python -m pytest tests/test_url_import.py::<test_name> -q  # Single test
+cd frontend && node scripts/verify-crypto-parity.mjs                # Python↔TS AES-GCM ciphertext parity (needs backend/.env + venv)
 ```
 
-> No automated test suite. After a UI change, drive the app in a browser and confirm the path manually (see "Doing tasks" in your operator instructions).
+Backend tests build a throwaway SQLite DB in `tmp_path` via `Base.metadata.create_all` and monkeypatch each router module's `SessionLocal`; fixtures are shared by plain import between test files (e.g. `from test_translation import translation_db`), there is no `conftest.py`. No frontend test runner — after a UI change, drive the app in a browser and confirm the path manually.
+
+### Database / schema changes
+There is **no Alembic** setup. Tables are created by `create_tables()` (`Base.metadata.create_all`) and new columns on existing tables are added by the hand-written `run_migrations()` in `app/database.py` (`ALTER TABLE ... ADD COLUMN`). When adding a column to an existing model, also add it to that list or existing DBs will break.
 
 ## Architecture
 
@@ -52,7 +56,7 @@ alembic upgrade head                                # Apply migrations
 The app intentionally has only two user-facing pages:
 
 - `app/page.tsx` — landing + GitHub/Google login (also: "browse as guest" → /dashboard)
-- `app/dashboard/page.tsx` — the entire product (~1750 lines, three-panel workspace)
+- `app/dashboard/page.tsx` — the entire product (~1800 lines, three-panel workspace)
 - `app/auth/callback/` — OAuth callback
 
 Two dev-only prototype routes also exist and are not part of the shipped UX:
@@ -65,12 +69,12 @@ Two dev-only prototype routes also exist and are not part of the shipped UX:
 - Server state: TanStack Query (`staleTime: 60s`, `refetchOnWindowFocus: false`)
 - Client state: Zustand stores in `store/` — `user.ts` (auth), `aiAssistant.ts` (AI toggle)
 
-**TipTap Editor** (`components/NotionEditor.tsx`, ~1240 lines): tables, task lists, syntax-highlighted code blocks, KaTeX math, YouTube/Bilibili embeds, resizable images, collapsible code blocks. Custom extensions in `lib/tiptap-extensions/` — notably `PromptSlot/` (typed slot tokens used by the Prompt Writing prototype + `useSlotEngine`/`CandidatePopover`).
+**TipTap Editor** (`components/NotionEditor.tsx`, ~1500 lines): tables, task lists, syntax-highlighted code blocks, KaTeX math, YouTube/Bilibili embeds, resizable images, collapsible code blocks. Custom extensions in `lib/tiptap-extensions/` — notably `PromptSlot/` (typed slot tokens used by the Prompt Writing prototype + `useSlotEngine`/`CandidatePopover`).
 
 **Text Actions System**: `useTextActions` hook (`lib/hooks/`) provides unified AI text operations (improve, expand, summarize, translate, fix-grammar, brainstorm, custom-prompt). Posts to `/api/agents/text-action`. Gated by AI Assistant toggle.
 
 **Dashboard-embedded components** (everything routes through `app/dashboard/page.tsx`):
-- `studio/SettingsPanel` — model + provider picker (the old `studio/ChatPanel` was removed; the right rail is now history-focused)
+- `studio/SettingsPanel` — model + provider picker (`studio/ChatPanel.tsx` still exists on disk but is no longer mounted; the right rail is now history-focused)
 - `studio/DiffView` — accept/reject pane for AI-proposed edits
 - `EditHistoryPanel` + `useEditHistory` hook — in-session AI edit log on the right rail
 - `PublishHistoryPanel` — publish-to-GitHub history (reads `SyncHistory`)
@@ -107,7 +111,7 @@ User-owned library of writing-prompt templates. Each Skill is `{name, descriptio
 
 **Prompt System** (`app/agent/prompts/`): `builder.py` for dynamic prompt construction, `registry.py` for action registry, `action_prompts/` subdirectory with the action templates used by `/api/agents/text-action`.
 
-**Multi-Model Support** (`app/services/unified_ai.py`): Single OpenAI-compatible SDK path against 3 aggregated provider base URLs — AIHubMix (`aihubmix.com/v1`), OpenRouter (`openrouter.ai/api/v1`), 百炼 (`dashscope.aliyuncs.com/compatible-mode/v1`). User stores per-provider keys (`aihubmixKey`, `openrouterKey`, `bailianKey`) on the User model, encrypted. Model registry in `app/models_config.py` is shared across providers (Claude, GPT, Gemini, Qwen, DeepSeek). Per-agent model + provider selection. Legacy `openaiKey`/`claudeKey`/`geminiKey` columns are kept only for migration.
+**Multi-Model Support** (`app/services/unified_ai.py`): Single OpenAI-compatible SDK path against 3 aggregated provider base URLs — AIHubMix (`aihubmix.com/v1`), OpenRouter (`openrouter.ai/api/v1`), 百炼 (`dashscope.aliyuncs.com/compatible-mode/v1`). User stores per-provider keys (`aihubmixKey`, `openrouterKey`, `bailianKey`) on the User model, encrypted. Model registry in `app/models_config.py` is shared across providers (Claude, GPT, Gemini, Qwen, DeepSeek). Per-agent model + provider selection. A direct `deepseek` provider (`deepseekKey`, with fallback to a server-side `settings.deepseek_api_key`) is being added alongside the three aggregators. Legacy `openaiKey`/`claudeKey`/`geminiKey` columns are kept only for migration.
 
 ### Key Data Flows
 
@@ -119,7 +123,7 @@ User-owned library of writing-prompt templates. Each Skill is `{name, descriptio
 
 Active models: `User` (OAuth + encrypted API keys), `UserSettings`, `Agent` (AI writing assistants), `Article` (content + publish state), `Skill` (prompt templates), `SyncHistory` (publish log).
 
-All sensitive data (API keys, tokens) encrypted before storage.
+All sensitive data (API keys, tokens) encrypted before storage via `backend/app/utils/security.py` (AES-GCM, Scrypt KDF from `ENCRYPTION_KEY`/`ENCRYPTION_SALT`, format `nonce[12] || ciphertext || tag[16]`). `frontend/lib/crypto.ts` is a byte-compatible TS port (Phase 0 of a planned TS backend migration) — change both together and re-run the parity script.
 
 > Legacy tables `ChatHistory`, `MusesConfig`, `ConfigHistory`, `ConfigTemplate`, `AgentMusesConfig` still exist in the SQLite file but no longer have ORM models (Phase 6 of slimming kept the data, dropped the code). New migrations should not depend on them.
 

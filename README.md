@@ -101,7 +101,8 @@ GITHUB_CLIENT_SECRET="<from github oauth app>"
 ENCRYPTION_KEY="<32-char string>"
 ```
 
-> AI provider key（AIHubMix / OpenRouter / 百炼）通过登录后的设置面板逐用户配置，加密存于 User 表，不通过 env 注入。
+> AI provider key（DeepSeek / AIHubMix / OpenRouter / 百炼）在「Settings → 模型」中逐用户配置，加密存储。DeepSeek 官方 Key 填入「DeepSeek 官方」一栏；整篇翻译可选择 `deepseek-flash` 或 `deepseek-v4-pro`。只配置 DeepSeek 时，自动模式使用 Flash；已有其他服务商时保留原优先级。
+> 本地已有的 `DEEPSEEK_API_KEY` 环境变量仍可使用，用户设置的 DeepSeek Key 优先。
 
 GitHub OAuth callback URL：`http://localhost:8080/api/auth/github/callback`。
 
