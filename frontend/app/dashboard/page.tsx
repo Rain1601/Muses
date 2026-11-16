@@ -1,6 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { isTextSelection } from "@tiptap/core";
+import { BubbleMenu, type BubbleMenuProps } from "@tiptap/react/menus";
+import { MessageSquare } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { marked } from "marked";
 import { useUserStore } from "@/store/user";
@@ -9,7 +12,8 @@ import SettingsPanel from "@/components/studio/SettingsPanel";
 import PublishHistoryPanel from "@/components/PublishHistoryPanel";
 import SkillLibrary from "@/components/SkillLibrary";
 import ContextConfigPanel from "@/components/ContextConfigPanel";
-import { TaskCenter } from "@/components/TaskCenter";
+import { TaskDropdown } from "@/components/TaskDropdown";
+import { toast } from "@/components/ui/use-toast";
 import { FileImport } from "@/components/FileImport";
 import { persistSelection, clearPersistedSelection } from "@/lib/tiptap-extensions/SelectionPersistence";
 import { getLineContent } from "@/lib/tiptap-extensions/LineNumbers";
@@ -17,6 +21,7 @@ import SelectionTaskMenu from "@/components/SelectionTaskMenu";
 import DocWriterBar from "@/components/docs/DocWriterBar";
 import CommentsPanel from "@/components/docs/CommentsPanel";
 import { useComments } from "@/lib/hooks/useComments";
+import { isActiveTask, useArticleTasks } from "@/lib/hooks/useArticleTasks";
 import { useSuggestions } from "@/lib/hooks/useSuggestions";
 import DocTabs, { type DocTab } from "@/components/docs/DocTabs";
 import VersionHistory from "@/components/docs/VersionHistory";
@@ -49,6 +54,12 @@ const CHAT_WIDTH_KEY = "muses-chat-panel-width";
 const CHAT_WIDTH_DEFAULT = 280;
 const CHAT_WIDTH_MIN = 240;
 const CHAT_WIDTH_MAX = 380;
+
+const showCommentButton: NonNullable<BubbleMenuProps["shouldShow"]> = ({ editor, element, view, state, from, to }) =>
+  editor.isEditable && isTextSelection(state.selection) && from < to &&
+  (view.hasFocus() || element.contains(document.activeElement)) && !!state.doc.textBetween(from, to, " ").trim();
+
+const commentMenuParent = () => document.body;
 
 interface FileItem { name: string; path: string; size: number; modified: number; }
 interface DBArticle { id: string; title: string; summary?: string; publishStatus: string; publishedAt?: string; githubUrl?: string; createdAt: string; updatedAt: string; }
@@ -170,7 +181,6 @@ export default function Dashboard() {
   const darkMode = true; // Dark-only UI — warm minimalist design
   const [showSettings, setShowSettings] = useState(false);
   const [showPublishHistory, setShowPublishHistory] = useState(false);
-  const [showTaskCenter, setShowTaskCenter] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [articleMenuOpen, setArticleMenuOpen] = useState<string | null>(null);
   // Menu anchor — fixed position relative to click point (right-click or ··· button)
@@ -187,7 +197,7 @@ export default function Dashboard() {
   const [translateLang, setTranslateLang] = useState("en");
   const [translateMode, setTranslateMode] = useState<"translated" | "bilingual">("translated");
   const [translating, setTranslating] = useState(false);
-  const [hasRunningTasks, setHasRunningTasks] = useState(false);
+  const { tasks, addTask, cancelTask, removeHistory } = useArticleTasks(isAuthenticated);
   const [publishingFile, setPublishingFile] = useState<string | null>(null);
   const [publishStatus, setPublishStatus] = useState<{ type: "success" | "error" | "info"; msg: string } | null>(null);
   const [translateError, setTranslateError] = useState<string | null>(null);
@@ -204,52 +214,6 @@ export default function Dashboard() {
   // ===== Theme (dark-only) =====
   useEffect(() => {
     document.documentElement.classList.add("dark");
-  }, []);
-
-  // ===== Running tasks indicator + completion notifications =====
-  // Note: We dispatch a custom event when articles need reloading instead of
-  // calling loadDbArticles directly, because loadDbArticles is defined later
-  // (useCallback hoisting / TDZ).
-  useEffect(() => {
-    const check = () => {
-      try {
-        const raw = localStorage.getItem("muses_tasks");
-        if (!raw) { setHasRunningTasks(false); runningTaskIdsRef.current = new Set(); return; }
-        const tasks: any[] = JSON.parse(raw);
-        setHasRunningTasks(tasks.some(t => t.status === "pending" || t.status === "running"));
-
-        const currentRunning = new Set<string>(
-          tasks.filter(t => t.status === "pending" || t.status === "running").map(t => t.taskId)
-        );
-        for (const id of runningTaskIdsRef.current) {
-          if (currentRunning.has(id)) continue;
-          const t = tasks.find(x => x.taskId === id);
-          if (!t) continue;
-          const isTranslate = t.task_type === "translate_article";
-          if (t.status === "completed") {
-            const title = t.result?.title || t.article_id || "";
-            setPublishStatus({
-              type: "success",
-              msg: isTranslate ? `翻译完成${title ? `: ${title}` : ""}` : `任务完成${title ? `: ${title}` : ""}`,
-            });
-            setTimeout(() => setPublishStatus(null), 5000);
-            window.dispatchEvent(new Event("muses-articles-changed"));
-          } else if (t.status === "failed") {
-            setPublishStatus({
-              type: "error",
-              msg: (isTranslate ? "翻译失败: " : "任务失败: ") + (t.error || "未知错误"),
-            });
-            setTimeout(() => setPublishStatus(null), 6000);
-          }
-        }
-        runningTaskIdsRef.current = currentRunning;
-      } catch { setHasRunningTasks(false); }
-    };
-    check();
-    const interval = setInterval(check, 2000);
-    const onUpdate = () => check();
-    window.addEventListener("muses-task-update", onUpdate);
-    return () => { clearInterval(interval); window.removeEventListener("muses-task-update", onUpdate); };
   }, []);
 
   // ===== Trigger translation =====
@@ -280,40 +244,27 @@ export default function Dashboard() {
       });
       const result = await res.json();
       if (res.ok && result.taskId) {
-        try {
-          const raw = localStorage.getItem("muses_tasks");
-          const tasks = raw ? JSON.parse(raw) : [];
-          const now = new Date().toISOString();
-          tasks.unshift({
-            taskId: result.taskId,
-            status: result.status || "pending",
-            progress: 0,
-            total: 0,
-            createdAt: now,
-            updatedAt: now,
-            task_type: "translate_article",
-            article_id: activeDbArticle.id,
-            target_language: translateLang,
-            mode: translateMode,
-            result: { article_id: activeDbArticle.id, title: activeDbArticle.title },
-          });
-          localStorage.setItem("muses_tasks", JSON.stringify(tasks));
-          window.dispatchEvent(new Event("muses-task-update"));
-        } catch (e) { console.warn("Failed to record task:", e); }
-        setPublishStatus({ type: "info", msg: "翻译任务已启动 — 在任务中心查看进度" });
-        setTimeout(() => setPublishStatus(null), 3500);
+        addTask({
+          taskId: result.taskId,
+          status: "pending",
+          progress: 0,
+          total: 0,
+          createdAt: new Date().toISOString(),
+          task_type: "translate_article",
+          sourceTitle: activeDbArticle.title,
+        });
+        toast({ title: "翻译任务已提交" });
         setShowTranslate(false);
-        setShowTaskCenter(true);
       } else {
-        setTranslateError(result.detail || "翻译启动失败");
+        setTranslateError(typeof result.detail === "string" ? result.detail : "翻译启动失败，请重试");
       }
     } catch (e: any) {
-      setTranslateError(e.name === "TimeoutError" ? "请求超时，请先在任务中心确认是否已创建任务" : e.message || "翻译启动失败");
+      setTranslateError(e.name === "TimeoutError" ? "翻译请求超时" : e.message || "翻译启动失败，请重试");
     } finally {
       translationPending.current = false;
       setTranslating(false);
     }
-  }, [activeDbArticle, translateLang, translateMode, translateModel]);
+  }, [activeDbArticle, addTask, translateLang, translateMode, translateModel]);
 
   // ===== File operations =====
   const loadFiles = useCallback(async () => {
@@ -340,12 +291,22 @@ export default function Dashboard() {
 
   useEffect(() => { loadFiles(); loadDbArticles(); }, [loadFiles, loadDbArticles]);
 
-  // Refresh DB article list when a background task completes (translation, import, etc.)
   useEffect(() => {
-    const handler = () => loadDbArticles();
-    window.addEventListener("muses-articles-changed", handler);
-    return () => window.removeEventListener("muses-articles-changed", handler);
-  }, [loadDbArticles]);
+    const previous = runningTaskIdsRef.current;
+    runningTaskIdsRef.current = new Set(tasks.filter(isActiveTask).map(task => task.taskId));
+    let refreshArticles = false;
+    for (const task of tasks) {
+      if (!previous.has(task.taskId)) continue;
+      const kind = task.task_type === "translate_article" ? "翻译" : "任务";
+      if (task.status === "completed") {
+        toast({ title: `${kind}完成`, description: task.result?.title });
+        refreshArticles = true;
+      } else if (task.status === "failed") {
+        toast({ title: `${kind}失败`, description: task.error, variant: "destructive" });
+      }
+    }
+    if (refreshArticles) void loadDbArticles();
+  }, [tasks, loadDbArticles]);
 
   // ===== Publish =====
   const publishFile = useCallback(async (filePath: string) => {
@@ -819,12 +780,23 @@ export default function Dashboard() {
     setEditorState(editor);
   }, []);
 
-  // ===== Comment threads (Claude Docs model, right rail) =====
+  // ===== Comments =====
   const docKey = activeDbArticle
     ? `article:${activeDbArticle.id}${activeTabId === "main" ? "" : `#${activeTabId}`}`
     : activeFile ? `file:${activeFile}` : null;
   const comments = useComments(docKey, editorState);
-  const beginComment = comments.begin;
+  const [editorScroll, setEditorScroll] = useState<HTMLDivElement | null>(null);
+  const [commentGutter, setCommentGutter] = useState<HTMLDivElement | null>(null);
+  const begin = comments.begin;
+  const beginComment = useCallback(() => {
+    if (!begin()) return false;
+    setShowHistory(false);
+    return true;
+  }, [begin]);
+  const commentMenuOptions = useMemo<BubbleMenuProps["options"]>(() => ({
+    placement: "top", strategy: "fixed", scrollTarget: editorScroll ?? undefined,
+    hide: editorScroll ? { boundary: editorScroll } : false,
+  }), [editorScroll]);
   // ⌘⇧M with a selection → start a comment thread on it.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -988,25 +960,6 @@ export default function Dashboard() {
           }}
         />
       )}
-      {/* Task Center */}
-      <TaskCenter
-        isOpen={showTaskCenter}
-        onClose={() => setShowTaskCenter(false)}
-        onArticleClick={async (articleId) => {
-          setShowTaskCenter(false);
-          // Load articles, find by id, open it
-          const token = localStorage.getItem("token");
-          if (!token) return;
-          try {
-            const res = await fetch(`${API_BASE}/api/articles/${articleId}`, {
-              headers: { Authorization: `Bearer ${token}` },
-            });
-            const data = await res.json();
-            if (data.article) openDbArticle(data.article);
-          } catch (e) { console.error("Open from task center failed:", e); }
-        }}
-      />
-
       {/* File import modal */}
       {showImport && (
         <div
@@ -1089,7 +1042,7 @@ export default function Dashboard() {
                   aria-label="翻译文章"
                   disabled={!activeDbArticle}
                   className={s.iconBtn}
-                  title={activeDbArticle ? "翻译这篇文章(异步,任务中心查进度)" : "选中文章后可翻译"}
+                  title={activeDbArticle ? "翻译这篇文章" : "选中文章后可翻译"}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M5 8l6 6"/>
@@ -1118,7 +1071,7 @@ export default function Dashboard() {
                       翻译文章
                     </div>
                     <div id="translate-description" style={{ fontSize: "0.75rem", color: "#A8A29E", marginBottom: "0.75rem", lineHeight: 1.5 }}>
-                      保存当前内容并生成新文章，原文保留。提交后可在任务中心查看进度。
+                      保存当前内容，翻译完成后生成新文章。
                     </div>
 
                     <label style={{ display: "block", fontSize: "0.625rem", letterSpacing: "0.02em", color: "#78716C", marginBottom: "0.375rem" }}>
@@ -1217,26 +1170,25 @@ export default function Dashboard() {
                 )}
               </Popover>
 
-              <button
-                onClick={() => setShowTaskCenter(true)}
-                className={s.iconBtn}
-                title="任务中心(翻译等后台任务)"
-                style={{ position: "relative" }}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="8" y="3" width="8" height="4" rx="1"/>
-                  <path d="M16 5h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2"/>
-                  <line x1="9" y1="12" x2="15" y2="12"/>
-                  <line x1="9" y1="16" x2="13" y2="16"/>
-                </svg>
-                {hasRunningTasks && (
-                  <span style={{
-                    position: "absolute", top: 3, right: 3,
-                    width: 6, height: 6, borderRadius: 999,
-                    background: "#3b82f6", boxShadow: "0 0 6px rgba(59, 130, 246, 0.6)",
-                  }} />
-                )}
-              </button>
+              <TaskDropdown tasks={tasks} onCancel={cancelTask} onRemove={removeHistory}
+                triggerClassName={s.iconBtn} disabled={!isAuthenticated}
+                onArticleClick={async (articleId) => {
+                  const known = dbArticles.find((article) => article.id === articleId);
+                  if (known) { await openDbArticle(known); return; }
+                  const token = localStorage.getItem("token");
+                  if (!token) return;
+                  try {
+                    const res = await fetch(`${API_BASE}/api/articles/${articleId}`, {
+                      headers: { Authorization: `Bearer ${token}` },
+                      signal: AbortSignal.timeout(30000),
+                    });
+                    if (!res.ok) throw new Error("文章无法打开");
+                    const data = await res.json();
+                    await openDbArticle(data.article);
+                  } catch {
+                    toast({ title: "文章无法打开", variant: "destructive" });
+                  }
+                }} />
               <button
                 onClick={() => activeDbArticle && setShowPublishHistory(true)}
                 disabled={!activeDbArticle}
@@ -1596,43 +1548,57 @@ export default function Dashboard() {
           {showSettings ? (
             <SettingsPanel onClose={() => setShowSettings(false)} />
           ) : (activeFile || activeDbArticle) ? (
-            <div className={s.editorScroll}>
-              <div className={s.editorInner}>
-                {activeDbArticle && (
-                  <DocTabs
-                    tabs={tabs}
-                    activeId={activeTabId}
-                    onSelect={selectTab}
-                    onAdd={addTab}
-                    onRename={renameTab}
-                    onDelete={deleteTab}
-                    historyOpen={showHistory}
-                    onToggleHistory={() => setShowHistory(v => !v)}
-                  />
-                )}
-                {editorState && (
-                  <div className="doc-toolbar">
-                    <div className="doc-toolbar-main">
-                      <DocWriterBar key={`${activeFile || activeDbArticle?.id || "empty"}:${activeTabId}`} editor={editorState} title={activeDbArticle?.title || activeFile || undefined} insertTitle={!activeDbArticle} />
-                    </div>
-                    <ExportMenu
-                      editor={editorState}
-                      title={[
-                        activeDbArticle?.title || activeFile?.replace(/\.md$/, "") || "muses-doc",
-                        activeTabId !== "main" ? tabs.find(t => t.id === activeTabId)?.name : null,
-                      ].filter(Boolean).join(" - ")}
+            <div className={s.editorScroll} ref={setEditorScroll}>
+              <div className={s.editorPage}>
+                <div className={s.editorInner}>
+                  {activeDbArticle && (
+                    <DocTabs
+                      tabs={tabs}
+                      activeId={activeTabId}
+                      onSelect={selectTab}
+                      onAdd={addTab}
+                      onRename={renameTab}
+                      onDelete={deleteTab}
+                      historyOpen={showHistory}
+                      onToggleHistory={() => setShowHistory(v => !v)}
                     />
-                  </div>
-                )}
-                <NotionEditor
-                  key={`${activeFile || activeDbArticle?.id || "empty"}:${activeTabId}:${editorEpoch}`}
-                  initialContent={content}
-                  onChange={setContent}
-                  onSelectionChange={handleSelectionChange}
-                  onEditorReady={handleEditorReady}
-                  articleTitle={activeDbArticle?.title || activeFile || undefined}
-                  onTitleChange={activeDbArticle ? (t) => renameArticle(activeDbArticle.id, t) : undefined}
-                />
+                  )}
+                  {editorState && (
+                    <div className="doc-toolbar">
+                      <div className="doc-toolbar-main">
+                        <DocWriterBar key={`${activeFile || activeDbArticle?.id || "empty"}:${activeTabId}`} editor={editorState} title={activeDbArticle?.title || activeFile || undefined} insertTitle={!activeDbArticle} />
+                      </div>
+                      <ExportMenu
+                        editor={editorState}
+                        title={[
+                          activeDbArticle?.title || activeFile?.replace(/\.md$/, "") || "muses-doc",
+                          activeTabId !== "main" ? tabs.find(t => t.id === activeTabId)?.name : null,
+                        ].filter(Boolean).join(" - ")}
+                      />
+                    </div>
+                  )}
+                  <NotionEditor
+                    key={`${activeFile || activeDbArticle?.id || "empty"}:${activeTabId}:${editorEpoch}`}
+                    initialContent={content}
+                    onChange={setContent}
+                    onSelectionChange={handleSelectionChange}
+                    onEditorReady={handleEditorReady}
+                    articleTitle={activeDbArticle?.title || activeFile || undefined}
+                    onTitleChange={activeDbArticle ? (t) => renameArticle(activeDbArticle.id, t) : undefined}
+                  />
+                  {editorState && editorScroll && !comments.draft && !selMenu && (
+                    <BubbleMenu editor={editorState} pluginKey="commentMenu" updateDelay={60}
+                      appendTo={commentMenuParent} shouldShow={showCommentButton} options={commentMenuOptions} className="z-30">
+                      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={beginComment}
+                        aria-keyshortcuts="Meta+Shift+M Control+Shift+M" title="评论所选文字（⌘⇧M）"
+                        className="flex items-center gap-2 rounded-md border border-stone-600 bg-stone-800 px-3 py-2 text-sm text-stone-100 hover:bg-stone-700 focus-visible:outline focus-visible:outline-ring active:bg-stone-900">
+                        <MessageSquare className="size-4" aria-hidden="true" />
+                        评论
+                      </button>
+                    </BubbleMenu>
+                  )}
+                </div>
+                <div className={s.commentGutter} ref={setCommentGutter} aria-hidden="true" />
               </div>
             </div>
           ) : (
@@ -1663,7 +1629,8 @@ export default function Dashboard() {
               onClose={() => setShowHistory(false)}
             />
           ) : (
-            <CommentsPanel api={comments} suggestions={suggestions} enabled={!!docKey && !!editorState} />
+            <CommentsPanel api={comments} suggestions={suggestions} editor={editorScroll ? editorState : null}
+              scrollArea={editorScroll} gutter={commentGutter} />
           )}
         </div>
         </>

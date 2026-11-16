@@ -8,6 +8,11 @@
  * turndown keep rule, .md workspace files.
  */
 import { Mark, mergeAttributes } from '@tiptap/core';
+import type { Editor } from '@tiptap/core';
+import { Plugin, PluginKey } from '@tiptap/pm/state';
+import { Decoration, DecorationSet } from '@tiptap/pm/view';
+
+const commentDraftKey = new PluginKey<DecorationSet>('commentDraft');
 
 export const CommentAnchor = Mark.create({
   name: 'commentAnchor',
@@ -32,11 +37,31 @@ export const CommentAnchor = Mark.create({
   renderHTML({ HTMLAttributes }) {
     return ['span', mergeAttributes(HTMLAttributes, { class: 'comment-anchor' }), 0];
   },
+
+  addProseMirrorPlugins() {
+    return [new Plugin({
+      key: commentDraftKey,
+      state: {
+        init: () => DecorationSet.empty,
+        apply(transaction, decorations) {
+          const range = transaction.getMeta(commentDraftKey) as Range | null | undefined;
+          if (range === undefined) return decorations.map(transaction.mapping, transaction.doc);
+          if (!range || range.from === range.to) return DecorationSet.empty;
+          return DecorationSet.create(transaction.doc, [Decoration.inline(range.from, range.to, { class: 'comment-draft' })]);
+        },
+      },
+      props: { decorations: (state) => commentDraftKey.getState(state) },
+    })];
+  },
 });
 
 export default CommentAnchor;
 
 type Range = { from: number; to: number };
+
+export function showCommentDraft(editor: Editor, range: Range | null) {
+  editor.view.dispatch(editor.state.tr.setMeta(commentDraftKey, range));
+}
 
 function anchorMarks(editor: any, threadId: string): Array<Range & { mark: any }> {
   const out: Array<Range & { mark: any }> = [];

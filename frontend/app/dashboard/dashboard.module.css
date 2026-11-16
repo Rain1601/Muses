@@ -1009,12 +1009,36 @@
   flex: 1;
   overflow: auto;
   scroll-behavior: smooth;
+  container-type: inline-size;
 }
 
 .editorScroll::-webkit-scrollbar { width: 8px; }
 .editorScroll::-webkit-scrollbar-track { background: #252220; }
 .editorScroll::-webkit-scrollbar-thumb { background: #3F3A36; border-radius: 8px; }
 .editorScroll::-webkit-scrollbar-thumb:hover { background: #57534E; }
+
+.commentGutter { display: none; }
+
+@container (min-width: 48rem) {
+  .editorPage {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 15rem;
+    column-gap: 1.5rem;
+    padding-inline-end: 1.5rem;
+  }
+
+  .editorPage .editorInner {
+    min-width: 0;
+    width: 100%;
+    padding-inline: 1.5rem;
+  }
+
+  .commentGutter { display: block; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .editorScroll { scroll-behavior: auto; }
+}
 
 .editorInner {
   max-width: 920px;

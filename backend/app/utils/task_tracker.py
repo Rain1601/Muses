@@ -3,6 +3,8 @@
 用于跟踪长时间运行的异步任务（如文章翻译）
 """
 
+import asyncio
+from collections.abc import Coroutine
 from typing import Dict, Any, Optional
 from datetime import datetime
 import uuid
@@ -15,6 +17,7 @@ class TaskStatus(str, Enum):
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
+    CANCELLED = "cancelled"
 
 
 class TaskTracker:
@@ -52,6 +55,20 @@ class TaskTracker:
         return task_id
 
     @classmethod
+    def start_task(cls, task_id: str, work: Coroutine[Any, Any, None]) -> None:
+        task = cls._tasks[task_id]
+        worker = asyncio.create_task(work)
+        task["worker"] = worker
+        worker.add_done_callback(lambda _: task.pop("worker"))
+
+    @classmethod
+    def cancel_task(cls, task_id: str) -> None:
+        task = cls._tasks[task_id]
+        if task["status"] in (TaskStatus.PENDING, TaskStatus.RUNNING):
+            cls.update_task(task_id, status=TaskStatus.CANCELLED)
+            task["worker"].cancel()
+
+    @classmethod
     def update_task(
         cls,
         task_id: str,
@@ -68,6 +85,8 @@ class TaskTracker:
             raise ValueError(f"Task {task_id} not found")
 
         task = cls._tasks[task_id]
+        if task["status"] == TaskStatus.CANCELLED:
+            return
 
         if status is not None:
             task["status"] = status

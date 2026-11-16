@@ -641,8 +641,6 @@ async def translate_article(
     - 翻译用 asyncio.create_task 真正脱离响应生命周期,不阻塞 HTTP 响应
     - 通过 /tasks/{task_id} 查询进度
     """
-    import asyncio
-
     # 验证文章存在且属于用户
     article = db.query(Article).filter(
         Article.id == article_id,
@@ -684,7 +682,8 @@ async def translate_article(
 
     # 用 asyncio.create_task 真正 fire-and-forget,不走 FastAPI BackgroundTasks
     # (后者会在响应生命周期里 await 任务,长任务会让 HTTP 响应迟迟刷不出去)
-    asyncio.create_task(
+    task_tracker.start_task(
+        task_id,
         _translate_article_background(
             task_id,
             article_id,
@@ -709,20 +708,29 @@ async def get_task_status(
     task_id: str = Path(..., description="任务ID"),
     current_user = Depends(get_current_user_db)
 ):
-    """
-    查询任务进度
-    返回任务状态、进度、结果或错误信息
-    """
+    return _task_response(_owned_task(task_id, current_user))
+
+
+@router.post("/tasks/{task_id}/cancel")
+async def cancel_article_task(task_id: str, current_user=Depends(get_current_user_db)):
+    task = _owned_task(task_id, current_user)
+    task_tracker.cancel_task(task_id)
+    return _task_response(task)
+
+
+def _owned_task(task_id: str, user: User) -> dict:
     task = task_tracker.get_task(task_id)
 
     if not task:
         raise HTTPNotFoundError("任务不存在")
 
     # 验证任务属于当前用户
-    if task.get("user_id") != current_user.id:
+    if task.get("user_id") != user.id:
         raise HTTPValidationError("无权访问此任务")
+    return task
 
-    # 返回任务信息
+
+def _task_response(task: dict) -> dict:
     response = {
         "taskId": task["id"],
         "status": task["status"],

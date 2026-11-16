@@ -33,11 +33,8 @@ async def github_callback(
 ):
     """处理GitHub OAuth回调"""
     try:
-        user, jwt_token, is_new_user = await AuthService.github_oauth_callback(code, db)
-        
-        # 根据是否新用户重定向到不同页面
-        redirect_path = "/onboarding" if is_new_user else "/dashboard"
-        redirect_url = f"{settings.frontend_url}{redirect_path}?token={jwt_token}"
+        _, jwt_token, _ = await AuthService.github_oauth_callback(code, db)
+        redirect_url = f"{settings.frontend_url}/dashboard?token={jwt_token}"
         
         return RedirectResponse(url=redirect_url)
         
@@ -75,9 +72,8 @@ async def google_callback(
 ):
     """处理Google OAuth回调"""
     try:
-        user, jwt_token, is_new_user = await AuthService.google_oauth_callback(code, db)
-        redirect_path = "/onboarding" if is_new_user else "/dashboard"
-        redirect_url = f"{settings.frontend_url}{redirect_path}?token={jwt_token}"
+        _, jwt_token, _ = await AuthService.google_oauth_callback(code, db)
+        redirect_url = f"{settings.frontend_url}/dashboard?token={jwt_token}"
         return RedirectResponse(url=redirect_url)
     except ValueError as e:
         print(f"ValueError in Google callback: {str(e)}")

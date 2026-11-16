@@ -10,6 +10,8 @@
   background: #d9714930;
 }
 
+.comment-draft { background: hsl(var(--primary) / 0.25); }
+
 .cm-panel {
   height: 100%;
   display: flex;
@@ -63,6 +65,40 @@
   cursor: default;
 }
 .cm-thread.resolved { opacity: 0.7; }
+
+.cm-thread-inline {
+  position: fixed;
+  z-index: 20;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.cm-thread-preview {
+  text-align: start;
+  font: inherit;
+}
+
+.cm-thread-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.cm-quote-trigger {
+  flex: 1;
+  text-align: start;
+  cursor: pointer;
+}
+
+.cm-thread button:focus-visible,
+.cm-thread-preview:focus-visible {
+  @apply outline outline-2 outline-offset-2 outline-ring;
+}
+
+.cm-chip:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 
 .cm-quote {
   border-left: 2px solid #d97149;
@@ -165,7 +201,7 @@
   border-radius: 999px;
   border: 1px solid #3f3a36;
   background: transparent;
-  color: #78716c;
+  @apply text-stone-400;
   cursor: pointer;
   font-family: inherit;
 }
