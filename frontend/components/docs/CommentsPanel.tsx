@@ -27,7 +27,14 @@ function Composer({
   onCancel?: () => void;
 }) {
   const [body, setBody] = useState('');
-  const [askMuses, setAskMuses] = useState(false);
+  // "Send to Muses" is on by default (like Claude Docs) and remembers the last choice.
+  const [askMuses, setAskMusesState] = useState(() => {
+    try { return localStorage.getItem('muses.sendToMuses') !== '0'; } catch { return true; }
+  });
+  const setAskMuses = (on: boolean) => {
+    setAskMusesState(on);
+    try { localStorage.setItem('muses.sendToMuses', on ? '1' : '0'); } catch { /* storage blocked */ }
+  };
   const [sending, setSending] = useState(false);
   const ref = useRef<HTMLTextAreaElement>(null);
   useEffect(() => { if (autoFocus) ref.current?.focus(); }, [autoFocus]);
@@ -39,7 +46,6 @@ function Composer({
     try {
       if (await onSubmit(body, willAsk)) {
         setBody('');
-        setAskMuses(false);
       }
     } finally {
       setSending(false);
@@ -376,9 +382,9 @@ export default function CommentsPanel({ api, suggestions, editor, scrollArea }: 
   const esc = (id: string) => CSS.escape(id);
   const hoverId = hover?.split(':').slice(1).join(':');
   const css = [
-    ...api.resolvedThreads.map((t) => `.comment-anchor[data-comment-id="${esc(t.id)}"]{background:none!important;border-bottom:none!important}`),
-    hover?.startsWith('thread:') && hoverId !== api.activeId ? `.comment-anchor[data-comment-id="${esc(hoverId!)}"]{background:#d9714930!important}` : '',
-    api.activeId ? `.comment-anchor[data-comment-id="${esc(api.activeId)}"]{background:#d9714948!important;border-bottom-color:#d97149!important}` : '',
+    ...api.resolvedThreads.map((t) => `.comment-anchor[data-comment-id="${esc(t.id)}"],.comment-anchor[data-comment-id="${esc(t.id)}"]:hover{background:none!important;cursor:text}`),
+    hover?.startsWith('thread:') && hoverId !== api.activeId && api.open.some((t) => t.id === hoverId) ? `.comment-anchor[data-comment-id="${esc(hoverId!)}"]{background:#d9714945!important}` : '',
+    api.activeId ? `.comment-anchor[data-comment-id="${esc(api.activeId)}"]{background:#d9714960!important}` : '',
     hover?.startsWith('sg:') ? `[data-suggestion-id="${esc(hoverId!)}"]{outline:1px dashed #d97149;outline-offset:1px;border-radius:2px}` : '',
     suggestions.activeId ? `[data-suggestion-id="${esc(suggestions.activeId)}"]{outline:1px solid #d97149;outline-offset:1px;border-radius:2px}` : '',
   ].join('\n');

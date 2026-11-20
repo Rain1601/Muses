@@ -3,10 +3,10 @@
 import { EXTENSION_BLOCKED_EVENT } from "@/lib/tiptap-extensions/ExtensionGuard";
 import ThemeToggle from "@/components/ThemeToggle";
 import DocMenu from "@/components/docs/DocMenu";
+import SelectionToolbar from "@/components/docs/SelectionToolbar";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { isTextSelection } from "@tiptap/core";
 import { BubbleMenu, type BubbleMenuProps } from "@tiptap/react/menus";
-import { MessageSquare } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { marked } from "marked";
 import { useUserStore } from "@/store/user";
@@ -828,29 +828,34 @@ export default function Dashboard() {
 
   // We intercept at capture phase so we win over the existing dashboard ⌘K
   // listener (no selection → that one focuses the chat as before).
+  /** Open the ask-Muses menu on the current selection; false when nothing is selected. */
+  const openSelMenu = useCallback(() => {
+    if (!editorState) return false;
+    const { from, to } = editorState.state.selection;
+    if (from === to) return false;
+    const text = editorState.state.doc.textBetween(from, to, " ");
+    if (!text.trim()) return false;
+    const coords = editorState.view.coordsAtPos(to);
+    setSelMenu({
+      anchor: {
+        top: Math.min(window.innerHeight - 360, coords.bottom + 8),
+        left: Math.min(window.innerWidth - 380, coords.left),
+      },
+      selectedText: text,
+      range: { from, to },
+    });
+    return true;
+  }, [editorState]);
   useEffect(() => {
-    if (!editorState) return;
     const onKey = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.key !== "k") return;
-      const { from, to } = editorState.state.selection;
-      if (from === to) return;
-      const text = editorState.state.doc.textBetween(from, to, " ");
-      if (!text.trim()) return;
+      if (!openSelMenu()) return;
       e.preventDefault();
       e.stopPropagation();
-      const coords = editorState.view.coordsAtPos(to);
-      setSelMenu({
-        anchor: {
-          top: Math.min(window.innerHeight - 360, coords.bottom + 8),
-          left: Math.min(window.innerWidth - 380, coords.left),
-        },
-        selectedText: text,
-        range: { from, to },
-      });
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [editorState]);
+  }, [openSelMenu]);
 
   const submitSelectionTask = useCallback(async (input: { instruction: string; selectedText: string }) => {
     if (!selMenu) return;
@@ -1606,12 +1611,7 @@ export default function Dashboard() {
                   {editorState && editorScroll && !comments.draft && !selMenu && (
                     <BubbleMenu editor={editorState} pluginKey="commentMenu" updateDelay={60}
                       appendTo={commentMenuParent} shouldShow={showCommentButton} options={commentMenuOptions} className="z-30">
-                      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={beginComment}
-                        aria-keyshortcuts="Meta+Shift+M Control+Shift+M" title="评论所选文字（⌘⇧M）"
-                        className="flex items-center gap-2 rounded-md border border-stone-400 dark:border-stone-600 bg-stone-200 dark:bg-stone-800 px-3 py-2 text-sm text-stone-900 dark:text-stone-100 hover:bg-stone-300 dark:hover:bg-stone-700 focus-visible:outline focus-visible:outline-ring active:bg-stone-100 dark:active:bg-stone-900">
-                        <MessageSquare className="size-4" aria-hidden="true" />
-                        评论
-                      </button>
+                      <SelectionToolbar editor={editorState} onComment={beginComment} onAskMuses={() => { openSelMenu(); }} />
                     </BubbleMenu>
                   )}
                 </div>
