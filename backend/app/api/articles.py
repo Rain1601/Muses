@@ -402,6 +402,9 @@ def _restore_markdown_to_html(text: str) -> Optional[str]:
         return None
 
 
+_TRANSLATABLE_BLOCKS = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'blockquote']
+
+
 async def _translate_article_background(
     task_id: str,
     article_id: str,
@@ -468,27 +471,20 @@ async def _translate_article_background(
 
         logger.info(f"🌍 [Task {task_id}] Translating article {article_id} to {language_name}")
 
-        # 解析HTML内容
+        # 解析HTML内容 —— 在原文结构上原地翻译,列表 / 表格 / 图片位置都保留
         soup = BeautifulSoup(article.content, 'html.parser')
 
-        # 提取所有段落和标题
+        # 只取"最内层"的文字块:TipTap 的列表项是 <li><p>…</p></li>,
+        # 若 li 和 p 都取,同一句会被翻两遍、输出两遍。
         elements = []
-        for tag in soup.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'blockquote']):
+        for tag in soup.find_all(_TRANSLATABLE_BLOCKS):
             text = tag.get_text().strip()
-            if text:
-                elements.append({
-                    'tag': tag.name,
-                    'text': text,
-                    'html': str(tag)
-                })
-
-        # 提取所有图片
-        images = []
-        for img in soup.find_all('img'):
-            images.append(str(img))
+            if not text or tag.find(_TRANSLATABLE_BLOCKS) or tag.find_parent('pre'):
+                continue
+            elements.append({'tag': tag.name, 'text': text, 'node': tag})
 
         total = len(elements)
-        logger.info(f"📝 [Task {task_id}] Found {total} text elements and {len(images)} images")
+        logger.info(f"📝 [Task {task_id}] Found {total} text blocks")
 
         # 更新任务总数
         task_tracker.update_task(task_id, total=total)
@@ -534,52 +530,33 @@ async def _translate_article_background(
                 logger.error(f"❌ [Task {task_id}] Error translating element {i+1}: {str(e)}")
                 raise RuntimeError(f"第 {i+1}/{total} 段翻译失败：{e}") from e
 
-        # 构建译文 HTML — 两种模式
-        out_html: list[str] = []
-        img_index = 0
-
-        def _maybe_insert_image(i: int, total_items: int):
-            nonlocal img_index
-            if img_index >= len(images):
-                return
-            # 每隔几段插入一张图片
-            if total_items < 5 or (i == (total_items // (len(images) + 1)) * (img_index + 1)):
-                out_html.append(images[img_index])
-                img_index += 1
+        # 把译文写回原位置 —— 两种模式
+        for item in translated_elements:
+            node = item['original']['node']
+            translation = item['translation']
+            if mode == "bilingual":
+                if node.name in ('li', 'blockquote'):
+                    # 容器块:原文和译文各成一段,仍留在同一个列表项 / 引用里
+                    original_p = soup.new_tag('p')
+                    original_p.extend(list(node.contents))
+                    translated_p = soup.new_tag('p')
+                    translated_p.string = translation
+                    node.append(original_p)
+                    node.append(translated_p)
+                else:
+                    sibling = soup.new_tag(node.name)
+                    sibling.string = translation
+                    node.insert_after(sibling)
+            else:
+                # translated 模式:纯译文,替换原文
+                node.clear()
+                node.string = translation
 
         if mode == "bilingual":
-            # 顶部双语提示
-            out_html.append('<div style="background-color: #f0f9ff; border-left: 4px solid #0284c7; padding: 12px; margin-bottom: 24px;">')
-            out_html.append('<p style="margin: 0; font-size: 14px; color: #0c4a6e;">💡 本文为双语对照版本 | This is a bilingual version</p>')
-            out_html.append('</div>')
+            notice = BeautifulSoup('<blockquote><p>💡 本文为双语对照版本 | This is a bilingual version</p></blockquote>', 'html.parser')
+            soup.insert(0, notice)
 
-            for i, item in enumerate(translated_elements):
-                original = item['original']
-                translation = item['translation']
-                tag = original['tag']
-                # 原文(浅灰)
-                out_html.append('<div style="background-color: #f9fafb; padding: 12px; margin: 8px 0; border-radius: 4px;">')
-                out_html.append(f'<{tag} style="margin: 0; color: #374151;">{original["text"]}</{tag}>')
-                out_html.append('</div>')
-                # 译文(浅蓝)
-                out_html.append('<div style="background-color: #eff6ff; padding: 12px; margin: 8px 0 24px 0; border-radius: 4px;">')
-                out_html.append(f'<{tag} style="margin: 0; color: #1e40af;">{translation}</{tag}>')
-                out_html.append('</div>')
-                _maybe_insert_image(i, len(translated_elements))
-        else:
-            # translated 模式:纯译文,保留原 tag 结构,不再交错原文
-            for i, item in enumerate(translated_elements):
-                tag = item['original']['tag']
-                translation = item['translation']
-                out_html.append(f'<{tag}>{translation}</{tag}>')
-                _maybe_insert_image(i, len(translated_elements))
-
-        # 剩余图片放末尾
-        while img_index < len(images):
-            out_html.append(images[img_index])
-            img_index += 1
-
-        new_content = '\n'.join(out_html)
+        new_content = str(soup)
 
         # 标题与摘要按 mode 区分
         if mode == "bilingual":
