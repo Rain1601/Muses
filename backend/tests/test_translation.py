@@ -106,3 +106,49 @@ async def test_cancel_translation_stops_work_and_keeps_original(translation_db, 
     assert started.is_set() == in_progress
     assert db.query(Article).count() == 1
     assert db.get(Article, 'source').content == '<p>Original</p>'
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('mode', ['translated', 'bilingual'])
+async def test_list_items_translated_once_and_structure_kept(translation_db, monkeypatch, mode):
+    """TipTap list items are <li><p>…</p></li>: each must be translated once, inside its list."""
+    db, user = translation_db
+    db.get(Article, 'source').content = (
+        '<h2>Title</h2><ul><li><p>Alpha</p></li><li><p>Beta</p></li></ul>'
+        '<p>Gamma</p><img src="x.png"><ol><li>Delta</li></ol>'
+    )
+    db.commit()
+
+    async def translate(**kwargs):
+        return {'processedText': f"T[{kwargs['text']}] <b>&"}
+
+    action = AsyncMock(side_effect=translate)
+    monkeypatch.setattr(EnhancedAIService, 'perform_text_action', action)
+    task = articles.task_tracker.create_task('translate_article', user_id=user.id)
+    await articles._translate_article_background(task, 'source', 'user', 'zh-CN', mode)
+    state = articles.task_tracker.get_task(task)
+    assert state['status'] == TaskStatus.COMPLETED
+
+    assert sorted(c.kwargs['text'] for c in action.call_args_list) == ['Alpha', 'Beta', 'Delta', 'Gamma', 'Title']
+    html = db.get(Article, state['result']['article_id']).content
+    for word in ['Alpha', 'Beta', 'Gamma', 'Delta', 'Title']:
+        assert html.count(f'T[{word}]') == 1
+        assert html.count(f'>{word}<') == (1 if mode == 'bilingual' else 0)
+    # Lists, headings and the image stay where they were; model output is text, not markup.
+    assert '<ul><li><p>' in html and '<ol><li>' in html and html.count('<li>') == 3
+    assert html.index('T[Gamma]') < html.index('<img src="x.png"/>') < html.index('T[Delta]')
+    assert '&lt;b&gt;&amp;' in html and '<b>' not in html
+
+
+@pytest.mark.asyncio
+async def test_inline_images_survive_translated_mode(translation_db, monkeypatch):
+    """Markdown import puts images inside paragraphs; replacing the text must not drop them."""
+    db, user = translation_db
+    db.get(Article, 'source').content = '<p>Caption <img src="x.png" alt="chart"> more</p>'
+    db.commit()
+    monkeypatch.setattr(EnhancedAIService, 'perform_text_action', AsyncMock(return_value={'processedText': '译文'}))
+    task = articles.task_tracker.create_task('translate_article', user_id=user.id)
+    await articles._translate_article_background(task, 'source', 'user', 'zh-CN', 'translated')
+    state = articles.task_tracker.get_task(task)
+    html = db.get(Article, state['result']['article_id']).content
+    assert html == '<p>译文<img alt="chart" src="x.png"/></p>'

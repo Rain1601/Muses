@@ -8,7 +8,7 @@
  * them, and can take its rows from the table right above it.
  *
  * Colors: the validated dark categorical slots 1–6 in fixed order (checked
- * against the editor surface #262321 with the dataviz validator). Marks follow
+ * against the editor surface var(--m-n885) with the dataviz validator). Marks follow
  * the dataviz spec: bars ≤ 24px, 4px rounded data-end, 2px surface gap; 2px
  * lines; ≥ 8px markers with a 2px surface ring; hairline solid grid; legend
  * for ≥ 2 series; hover tooltip; text never in series color.
@@ -33,10 +33,10 @@ declare module '@tiptap/core' {
 export type ChartKind = 'bar' | 'line';
 
 export const SERIES_COLORS = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300'];
-const SURFACE = '#262321';
-const GRID = '#3a3531';
-const TEXT_MUTED = '#a8a29e';
-const TEXT_PRIMARY = '#e7e5e4';
+const SURFACE = 'var(--m-n885)';
+const GRID = 'var(--m-n800)';
+const TEXT_MUTED = 'var(--m-n400)';
+const TEXT_PRIMARY = 'var(--m-n200)';
 const MAX_SERIES = SERIES_COLORS.length;
 
 export const SAMPLE_CSV = '季度,收入,成本\nQ1,120,80\nQ2,150,95\nQ3,170,100\nQ4,210,120';
@@ -169,20 +169,20 @@ export function ChartSvg({ data, kind }: { data: ChartData; kind: ChartKind }) {
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="图表" className="chart-svg">
         {ticks.map((t) => (
           <g key={t}>
-            <line x1={L} x2={W - R} y1={y(t)} y2={y(t)} stroke={GRID} strokeWidth={1} />
-            <text x={L - 8} y={y(t)} dy="0.32em" textAnchor="end" fontSize={11} fill={TEXT_MUTED}>{fmt(t)}</text>
+            <line x1={L} x2={W - R} y1={y(t)} y2={y(t)} style={{ stroke: GRID }} strokeWidth={1} />
+            <text x={L - 8} y={y(t)} dy="0.32em" textAnchor="end" fontSize={11} style={{ fill: TEXT_MUTED }}>{fmt(t)}</text>
           </g>
         ))}
         {data.labels.map((lab, i) => (showEveryLabel || i % Math.ceil(n / 12) === 0) && (
-          <text key={i} x={xAt(i)} y={H - B + 18} textAnchor="middle" fontSize={11} fill={TEXT_MUTED}>
+          <text key={i} x={xAt(i)} y={H - B + 18} textAnchor="middle" fontSize={11} style={{ fill: TEXT_MUTED }}>
             {lab.length > 8 ? `${lab.slice(0, 7)}…` : lab}
           </text>
         ))}
         {kind === 'line' && hover !== null && (
-          <line x1={xAt(hover)} x2={xAt(hover)} y1={T} y2={H - B} stroke={TEXT_MUTED} strokeWidth={1} opacity={0.5} />
+          <line x1={xAt(hover)} x2={xAt(hover)} y1={T} y2={H - B} style={{ stroke: TEXT_MUTED }} strokeWidth={1} opacity={0.5} />
         )}
         {kind === 'bar' && hover !== null && (
-          <rect x={L + band * hover} y={T} width={band} height={H - T - B} fill={TEXT_PRIMARY} opacity={0.05} />
+          <rect x={L + band * hover} y={T} width={band} height={H - T - B} style={{ fill: TEXT_PRIMARY }} opacity={0.05} />
         )}
 
         {kind === 'bar' && data.series.map((s, j) => s.values.map((v, i) => v === null ? null : (
@@ -206,10 +206,10 @@ export function ChartSvg({ data, kind }: { data: ChartData; kind: ChartKind }) {
             <g key={j}>
               <path d={d} fill="none" stroke={SERIES_COLORS[j]} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
               {pts.map((p, i) => p && (markAll || i === lastIdx || i === hover) && (
-                <circle key={i} cx={p[0]} cy={p[1]} r={4} fill={SERIES_COLORS[j]} stroke={SURFACE} strokeWidth={2} />
+                <circle key={i} cx={p[0]} cy={p[1]} r={4} fill={SERIES_COLORS[j]} style={{ stroke: SURFACE }} strokeWidth={2} />
               ))}
               {nS > 1 && nS <= 4 && lastIdx !== undefined && (
-                <text x={pts[lastIdx]![0] + 8} y={pts[lastIdx]![1]} dy="0.32em" fontSize={11} fill={TEXT_PRIMARY}>
+                <text x={pts[lastIdx]![0] + 8} y={pts[lastIdx]![1]} dy="0.32em" fontSize={11} style={{ fill: TEXT_PRIMARY }}>
                   {s.name.length > 8 ? `${s.name.slice(0, 7)}…` : s.name}
                 </text>
               )}
@@ -217,7 +217,7 @@ export function ChartSvg({ data, kind }: { data: ChartData; kind: ChartKind }) {
           );
         })}
 
-        <line x1={L} x2={W - R} y1={y(0)} y2={y(0)} stroke={TEXT_MUTED} strokeWidth={1} opacity={0.6} />
+        <line x1={L} x2={W - R} y1={y(0)} y2={y(0)} style={{ stroke: TEXT_MUTED }} strokeWidth={1} opacity={0.6} />
         {/* Hit area bigger than the marks: the whole plot */}
         <rect x={L} y={T} width={plotW} height={H - T - B} fill="transparent" onMouseMove={onMove} onMouseLeave={() => setHover(null)} />
       </svg>

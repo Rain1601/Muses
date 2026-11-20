@@ -20,13 +20,13 @@ const CATEGORIES: { key: string; label: string; accent: string }[] = [
   { key: "structure", label: "Structure",  accent: "#9AB6A4" },
   { key: "polish",    label: "Polish",     accent: "#C3B091" },
   { key: "style",     label: "Style",      accent: "#A89BC1" },
-  { key: "general",   label: "General",    accent: "#78716C" },
+  { key: "general",   label: "General",    accent: "var(--m-n500)" },
 ];
 
 const ALL_KEY = "all";
 
 function categoryAccent(key: string): string {
-  return CATEGORIES.find(c => c.key === key)?.accent || "#78716C";
+  return CATEGORIES.find(c => c.key === key)?.accent || "var(--m-n500)";
 }
 
 function categoryLabel(key: string): string {
@@ -170,7 +170,7 @@ export default function SkillLibrary() {
       {/* Toolbar: search + category pills */}
       <div style={toolbarStyle}>
         <div style={searchWrapStyle}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ position: "absolute", left: "0.625rem", top: "50%", transform: "translateY(-50%)", color: "#57534E" }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ position: "absolute", left: "0.625rem", top: "50%", transform: "translateY(-50%)", color: "var(--m-n450)" }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
@@ -189,7 +189,7 @@ export default function SkillLibrary() {
             <button
               key={c.key}
               onClick={() => setActiveCategory(c.key)}
-              style={activeCategory === c.key ? { ...pillActiveStyle, borderColor: c.accent, color: "#FAFAF9" } : pillStyle}
+              style={activeCategory === c.key ? { ...pillActiveStyle, borderColor: c.accent, color: "var(--m-n50)" } : pillStyle}
             >
               <span style={{ width: "6px", height: "6px", borderRadius: "999px", background: c.accent, display: "inline-block", marginRight: "0.4375rem" }} />
               {c.label} <span style={pillCountStyle}>{counts[c.key] || 0}</span>
@@ -203,8 +203,8 @@ export default function SkillLibrary() {
         <div style={statusStyle}>加载中…</div>
       ) : filtered.length === 0 ? (
         <div style={emptyStateStyle}>
-          <div style={{ fontSize: "1.0625rem", color: "#A8A29E", marginBottom: "0.5rem", fontFamily: "'Times New Roman', Georgia, serif" }}>没有匹配的 skill</div>
-          <div style={{ fontSize: "0.8125rem", color: "#78716C", marginBottom: "1.25rem" }}>
+          <div style={{ fontSize: "1.0625rem", color: "var(--m-n300)", marginBottom: "0.5rem", fontFamily: "'Times New Roman', Georgia, serif" }}>没有匹配的 skill</div>
+          <div style={{ fontSize: "0.8125rem", color: "var(--m-n400)", marginBottom: "1.25rem" }}>
             {search.trim() ? "试试别的关键词，或" : "你可以"}从空白创建，或让 Skill Creator 帮你设计。
           </div>
           <button onClick={() => setCreating(true)} style={primaryBtnStyle}>+ New Skill</button>
@@ -296,7 +296,7 @@ function SkillCard({ skill, onOpen, onClone, onDelete }: SkillCardProps) {
       onMouseLeave={() => setHovered(false)}
       style={{
         ...cardStyle,
-        borderColor: hovered ? "#57534E" : "#3F3A36",
+        borderColor: hovered ? "var(--m-n600)" : "var(--m-n750)",
         background: hovered ? "rgba(41, 37, 36, 0.7)" : "transparent",
       }}
     >
@@ -455,7 +455,7 @@ const headerStyle: React.CSSProperties = {
 const titleStyle: React.CSSProperties = {
   fontSize: "1.625rem",
   fontWeight: 600,
-  color: "#FAFAF9",
+  color: "var(--m-n50)",
   fontFamily: "'Times New Roman', Georgia, serif",
   letterSpacing: "-0.02em",
   lineHeight: 1.1,
@@ -463,7 +463,7 @@ const titleStyle: React.CSSProperties = {
 
 const subtitleStyle: React.CSSProperties = {
   fontSize: "0.8125rem",
-  color: "#78716C",
+  color: "var(--m-n400)",
   marginTop: "0.375rem",
   letterSpacing: "0.01em",
 };
@@ -491,18 +491,18 @@ const heroLabelStyle: React.CSSProperties = {
   fontSize: "0.625rem",
   letterSpacing: "0.08em",
   textTransform: "uppercase",
-  color: "#A8A29E",
+  color: "var(--m-n300)",
   fontWeight: 500,
 };
 
 const heroDotStyle: React.CSSProperties = {
-  color: "#3F3A36",
+  color: "var(--m-n750)",
   fontSize: "0.625rem",
 };
 
 const heroTitleStyle: React.CSSProperties = {
   fontSize: "1.25rem",
-  color: "#FAFAF9",
+  color: "var(--m-n50)",
   fontFamily: "'Times New Roman', Georgia, serif",
   fontWeight: 600,
   letterSpacing: "-0.01em",
@@ -511,7 +511,7 @@ const heroTitleStyle: React.CSSProperties = {
 
 const heroDescStyle: React.CSSProperties = {
   fontSize: "0.8125rem",
-  color: "#A8A29E",
+  color: "var(--m-n300)",
   lineHeight: 1.55,
   maxWidth: "640px",
   marginBottom: "0.875rem",
@@ -533,7 +533,7 @@ const toolbarStyle: React.CSSProperties = {
   gap: "0.875rem",
   marginBottom: "1.75rem",
   paddingBottom: "1.25rem",
-  borderBottom: "1px solid #292524",
+  borderBottom: "1px solid var(--m-n880)",
 };
 
 const searchWrapStyle: React.CSSProperties = {
@@ -543,11 +543,11 @@ const searchWrapStyle: React.CSSProperties = {
 
 const searchInputStyle: React.CSSProperties = {
   width: "100%",
-  background: "#1C1917",
-  border: "1px solid #292524",
+  background: "var(--m-n925)",
+  border: "1px solid var(--m-n880)",
   borderRadius: "6px",
   padding: "0.4375rem 0.625rem 0.4375rem 1.875rem",
-  color: "#FAFAF9",
+  color: "var(--m-n50)",
   fontSize: "0.75rem",
   fontFamily: "inherit",
   outline: "none",
@@ -565,9 +565,9 @@ const pillStyle: React.CSSProperties = {
   fontSize: "0.6875rem",
   padding: "0.3125rem 0.6875rem",
   borderRadius: "999px",
-  border: "1px solid #292524",
+  border: "1px solid var(--m-n880)",
   background: "transparent",
-  color: "#78716C",
+  color: "var(--m-n400)",
   cursor: "pointer",
   fontFamily: "inherit",
   fontWeight: 500,
@@ -578,14 +578,14 @@ const pillStyle: React.CSSProperties = {
 const pillActiveStyle: React.CSSProperties = {
   ...pillStyle,
   background: "rgba(41, 37, 36, 0.7)",
-  border: "1px solid #57534E",
-  color: "#FAFAF9",
+  border: "1px solid var(--m-n600)",
+  color: "var(--m-n50)",
 };
 
 const pillCountStyle: React.CSSProperties = {
   marginLeft: "0.375rem",
   fontSize: "0.625rem",
-  color: "#57534E",
+  color: "var(--m-n450)",
 };
 
 // Section
@@ -606,13 +606,13 @@ const sectionLabelStyle: React.CSSProperties = {
   fontSize: "0.75rem",
   letterSpacing: "0.08em",
   textTransform: "uppercase",
-  color: "#A8A29E",
+  color: "var(--m-n300)",
   fontWeight: 500,
 };
 
 const sectionCountStyle: React.CSSProperties = {
   fontSize: "0.6875rem",
-  color: "#57534E",
+  color: "var(--m-n450)",
 };
 
 // Grid + Card
@@ -625,7 +625,7 @@ const gridStyle: React.CSSProperties = {
 const cardStyle: React.CSSProperties = {
   position: "relative",
   borderRadius: "10px",
-  border: "1px solid #3F3A36",
+  border: "1px solid var(--m-n750)",
   cursor: "pointer",
   transition: "all 0.18s ease",
   display: "flex",
@@ -657,7 +657,7 @@ const cardCategoryLabelStyle: React.CSSProperties = {
   fontSize: "0.625rem",
   letterSpacing: "0.08em",
   textTransform: "uppercase",
-  color: "#78716C",
+  color: "var(--m-n400)",
   fontWeight: 500,
 };
 
@@ -685,7 +685,7 @@ const cardTitleStyle: React.CSSProperties = {
   fontSize: "1rem",
   fontFamily: "'Times New Roman', Georgia, serif",
   fontWeight: 600,
-  color: "#FAFAF9",
+  color: "var(--m-n50)",
   letterSpacing: "-0.01em",
   marginBottom: "0.375rem",
   lineHeight: 1.25,
@@ -693,7 +693,7 @@ const cardTitleStyle: React.CSSProperties = {
 
 const cardDescStyle: React.CSSProperties = {
   fontSize: "0.75rem",
-  color: "#A8A29E",
+  color: "var(--m-n300)",
   lineHeight: 1.55,
   marginBottom: "0.625rem",
   display: "-webkit-box",
@@ -704,7 +704,7 @@ const cardDescStyle: React.CSSProperties = {
 
 const cardPreviewStyle: React.CSSProperties = {
   fontSize: "0.6875rem",
-  color: "#57534E",
+  color: "var(--m-n450)",
   fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
   lineHeight: 1.45,
   marginBottom: "0.75rem",
@@ -720,7 +720,7 @@ const cardFooterStyle: React.CSSProperties = {
   gap: "0.375rem",
   marginTop: "auto",
   paddingTop: "0.5rem",
-  borderTop: "1px solid #292524",
+  borderTop: "1px solid var(--m-n880)",
 };
 
 const cardActionGhostStyle: React.CSSProperties = {
@@ -729,7 +729,7 @@ const cardActionGhostStyle: React.CSSProperties = {
   borderRadius: "5px",
   border: "1px solid transparent",
   background: "transparent",
-  color: "#A8A29E",
+  color: "var(--m-n300)",
   cursor: "pointer",
   fontFamily: "inherit",
   transition: "all 0.15s ease",
@@ -760,9 +760,9 @@ const ghostBtnStyle: React.CSSProperties = {
   fontSize: "0.75rem",
   padding: "0.4375rem 0.875rem",
   borderRadius: "6px",
-  border: "1px solid #3F3A36",
+  border: "1px solid var(--m-n750)",
   background: "transparent",
-  color: "#A8A29E",
+  color: "var(--m-n300)",
   cursor: "pointer",
   fontFamily: "inherit",
 };
@@ -770,7 +770,7 @@ const ghostBtnStyle: React.CSSProperties = {
 // Status / empty
 const statusStyle: React.CSSProperties = {
   textAlign: "center",
-  color: "#78716C",
+  color: "var(--m-n400)",
   padding: "3rem 1rem",
   fontSize: "0.875rem",
 };
@@ -797,8 +797,8 @@ const editorPanelStyle: React.CSSProperties = {
   width: "580px",
   maxWidth: "92vw",
   maxHeight: "88vh",
-  background: "#1C1917",
-  border: "1px solid #3F3A36",
+  background: "var(--m-n925)",
+  border: "1px solid var(--m-n750)",
   borderRadius: "12px",
   display: "flex",
   flexDirection: "column",
@@ -816,7 +816,7 @@ const editorAccentBarStyle: React.CSSProperties = {
 
 const editorHeaderStyle: React.CSSProperties = {
   padding: "1.125rem 1.375rem 1rem",
-  borderBottom: "1px solid #292524",
+  borderBottom: "1px solid var(--m-n880)",
   display: "flex",
   alignItems: "flex-start",
   justifyContent: "space-between",
@@ -826,7 +826,7 @@ const editorEyebrowStyle: React.CSSProperties = {
   fontSize: "0.625rem",
   letterSpacing: "0.08em",
   textTransform: "uppercase",
-  color: "#78716C",
+  color: "var(--m-n400)",
   marginBottom: "0.375rem",
   fontWeight: 500,
 };
@@ -835,14 +835,14 @@ const editorTitleStyle: React.CSSProperties = {
   fontSize: "1.125rem",
   fontFamily: "'Times New Roman', Georgia, serif",
   fontWeight: 600,
-  color: "#FAFAF9",
+  color: "var(--m-n50)",
   letterSpacing: "-0.01em",
 };
 
 const closeBtnStyle: React.CSSProperties = {
   background: "transparent",
   border: "none",
-  color: "#78716C",
+  color: "var(--m-n400)",
   cursor: "pointer",
   padding: "0.25rem",
   display: "flex",
@@ -857,7 +857,7 @@ const editorBodyStyle: React.CSSProperties = {
 
 const editorFooterStyle: React.CSSProperties = {
   padding: "0.875rem 1.375rem",
-  borderTop: "1px solid #292524",
+  borderTop: "1px solid var(--m-n880)",
   display: "flex",
   gap: "0.5rem",
   justifyContent: "flex-end",
@@ -879,7 +879,7 @@ const presetNoticeStyle: React.CSSProperties = {
 const labelStyle: React.CSSProperties = {
   display: "block",
   fontSize: "0.6875rem",
-  color: "#78716C",
+  color: "var(--m-n400)",
   marginBottom: "0.375rem",
   marginTop: "0.75rem",
   letterSpacing: "0.02em",
@@ -887,11 +887,11 @@ const labelStyle: React.CSSProperties = {
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
-  background: "#292524",
-  border: "1px solid #3F3A36",
+  background: "var(--m-n880)",
+  border: "1px solid var(--m-n750)",
   borderRadius: "6px",
   padding: "0.5rem 0.625rem",
-  color: "#FAFAF9",
+  color: "var(--m-n50)",
   fontSize: "0.8125rem",
   fontFamily: "inherit",
   outline: "none",

@@ -229,7 +229,7 @@ export function FileImport({ onImportComplete, onClose }: FileImportProps) {
         <div style={progressTrackStyle}>
           <div style={{ ...progressBarStyle, width: `${uploadProgress}%` }} />
         </div>
-        <div style={{ fontSize: 11, color: '#57534E', marginTop: '0.5rem', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
+        <div style={{ fontSize: 11, color: 'var(--m-n450)', marginTop: '0.5rem', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
           {uploadProgress}%
         </div>
       </Frame>
@@ -271,7 +271,7 @@ export function FileImport({ onImportComplete, onClose }: FileImportProps) {
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
           >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={isDragging ? '#D97149' : '#78716C'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ transition: 'stroke 0.18s ease', marginBottom: '0.875rem' }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={isDragging ? '#D97149' : 'var(--m-n500)'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ transition: 'stroke 0.18s ease', marginBottom: '0.875rem' }}>
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
               <polyline points="17 8 12 3 7 8" />
               <line x1="12" y1="3" x2="12" y2="15" />
@@ -321,7 +321,7 @@ export function FileImport({ onImportComplete, onClose }: FileImportProps) {
         <>
           {/* URL input — input with inline submit affordance */}
           <div style={urlInputWrapStyle}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#57534E" strokeWidth="2" strokeLinecap="round" style={urlIconStyle}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ ...urlIconStyle, color: "var(--m-n450)" }}>
               <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
               <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
             </svg>
@@ -389,7 +389,7 @@ const frameStyle: React.CSSProperties = {
   position: 'relative',
   padding: '2rem 2.25rem 1.875rem',
   background: 'transparent',
-  color: '#FAFAF9',
+  color: 'var(--m-n50)',
   fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   WebkitFontSmoothing: 'antialiased',
 };
@@ -405,7 +405,7 @@ const closeBtnStyle: React.CSSProperties = {
   justifyContent: 'center',
   background: 'transparent',
   border: 'none',
-  color: '#78716C',
+  color: 'var(--m-n400)',
   cursor: 'pointer',
   borderRadius: 6,
   transition: 'color 0.15s ease, background 0.15s ease',
@@ -419,7 +419,7 @@ const eyebrowStyle: React.CSSProperties = {
   letterSpacing: '0.14em',
   textTransform: 'uppercase',
   fontWeight: 500,
-  color: '#78716C',
+  color: 'var(--m-n400)',
   marginBottom: '0.625rem',
 };
 
@@ -435,7 +435,7 @@ const headingStyle: React.CSSProperties = {
   fontFamily: '"Times New Roman", Georgia, serif',
   fontSize: '1.625rem',
   fontWeight: 600,
-  color: '#FAFAF9',
+  color: 'var(--m-n50)',
   letterSpacing: '-0.025em',
   lineHeight: 1.15,
   margin: 0,
@@ -444,7 +444,7 @@ const headingStyle: React.CSSProperties = {
 
 const paragraphStyle: React.CSSProperties = {
   fontSize: '0.8125rem',
-  color: '#A8A29E',
+  color: 'var(--m-n300)',
   lineHeight: 1.6,
   margin: 0,
   marginBottom: '1.5rem',
@@ -455,8 +455,8 @@ const paragraphStyle: React.CSSProperties = {
 const tabGroupStyle: React.CSSProperties = {
   display: 'inline-flex',
   gap: 0,
-  background: '#292524',
-  border: '1px solid #3F3A36',
+  background: 'var(--m-n880)',
+  border: '1px solid var(--m-n750)',
   borderRadius: 8,
   padding: 3,
   marginBottom: '1.25rem',
@@ -469,7 +469,7 @@ const tabStyle: React.CSSProperties = {
   borderRadius: 5,
   border: 'none',
   background: 'transparent',
-  color: '#78716C',
+  color: 'var(--m-n400)',
   cursor: 'pointer',
   fontFamily: 'inherit',
   fontWeight: 500,
@@ -478,8 +478,8 @@ const tabStyle: React.CSSProperties = {
 
 const tabActiveStyle: React.CSSProperties = {
   ...tabStyle,
-  background: '#3F3A36',
-  color: '#FAFAF9',
+  background: 'var(--m-n750)',
+  color: 'var(--m-n50)',
 };
 
 // Drop zone
@@ -489,7 +489,7 @@ const dropZoneStyle: React.CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   padding: '2.5rem 1.5rem',
-  border: '1px dashed #3F3A36',
+  border: '1px dashed var(--m-n750)',
   borderRadius: 10,
   background: 'rgba(41, 37, 36, 0.25)',
   transition: 'border-color 0.18s ease, background 0.18s ease',
@@ -506,14 +506,14 @@ const dropTitleStyle: React.CSSProperties = {
   fontFamily: '"Times New Roman", Georgia, serif',
   fontSize: '1.0625rem',
   fontWeight: 600,
-  color: '#E7E5E4',
+  color: 'var(--m-n200)',
   marginBottom: '0.25rem',
   letterSpacing: '-0.01em',
 };
 
 const dropHintStyle: React.CSSProperties = {
   fontSize: '0.75rem',
-  color: '#78716C',
+  color: 'var(--m-n400)',
   letterSpacing: '0.005em',
 };
 
@@ -552,9 +552,9 @@ const ghostBtnFullStyle: React.CSSProperties = {
   fontSize: '0.75rem',
   padding: '0.5rem 0.875rem',
   borderRadius: 7,
-  border: '1px solid #3F3A36',
+  border: '1px solid var(--m-n750)',
   background: 'transparent',
-  color: '#A8A29E',
+  color: 'var(--m-n300)',
   cursor: 'pointer',
   fontFamily: 'inherit',
   fontWeight: 500,
@@ -583,9 +583,9 @@ const ghostBtnStyle: React.CSSProperties = {
   fontSize: '0.75rem',
   padding: '0.5rem 1rem',
   borderRadius: 6,
-  border: '1px solid #3F3A36',
+  border: '1px solid var(--m-n750)',
   background: 'transparent',
-  color: '#A8A29E',
+  color: 'var(--m-n300)',
   cursor: 'pointer',
   fontFamily: 'inherit',
 };
@@ -605,11 +605,11 @@ const urlIconStyle: React.CSSProperties = {
 
 const urlInputStyle: React.CSSProperties = {
   width: '100%',
-  background: '#1C1917',
-  border: '1px solid #3F3A36',
+  background: 'var(--m-n925)',
+  border: '1px solid var(--m-n750)',
   borderRadius: 7,
   padding: '0.5625rem 0.75rem 0.5625rem 2rem',
-  color: '#FAFAF9',
+  color: 'var(--m-n50)',
   fontSize: '0.8125rem',
   fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
   letterSpacing: '0.005em',
@@ -624,21 +624,21 @@ const formatLineStyle: React.CSSProperties = {
   gap: '0.75rem',
   marginTop: '1.25rem',
   paddingTop: '1rem',
-  borderTop: '1px solid #292524',
+  borderTop: '1px solid var(--m-n880)',
 };
 
 const formatLabelStyle: React.CSSProperties = {
   fontSize: '0.625rem',
   letterSpacing: '0.12em',
   textTransform: 'uppercase',
-  color: '#57534E',
+  color: 'var(--m-n450)',
   fontWeight: 500,
   flexShrink: 0,
 };
 
 const formatValueStyle: React.CSSProperties = {
   fontSize: '0.6875rem',
-  color: '#78716C',
+  color: 'var(--m-n400)',
   fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
   letterSpacing: '0.01em',
 };
@@ -656,13 +656,13 @@ const articleListStyle: React.CSSProperties = {
 const articleRowStyle: React.CSSProperties = {
   padding: '0.625rem 0.75rem',
   background: 'rgba(41, 37, 36, 0.5)',
-  border: '1px solid #292524',
+  border: '1px solid var(--m-n880)',
   borderRadius: 7,
 };
 
 const articleTitleStyle: React.CSSProperties = {
   fontSize: '0.8125rem',
-  color: '#E7E5E4',
+  color: 'var(--m-n200)',
   fontWeight: 500,
   marginBottom: '0.1875rem',
   lineHeight: 1.35,
@@ -670,7 +670,7 @@ const articleTitleStyle: React.CSSProperties = {
 
 const articleMetaStyle: React.CSSProperties = {
   fontSize: '0.625rem',
-  color: '#57534E',
+  color: 'var(--m-n450)',
   fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
 };
 
@@ -685,7 +685,7 @@ const footerStyle: React.CSSProperties = {
 const progressTrackStyle: React.CSSProperties = {
   width: '100%',
   height: 2,
-  background: '#292524',
+  background: 'var(--m-n880)',
   borderRadius: 999,
   overflow: 'hidden',
   marginTop: '1.5rem',

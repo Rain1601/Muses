@@ -7,6 +7,7 @@
  * can be undone by restoring the version before it).
  */
 import { useCallback, useEffect, useState } from 'react';
+import { useTheme } from 'next-themes';
 
 interface Revision {
   id: string;
@@ -38,9 +39,17 @@ function fmt(ts?: string) {
     : d.toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-const PREVIEW_CSS = `body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;color:#e7e5e4;background:#24201d;margin:12px;font-size:13px;line-height:1.6}
+const PREVIEW_CSS = `body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;color:var(--m-n200);background:var(--m-n900);margin:12px;font-size:13px;line-height:1.6}
 h1{font-size:1.3em}h2{font-size:1.1em}img{max-width:100%}del{color:#e5a5a5}ins{color:#a7e0b0;text-decoration:none}
-[data-pending-block]{border:1px dashed #57534e;padding:6px;border-radius:6px;color:#a8a29e}`;
+[data-pending-block]{border:1px dashed var(--m-n600);padding:6px;border-radius:6px;color:var(--m-n300)}`;
+
+/** The sandboxed preview frame does not inherit the page's CSS variables: copy the current palette values in. */
+const PREVIEW_VARS = ['--m-n200', '--m-n300', '--m-n600', '--m-n900'];
+function previewRootCss(): string {
+  if (typeof window === 'undefined') return '';
+  const cs = getComputedStyle(document.documentElement);
+  return `:root{${PREVIEW_VARS.map((v) => `${v}:${cs.getPropertyValue(v).trim()}`).join(';')}}`;
+}
 
 export default function VersionHistory({
   articleId, tabId, tabName, refreshKey, onRestored, onClose, beforeRestore,
@@ -60,6 +69,7 @@ export default function VersionHistory({
   const [selected, setSelected] = useState<string | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const { resolvedTheme } = useTheme(); // re-render the preview when the theme flips
 
   const load = useCallback(async () => {
     try {
@@ -134,7 +144,7 @@ export default function VersionHistory({
                 {preview === null ? (
                   <div className="cm-meta" style={{ marginTop: 6 }}><span className="cm-spinner" /> 加载预览…</div>
                 ) : (
-                  <iframe className="vh-preview" sandbox="" srcDoc={`<style>${PREVIEW_CSS}</style>${preview}`} title="版本预览" />
+                  <iframe className="vh-preview" sandbox="" key={resolvedTheme} srcDoc={`<style>${previewRootCss()}${PREVIEW_CSS}</style>${preview}`} title="版本预览" />
                 )}
                 <div className="cm-row">
                   <span className="cm-spacer" />
