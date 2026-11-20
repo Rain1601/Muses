@@ -5,7 +5,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #1a1816;
+  background: var(--m-n950);
   overflow: hidden;
   position: relative;
 }
@@ -54,7 +54,7 @@
   font-size: 3.25rem;
   font-weight: 700;
   letter-spacing: -0.04em;
-  color: #FAFAF9;
+  color: var(--m-n50);
   margin: 0 0 0.625rem;
   line-height: 1;
 }
@@ -64,7 +64,7 @@
   font-family: 'Times New Roman', Georgia, serif;
   font-size: 1.0625rem;
   font-style: italic;
-  color: #78716C;
+  color: var(--m-n500);
   margin: 0 0 3rem;
   letter-spacing: 0.01em;
 }
@@ -76,9 +76,9 @@
   gap: 0.625rem;
   padding: 0.75rem 2rem;
   border-radius: 10px;
-  border: 1px solid #3F3A36;
-  background: #292524;
-  color: #E7E5E4;
+  border: 1px solid var(--m-n750);
+  background: var(--m-n880);
+  color: var(--m-n200);
   font-size: 0.9375rem;
   font-weight: 500;
   font-family: Inter, -apple-system, BlinkMacSystemFont, sans-serif;
@@ -89,9 +89,9 @@
 }
 
 .loginBtn:hover {
-  background: #3F3A36;
-  border-color: #57534E;
-  color: #FAFAF9;
+  background: var(--m-n750);
+  border-color: var(--m-n600);
+  color: var(--m-n50);
   transform: translateY(-1px);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
 }
@@ -107,21 +107,21 @@
 }
 
 .googleBtn {
-  background: #FAFAF9;
-  color: #292524;
-  border-color: #D6D3D1;
+  background: var(--m-n50);
+  color: var(--m-n880);
+  border-color: var(--m-n300);
 }
 
 .googleBtn:hover {
-  background: #F5F5F4;
-  border-color: #A8A29E;
-  color: #1C1917;
+  background: var(--m-n100);
+  border-color: var(--m-n400);
+  color: var(--m-n925);
 }
 
 /* Subtitle */
 .subtitle {
   font-size: 0.8125rem;
-  color: #57534E;
+  color: var(--m-n600);
   margin: 0;
   letter-spacing: 0.01em;
 }
@@ -137,7 +137,7 @@
 .guestLink {
   background: none;
   border: none;
-  color: #78716C;
+  color: var(--m-n500);
   font-size: 0.8125rem;
   cursor: pointer;
   font-family: inherit;
@@ -150,7 +150,7 @@
 }
 
 .guestSep {
-  color: #3F3A36;
+  color: var(--m-n750);
   font-size: 0.75rem;
 }
 
@@ -160,13 +160,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #1a1816;
+  background: var(--m-n950);
 }
 
 .spinner {
   width: 32px;
   height: 32px;
-  border: 3px solid #292524;
+  border: 3px solid var(--m-n880);
   border-top-color: #D97149;
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
@@ -183,7 +183,7 @@
   left: 50%;
   transform: translateX(-50%);
   font-size: 0.6875rem;
-  color: #3F3A36;
+  color: var(--m-n750);
   letter-spacing: 0.02em;
 }
 
@@ -224,3 +224,22 @@
     stroke-dashoffset: 0;
   }
 }
+
+.themeToggle {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 2;
+  width: 2rem;
+  height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid var(--m-n750);
+  background: transparent;
+  color: var(--m-n400);
+  cursor: pointer;
+}
+.themeToggle:hover { color: var(--m-n50); border-color: var(--m-n600); }
+.themeToggle:focus-visible { outline: 2px solid #D97149; outline-offset: 2px; }

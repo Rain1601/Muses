@@ -2,8 +2,9 @@
 
 /**
  * DocWriterBar — the "让 Claude 写" composer above the editor.
- * Collapsed it is a small pill; open it takes a topic (+ optional writing
- * skill) and runs useDocWriter.draft: outline as pending blocks, then fill.
+ * Collapsed it is a small pill; open, a dropdown under the pill takes a topic
+ * (+ optional writing skill) and runs useDocWriter.draft: outline as pending
+ * blocks at the end of the doc, then fill. Enter writes, Esc / click outside closes.
  * The slash command "让 Claude 写" opens it via the `muses:open-doc-writer` event.
  */
 import { useEffect, useRef, useState } from 'react';
@@ -25,6 +26,17 @@ export default function DocWriterBar({ editor, title, insertTitle = true }: { ed
   const [skillId, setSkillId] = useState('');
   const [skills, setSkills] = useState<SkillOption[]>([]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // Click outside closes the composer (the typed topic is kept for next time).
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [open]);
 
   useEffect(() => {
     const onOpen = () => {
@@ -72,7 +84,7 @@ export default function DocWriterBar({ editor, title, insertTitle = true }: { ed
   if (!open) {
     return (
       <div className="doc-writer">
-        <button type="button" className="doc-writer-trigger" onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 0); }}>
+        <button type="button" className="doc-writer-trigger" aria-expanded="false" onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 0); }}>
           <span className="spark">✦</span> 让 Claude 写
         </button>
         {writer.error && <span className="doc-writer-error" style={{ marginLeft: 10 }}>{writer.error}</span>}
@@ -80,9 +92,14 @@ export default function DocWriterBar({ editor, title, insertTitle = true }: { ed
     );
   }
 
+  const appending = !!editor && !editor.isDestroyed && editor.getText().trim().length > 0;
+
   return (
-    <div className="doc-writer">
-      <div className="doc-writer-panel">
+    <div className="doc-writer" ref={rootRef}>
+      <button type="button" className="doc-writer-trigger active" aria-expanded="true" onClick={() => setOpen(false)}>
+        <span className="spark">✦</span> 让 Claude 写
+      </button>
+      <div className="doc-writer-panel" role="dialog" aria-label="让 Claude 写">
         <textarea
           ref={inputRef}
           className="doc-writer-input"
@@ -91,8 +108,9 @@ export default function DocWriterBar({ editor, title, insertTitle = true }: { ed
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); run(true); }
-            if (e.key === 'Escape') setOpen(false);
+            // Enter writes; Shift+Enter is a newline. Never act while an IME is composing.
+            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && e.keyCode !== 229) { e.preventDefault(); run(true); }
+            if (e.key === 'Escape') { e.preventDefault(); setOpen(false); }
           }}
         />
         <div className="doc-writer-row">
@@ -104,11 +122,10 @@ export default function DocWriterBar({ editor, title, insertTitle = true }: { ed
               ))}
             </select>
           )}
-          <span className="doc-writer-hint">先列大纲，再一节一节写</span>
+          <span className="doc-writer-hint">{appending ? '接在文末续写' : '从空白写成整篇'}</span>
           <span className="doc-writer-spacer" />
-          <button type="button" className="pending-block-btn" onClick={() => setOpen(false)}>取消</button>
-          <button type="button" className="pending-block-btn" disabled={!topic.trim()} onClick={() => run(false)}>只列大纲</button>
-          <button type="button" className="pending-block-btn primary" disabled={!topic.trim()} onClick={() => run(true)}>开始写 ⌘↵</button>
+          <button type="button" className="doc-writer-link" disabled={!topic.trim()} onClick={() => run(false)}>只列大纲</button>
+          <button type="button" className="pending-block-btn primary" disabled={!topic.trim()} onClick={() => run(true)}>开始写 ↵</button>
         </div>
       </div>
     </div>

@@ -109,11 +109,11 @@ function NumField({ label, hint, value, min, max, step = 1, suffix, onChange, di
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4, opacity: disabled ? 0.4 : 1 }}>
       <label style={{
-        fontSize: "0.6875rem", color: "#A8A29E", letterSpacing: "0.02em",
+        fontSize: "0.6875rem", color: "var(--m-n300)", letterSpacing: "0.02em",
         display: "flex", justifyContent: "space-between", alignItems: "baseline",
       }}>
         <span>{label}</span>
-        {hint && <span style={{ color: "#57534E", fontSize: "0.625rem" }}>{hint}</span>}
+        {hint && <span style={{ color: "var(--m-n450)", fontSize: "0.625rem" }}>{hint}</span>}
       </label>
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <input
@@ -130,18 +130,18 @@ function NumField({ label, hint, value, min, max, step = 1, suffix, onChange, di
           }}
           style={{
             flex: 1,
-            background: "#1C1917",
-            border: "1px solid #3F3A36",
+            background: "var(--m-n925)",
+            border: "1px solid var(--m-n750)",
             borderRadius: 6,
             padding: "0.4375rem 0.5rem",
-            color: "#FAFAF9",
+            color: "var(--m-n50)",
             fontSize: "0.8125rem",
             fontFamily: "inherit",
             outline: "none",
           }}
         />
         {suffix && (
-          <span style={{ fontSize: "0.6875rem", color: "#78716C", minWidth: 24 }}>{suffix}</span>
+          <span style={{ fontSize: "0.6875rem", color: "var(--m-n400)", minWidth: 24 }}>{suffix}</span>
         )}
       </div>
     </div>
@@ -165,8 +165,8 @@ function Toggle({ label, hint, checked, onChange }: ToggleProps) {
         style={{ accentColor: "#D97149", width: 14, height: 14, cursor: "pointer" }}
       />
       <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-        <span style={{ fontSize: "0.8125rem", color: "#FAFAF9" }}>{label}</span>
-        {hint && <span style={{ fontSize: "0.6875rem", color: "#78716C" }}>{hint}</span>}
+        <span style={{ fontSize: "0.8125rem", color: "var(--m-n50)" }}>{label}</span>
+        {hint && <span style={{ fontSize: "0.6875rem", color: "var(--m-n400)" }}>{hint}</span>}
       </div>
     </label>
   );
@@ -181,8 +181,8 @@ interface SectionProps {
 function Section({ title, desc, children }: SectionProps) {
   return (
     <section style={{
-      background: "#1C1917",
-      border: "1px solid #292524",
+      background: "var(--m-n925)",
+      border: "1px solid var(--m-n880)",
       borderRadius: 10,
       padding: "1.25rem 1.5rem",
       display: "flex",
@@ -191,12 +191,12 @@ function Section({ title, desc, children }: SectionProps) {
     }}>
       <div>
         <h3 style={{
-          fontSize: "0.8125rem", color: "#FAFAF9", margin: 0,
+          fontSize: "0.8125rem", color: "var(--m-n50)", margin: 0,
           fontWeight: 500, letterSpacing: "0.01em",
         }}>{title}</h3>
         {desc && (
           <p style={{
-            fontSize: "0.6875rem", color: "#78716C",
+            fontSize: "0.6875rem", color: "var(--m-n400)",
             margin: "0.25rem 0 0", lineHeight: 1.5,
           }}>{desc}</p>
         )}
@@ -241,18 +241,18 @@ export default function ContextConfigPanel() {
       <header style={{ marginBottom: "0.5rem" }}>
         <div style={{
           fontSize: "0.625rem", letterSpacing: "0.14em", textTransform: "uppercase",
-          color: "#78716C", marginBottom: "0.5rem",
+          color: "var(--m-n400)", marginBottom: "0.5rem",
         }}>
           Agent · Context Injection
         </div>
         <h2 style={{
-          fontSize: "1.375rem", color: "#FAFAF9", margin: 0,
+          fontSize: "1.375rem", color: "var(--m-n50)", margin: 0,
           fontWeight: 500, letterSpacing: "-0.01em",
         }}>
           上下文注入配置
         </h2>
         <p style={{
-          fontSize: "0.8125rem", color: "#A8A29E",
+          fontSize: "0.8125rem", color: "var(--m-n300)",
           margin: "0.5rem 0 0", lineHeight: 1.55, maxWidth: 560,
         }}>
           当你在编辑器选中文本触发 AI 操作时，模型能"看到"多少周围信息。
@@ -264,12 +264,12 @@ export default function ContextConfigPanel() {
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "0.625rem 1rem",
-        background: "#292524",
-        border: "1px solid #3F3A36",
+        background: "var(--m-n880)",
+        border: "1px solid var(--m-n750)",
         borderRadius: 8,
         fontSize: "0.75rem",
       }}>
-        <span style={{ color: "#A8A29E" }}>单次请求注入上限</span>
+        <span style={{ color: "var(--m-n300)" }}>单次请求注入上限</span>
         <span style={{ color: "#E9A476", fontWeight: 500 }}>
           ≈ {estimated.toLocaleString()} 字 / {Math.round(estimated * 1.3).toLocaleString()} tokens
         </span>
@@ -386,17 +386,17 @@ export default function ContextConfigPanel() {
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
         marginTop: "0.5rem", paddingTop: "1rem",
-        borderTop: "1px solid #292524",
+        borderTop: "1px solid var(--m-n880)",
       }}>
-        <span style={{ fontSize: "0.6875rem", color: "#57534E" }}>
+        <span style={{ fontSize: "0.6875rem", color: "var(--m-n450)" }}>
           {savedAt ? `已自动保存 · ${new Date(savedAt).toLocaleTimeString()}` : "未保存"}
         </span>
         <button
           onClick={reset}
           style={{
             background: "transparent",
-            border: "1px solid #3F3A36",
-            color: "#A8A29E",
+            border: "1px solid var(--m-n750)",
+            color: "var(--m-n300)",
             padding: "0.4375rem 0.875rem",
             borderRadius: 6,
             fontSize: "0.75rem",

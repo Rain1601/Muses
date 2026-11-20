@@ -106,26 +106,26 @@ const CodeBlockComponent: React.FC<CodeBlockComponentProps> = ({
   return (
     <NodeViewWrapper className="relative my-4 group">
       {/* 代码块头部 */}
-      <div className="flex items-center justify-between px-3 py-2 bg-zinc-800 dark:bg-zinc-900 border-b border-zinc-700 dark:border-zinc-800 rounded-t-md">
+      <div className="flex items-center justify-between px-3 py-2 bg-zinc-200 dark:bg-zinc-800 dark:bg-zinc-900 border-b border-zinc-300 dark:border-zinc-700 dark:border-zinc-800 rounded-t-md">
         <div className="flex items-center gap-2">
           {shouldShowToggle && (
             <button
               onClick={toggleCollapse}
-              className="p-1 hover:bg-zinc-700 dark:hover:bg-zinc-800 rounded transition-colors"
+              className="p-1 hover:bg-zinc-300 dark:hover:bg-zinc-700 dark:hover:bg-zinc-800 rounded transition-colors"
               title={isCollapsed ? '展开代码' : '收起代码'}
             >
               {isCollapsed ? (
-                <ChevronRight className="w-4 h-4 text-zinc-400" />
+                <ChevronRight className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
               ) : (
-                <ChevronDown className="w-4 h-4 text-zinc-400" />
+                <ChevronDown className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
               )}
             </button>
           )}
           <div ref={menuRef} className="relative flex items-center gap-2">
-            <Code2 className="w-4 h-4 text-zinc-500" />
+            <Code2 className="w-4 h-4 text-zinc-500 dark:text-zinc-500" />
             <button
               onClick={() => setShowLanguageMenu(!showLanguageMenu)}
-              className="text-xs font-mono text-zinc-400 hover:text-zinc-200 px-2 py-1 rounded hover:bg-zinc-700 dark:hover:bg-zinc-800 transition-colors"
+              className="text-xs font-mono text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 px-2 py-1 rounded hover:bg-zinc-300 dark:hover:bg-zinc-700 dark:hover:bg-zinc-800 transition-colors"
               title="切换语言"
             >
               {getLanguageLabel(language)}
@@ -134,8 +134,8 @@ const CodeBlockComponent: React.FC<CodeBlockComponentProps> = ({
             {/* 语言选择下拉菜单 */}
             {showLanguageMenu && (
               <div
-                className="absolute top-full left-0 mt-2 border border-zinc-700 dark:border-zinc-800 rounded-lg shadow-2xl z-50 min-w-[160px] overflow-hidden"
-                style={{ backgroundColor: '#27272a' }}
+                className="absolute top-full left-0 mt-2 border border-zinc-300 dark:border-zinc-700 dark:border-zinc-800 rounded-lg shadow-2xl z-50 min-w-[160px] overflow-hidden"
+                style={{ backgroundColor: 'var(--m-n882)' }}
               >
                 <div className="py-1.5 max-h-60 overflow-y-auto">
                   {supportedLanguages.map((lang, index) => (
@@ -145,8 +145,8 @@ const CodeBlockComponent: React.FC<CodeBlockComponentProps> = ({
                       className={`w-full text-left px-4 py-2.5 text-sm font-mono transition-all duration-150 ${
                         language === lang.id
                           ? 'bg-blue-600 text-white'
-                          : 'text-zinc-300 hover:bg-zinc-700 hover:text-white'
-                      } ${index > 0 ? 'border-t border-zinc-700/50' : ''}`}
+                          : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-zinc-700 hover:text-white'
+                      } ${index > 0 ? 'border-t border-zinc-300/50 dark:border-zinc-700/50' : ''}`}
                     >
                       {lang.label}
                     </button>
@@ -156,7 +156,7 @@ const CodeBlockComponent: React.FC<CodeBlockComponentProps> = ({
             )}
           </div>
           {isCollapsed && (
-            <span className="text-xs text-zinc-500">
+            <span className="text-xs text-zinc-500 dark:text-zinc-500">
               {lines.length} 行代码
             </span>
           )}
@@ -165,13 +165,13 @@ const CodeBlockComponent: React.FC<CodeBlockComponentProps> = ({
         {/* 复制按钮 */}
         <button
           onClick={handleCopy}
-          className="p-1.5 hover:bg-zinc-700 dark:hover:bg-zinc-800 rounded transition-colors opacity-0 group-hover:opacity-100"
+          className="p-1.5 hover:bg-zinc-300 dark:hover:bg-zinc-700 dark:hover:bg-zinc-800 rounded transition-colors opacity-0 group-hover:opacity-100"
           title="复制代码"
         >
           {copied ? (
             <Check className="w-4 h-4 text-green-500" />
           ) : (
-            <Copy className="w-4 h-4 text-zinc-400" />
+            <Copy className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
           )}
         </button>
       </div>
@@ -200,7 +200,7 @@ const CodeBlockComponent: React.FC<CodeBlockComponentProps> = ({
       {isCollapsed && (
         <button
           onClick={toggleCollapse}
-          className="w-full py-2 bg-zinc-800 dark:bg-zinc-900 border-t border-zinc-700 dark:border-zinc-800 text-xs text-zinc-400 hover:text-zinc-300 hover:bg-zinc-700 dark:hover:bg-zinc-800 transition-colors rounded-b-md flex items-center justify-center gap-1"
+          className="w-full py-2 bg-zinc-200 dark:bg-zinc-800 dark:bg-zinc-900 border-t border-zinc-300 dark:border-zinc-700 dark:border-zinc-800 text-xs text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-zinc-700 dark:hover:bg-zinc-800 transition-colors rounded-b-md flex items-center justify-center gap-1"
         >
           <ChevronDown className="w-3 h-3" />
           展开查看全部代码

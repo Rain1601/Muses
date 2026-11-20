@@ -1,5 +1,6 @@
 "use client";
 
+import ThemeToggle from "@/components/ThemeToggle";
 import { useUserStore } from "@/store/user";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -155,6 +156,7 @@ export default function HomePage() {
 
   return (
     <div className={s.scene}>
+      <ThemeToggle className={s.themeToggle} />
       <div className={s.glow} />
       <div className={s.card}>
         <MusesIllustration className={s.illustration} />

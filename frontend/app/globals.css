@@ -229,3 +229,65 @@
 .dark .hover-lift:hover {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
 }
+
+/* ── Muses workspace palette ─────────────────────────────────
+   Warm-neutral scale used by the dashboard. Dark values are the
+   original design; light values mirror the scale so contrast holds. */
+:root {
+  --m-n950: #E6E1DA;
+  --m-n925: #EAE6E0;
+  --m-n900: #F2EFEA;
+  --m-n890: #F8F6F2;
+  --m-n885: #F6F4F0;
+  --m-n882: #F4F2EE;
+  --m-n880: #F3F0EB;
+  --m-n875: #F1EEE9;
+  --m-n850: #EDE9E3;
+  --m-n845: #EBE7E1;
+  --m-n800: #E2DDD5;
+  --m-n750: #DAD4CB;
+  --m-n600: #BBB3A9;
+  --m-n500: #857E77;
+  --m-n450: #6B655F;
+  --m-n400: #57524D;
+  --m-n300: #3D3935;
+  --m-n200: #2A2623;
+  --m-n100: #211E1B;
+  --m-n50: #1C1917;
+  --m-accent-soft: #9C4524;
+  --m-accent-strong: #8F3D1E;
+  --m-n850-rgb: 237 233 227;
+  --m-n890-rgb: 248 246 242;
+  --m-n750-rgb: 218 212 203;
+  --m-n950-rgb: 230 225 218;
+  --m-warn: #854D0E;
+}
+.dark {
+  --m-n950: #1A1816;
+  --m-n925: #1C1917;
+  --m-n900: #24201D;
+  --m-n890: #252220;
+  --m-n885: #262321;
+  --m-n882: #27272A;
+  --m-n880: #292524;
+  --m-n875: #2A2622;
+  --m-n850: #2E2B28;
+  --m-n845: #2F2A26;
+  --m-n800: #3A3531;
+  --m-n750: #3F3A36;
+  --m-n600: #57534E;
+  --m-n500: #78716C;
+  --m-n450: #8F8984;
+  --m-n400: #A8A29E;
+  --m-n300: #D6D3D1;
+  --m-n200: #E7E5E4;
+  --m-n100: #F5F5F4;
+  --m-n50: #FAFAF9;
+  --m-accent-soft: #F0A988;
+  --m-accent-strong: #FFD2BD;
+  --m-n890-rgb: 37 34 32;
+  --m-n850-rgb: 46 43 40;
+  --m-n750-rgb: 63 58 54;
+  --m-n950-rgb: 26 24 22;
+  --m-warn: #EAB308;
+}

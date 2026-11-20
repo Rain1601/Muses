@@ -38,9 +38,9 @@ function fmt(ts?: string) {
     : d.toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-const PREVIEW_CSS = `body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;color:#e7e5e4;background:#24201d;margin:12px;font-size:13px;line-height:1.6}
+const PREVIEW_CSS = `body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;color:var(--m-n200);background:var(--m-n900);margin:12px;font-size:13px;line-height:1.6}
 h1{font-size:1.3em}h2{font-size:1.1em}img{max-width:100%}del{color:#e5a5a5}ins{color:#a7e0b0;text-decoration:none}
-[data-pending-block]{border:1px dashed #57534e;padding:6px;border-radius:6px;color:#a8a29e}`;
+[data-pending-block]{border:1px dashed var(--m-n600);padding:6px;border-radius:6px;color:var(--m-n300)}`;
 
 export default function VersionHistory({
   articleId, tabId, tabName, refreshKey, onRestored, onClose, beforeRestore,

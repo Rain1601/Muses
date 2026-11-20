@@ -89,11 +89,11 @@
 }
 .pending-block-btn.primary {
   border-color: #d97149;
-  color: #f0a988;
+  color: var(--m-accent-soft);
 }
 .pending-block-btn.primary:hover:not(:disabled) {
   background: #d9714920;
-  color: #ffd2bd;
+  color: var(--m-accent-strong);
 }
 .pending-block-btn:disabled {
   opacity: 0.45;
@@ -143,6 +143,7 @@
 
 /* ── DocWriterBar ─────────────────────────────── */
 .doc-writer {
+  position: relative;
   margin: 0 0 1.25rem;
 }
 .doc-writer-trigger {
@@ -157,8 +158,9 @@
   font-size: 12px;
   cursor: pointer;
 }
-.doc-writer-trigger:hover {
-  color: #f0a988;
+.doc-writer-trigger:hover,
+.doc-writer-trigger.active {
+  color: var(--m-accent-soft);
   border-color: #d97149;
 }
 .doc-writer-trigger .spark {
@@ -169,6 +171,33 @@
   border: 1px solid hsl(var(--border));
   border-radius: 10px;
   background: hsl(var(--foreground) / 0.03);
+}
+/* Open composer: a dropdown under the pill, so the doc and toolbar don't shift. */
+.doc-writer > .doc-writer-panel[role="dialog"] {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 40;
+  width: min(560px, calc(100vw - 2rem));
+  background: hsl(var(--card));
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.45);
+}
+.doc-writer-link {
+  padding: 3px 4px;
+  border: 0;
+  background: none;
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+}
+.doc-writer-link:hover:not(:disabled) {
+  color: hsl(var(--foreground));
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.doc-writer-link:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 .doc-writer-row {
   display: flex;

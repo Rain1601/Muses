@@ -1,5 +1,7 @@
 "use client";
 
+import { EXTENSION_BLOCKED_EVENT } from "@/lib/tiptap-extensions/ExtensionGuard";
+import ThemeToggle from "@/components/ThemeToggle";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { isTextSelection } from "@tiptap/core";
 import { BubbleMenu, type BubbleMenuProps } from "@tiptap/react/menus";
@@ -200,6 +202,17 @@ export default function Dashboard() {
   const { tasks, addTask, cancelTask, removeHistory } = useArticleTasks(isAuthenticated);
   const [publishingFile, setPublishingFile] = useState<string | null>(null);
   const [publishStatus, setPublishStatus] = useState<{ type: "success" | "error" | "info"; msg: string } | null>(null);
+  // Browser extensions caught writing into the editor (ExtensionGuard) → one notice per extension.
+  useEffect(() => {
+    const onBlocked = (e: Event) => {
+      const name = (e as CustomEvent<{ name: string }>).detail?.name;
+      if (!name) return;
+      setPublishStatus({ type: "info", msg: `已拦截「${name}」改写正文，它的内容不会保存进文章` });
+      setTimeout(() => setPublishStatus(null), 5000);
+    };
+    window.addEventListener(EXTENSION_BLOCKED_EVENT, onBlocked);
+    return () => window.removeEventListener(EXTENSION_BLOCKED_EVENT, onBlocked);
+  }, []);
   const [translateError, setTranslateError] = useState<string | null>(null);
   const translationPending = useRef(false);
   const runningTaskIdsRef = useRef<Set<string>>(new Set());
@@ -210,11 +223,6 @@ export default function Dashboard() {
   const savedContentRef = useRef(savedContent);
   contentRef.current = content;
   savedContentRef.current = savedContent;
-
-  // ===== Theme (dark-only) =====
-  useEffect(() => {
-    document.documentElement.classList.add("dark");
-  }, []);
 
   // ===== Trigger translation =====
   const doTranslate = useCallback(async () => {
@@ -786,7 +794,6 @@ export default function Dashboard() {
     : activeFile ? `file:${activeFile}` : null;
   const comments = useComments(docKey, editorState);
   const [editorScroll, setEditorScroll] = useState<HTMLDivElement | null>(null);
-  const [commentGutter, setCommentGutter] = useState<HTMLDivElement | null>(null);
   const begin = comments.begin;
   const beginComment = useCallback(() => {
     if (!begin()) return false;
@@ -974,7 +981,7 @@ export default function Dashboard() {
           <div
             style={{
               width: "520px", maxWidth: "100%", maxHeight: "92vh", overflow: "auto",
-              background: "#1C1917", border: "1px solid #3F3A36", borderRadius: 12,
+              background: "var(--m-n925)", border: "1px solid var(--m-n750)", borderRadius: 12,
               boxShadow: "0 24px 60px rgba(0,0,0,0.55)",
             }}
             onClick={(e) => e.stopPropagation()}
@@ -1020,17 +1027,8 @@ export default function Dashboard() {
             </>
           )}
         </div>
-        {/* Centered tabs (Claude Cowork style) */}
-        <div className={s.topbarCenter}>
-          <div className={s.topTabGroup}>
-            {(["article", "agent", "skill"] as const).map(tab => (
-              <button key={tab} onClick={() => goToTab(tab)} className={sidebarTab === tab ? s.topTabActive : s.topTab}>
-                {tab === "article" ? "Article" : tab === "agent" ? "Agent" : "Skill"}
-              </button>
-            ))}
-          </div>
-        </div>
         <div className={s.topbarActions}>
+          <ThemeToggle className={s.iconBtn} />
           {sidebarTab === "article" && (
             <>
               <button onClick={() => saveFile()} className={s.btnGhost}>Save</button>
@@ -1063,21 +1061,21 @@ export default function Dashboard() {
                     style={{
                       zIndex: 400, width: "min(320px, calc(100vw - 24px))", padding: "0.875rem",
                       maxHeight: "var(--radix-popover-content-available-height)", overflowY: "auto",
-                      background: "#1C1917", border: "1px solid #3F3A36", borderRadius: 10,
+                      background: "var(--m-n925)", border: "1px solid var(--m-n750)", borderRadius: 10,
                       boxShadow: "0 12px 32px rgba(0,0,0,0.5)",
                     }}
                   >
-                    <div id="translate-title" style={{ fontSize: "0.625rem", letterSpacing: "0.12em", textTransform: "uppercase", color: "#78716C", marginBottom: "0.5rem", fontWeight: 500 }}>
+                    <div id="translate-title" style={{ fontSize: "0.625rem", letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--m-n400)", marginBottom: "0.5rem", fontWeight: 500 }}>
                       翻译文章
                     </div>
-                    <div id="translate-description" style={{ fontSize: "0.75rem", color: "#A8A29E", marginBottom: "0.75rem", lineHeight: 1.5 }}>
+                    <div id="translate-description" style={{ fontSize: "0.75rem", color: "var(--m-n300)", marginBottom: "0.75rem", lineHeight: 1.5 }}>
                       保存当前内容，翻译完成后生成新文章。
                     </div>
 
-                    <label style={{ display: "block", fontSize: "0.625rem", letterSpacing: "0.02em", color: "#78716C", marginBottom: "0.375rem" }}>
+                    <label style={{ display: "block", fontSize: "0.625rem", letterSpacing: "0.02em", color: "var(--m-n400)", marginBottom: "0.375rem" }}>
                       翻译模式
                     </label>
-                    <div style={{ display: "flex", gap: 0, background: "#292524", border: "1px solid #3F3A36", borderRadius: 6, padding: 3, marginBottom: "0.75rem" }}>
+                    <div style={{ display: "flex", gap: 0, background: "var(--m-n880)", border: "1px solid var(--m-n750)", borderRadius: 6, padding: 3, marginBottom: "0.75rem" }}>
                       {([
                         { v: "translated", label: "整篇翻译", hint: "纯译文" },
                         { v: "bilingual", label: "双语对照", hint: "原文 + 译文" },
@@ -1093,20 +1091,20 @@ export default function Dashboard() {
                             padding: "0.375rem 0.5rem",
                             borderRadius: 4,
                             border: "none",
-                            background: translateMode === opt.v ? "#3F3A36" : "transparent",
-                            color: translateMode === opt.v ? "#FAFAF9" : "#78716C",
+                            background: translateMode === opt.v ? "var(--m-n750)" : "transparent",
+                            color: translateMode === opt.v ? "var(--m-n50)" : "var(--m-n500)",
                             cursor: "pointer",
                             fontFamily: "inherit",
                             transition: "all 0.15s ease",
                           }}
                         >
                           <span style={{ fontSize: "0.6875rem", fontWeight: 500 }}>{opt.label}</span>
-                          <span style={{ fontSize: "0.5625rem", color: translateMode === opt.v ? "#A8A29E" : "#57534E" }}>{opt.hint}</span>
+                          <span style={{ fontSize: "0.5625rem", color: translateMode === opt.v ? "var(--m-n400)" : "var(--m-n600)" }}>{opt.hint}</span>
                         </button>
                       ))}
                     </div>
 
-                    <label style={{ display: "block", fontSize: "0.625rem", letterSpacing: "0.02em", color: "#78716C", marginBottom: "0.375rem" }}>
+                    <label style={{ display: "block", fontSize: "0.625rem", letterSpacing: "0.02em", color: "var(--m-n400)", marginBottom: "0.375rem" }}>
                       目标语言
                     </label>
                     <select
@@ -1115,8 +1113,8 @@ export default function Dashboard() {
                       value={translateLang}
                       onChange={(e) => setTranslateLang(e.target.value)}
                       style={{
-                        width: "100%", background: "#292524", border: "1px solid #3F3A36", borderRadius: 6,
-                        padding: "0.4375rem 0.5rem", color: "#FAFAF9", fontSize: "0.75rem",
+                        width: "100%", background: "var(--m-n880)", border: "1px solid var(--m-n750)", borderRadius: 6,
+                        padding: "0.4375rem 0.5rem", color: "var(--m-n50)", fontSize: "0.75rem",
                         fontFamily: "inherit", outline: "none", marginBottom: "0.75rem",
                       }}
                     >
@@ -1129,13 +1127,13 @@ export default function Dashboard() {
                       <option value="de">Deutsch</option>
                       <option value="es">Español</option>
                     </select>
-                    <label htmlFor="translation-model" style={{ display: "block", fontSize: "0.625rem", color: "#78716C", marginBottom: "0.375rem" }}>翻译模型</label>
+                    <label htmlFor="translation-model" style={{ display: "block", fontSize: "0.625rem", color: "var(--m-n400)", marginBottom: "0.375rem" }}>翻译模型</label>
                     <select
                       id="translation-model"
                       value={translateModel}
                       onChange={(e) => setTranslateModel(e.target.value)}
                       disabled={translating}
-                      style={{ width: "100%", background: "#292524", border: "1px solid #3F3A36", borderRadius: 6, padding: "0.4375rem 0.5rem", color: "#FAFAF9", fontSize: "0.75rem", marginBottom: "0.75rem" }}
+                      style={{ width: "100%", background: "var(--m-n880)", border: "1px solid var(--m-n750)", borderRadius: 6, padding: "0.4375rem 0.5rem", color: "var(--m-n50)", fontSize: "0.75rem", marginBottom: "0.75rem" }}
                     >
                       <option value="">自动（已配置的服务商）</option>
                       <option value="deepseek-flash">DeepSeek V4.1 Flash</option>
@@ -1159,7 +1157,7 @@ export default function Dashboard() {
                         onClick={() => setShowTranslate(false)}
                         style={{
                           fontSize: "0.6875rem", padding: "0.4375rem 0.75rem", borderRadius: 6,
-                          border: "1px solid #3F3A36", background: "transparent", color: "#A8A29E",
+                          border: "1px solid var(--m-n750)", background: "transparent", color: "var(--m-n300)",
                           cursor: "pointer", fontFamily: "inherit",
                         }}
                       >
@@ -1370,7 +1368,7 @@ export default function Dashboard() {
                       ))}
                       {files.length === 0 && folders.length === 0 && dbArticles.length === 0 && !creating && (
                         <div className={s.emptyState}>
-                          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#3F3A36" strokeWidth="1.5" strokeLinecap="round" style={{ marginBottom: "0.5rem" }}>
+                          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" style={{ marginBottom: "0.5rem", color: "var(--m-n750)" }}>
                             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
                             <line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>
                           </svg>
@@ -1591,14 +1589,13 @@ export default function Dashboard() {
                       appendTo={commentMenuParent} shouldShow={showCommentButton} options={commentMenuOptions} className="z-30">
                       <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={beginComment}
                         aria-keyshortcuts="Meta+Shift+M Control+Shift+M" title="评论所选文字（⌘⇧M）"
-                        className="flex items-center gap-2 rounded-md border border-stone-600 bg-stone-800 px-3 py-2 text-sm text-stone-100 hover:bg-stone-700 focus-visible:outline focus-visible:outline-ring active:bg-stone-900">
+                        className="flex items-center gap-2 rounded-md border border-stone-400 dark:border-stone-600 bg-stone-200 dark:bg-stone-800 px-3 py-2 text-sm text-stone-900 dark:text-stone-100 hover:bg-stone-300 dark:hover:bg-stone-700 focus-visible:outline focus-visible:outline-ring active:bg-stone-100 dark:active:bg-stone-900">
                         <MessageSquare className="size-4" aria-hidden="true" />
                         评论
                       </button>
                     </BubbleMenu>
                   )}
                 </div>
-                <div className={s.commentGutter} ref={setCommentGutter} aria-hidden="true" />
               </div>
             </div>
           ) : (
@@ -1630,7 +1627,7 @@ export default function Dashboard() {
             />
           ) : (
             <CommentsPanel api={comments} suggestions={suggestions} editor={editorScroll ? editorState : null}
-              scrollArea={editorScroll} gutter={commentGutter} />
+              scrollArea={editorScroll} />
           )}
         </div>
         </>
