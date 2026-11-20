@@ -28,18 +28,21 @@
 }
 
 /* ===== Top bar ===== */
+/* Toolbar at the top of the center column: same surface as the doc, no divider. */
 .topbar {
   height: 48px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 1.25rem;
-  border-bottom: 1px solid var(--m-n850);
   flex-shrink: 0;
-  background: rgb(var(--m-n890-rgb) / 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: var(--m-n890);
   position: relative;
+  z-index: 5;
+}
+/* Full-width variant (Agent / Skill views, which have no center column). */
+.topbarFull {
+  border-bottom: 1px solid var(--m-n850);
 }
 
 .topbarLeft {
@@ -332,11 +335,20 @@
   overflow: hidden;
 }
 
+.sidebarBrand {
+  height: 48px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0 1rem;
+}
+
 .sidebarSubHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.95rem 0.85rem 0.4rem;
+  padding: 0.35rem 0.85rem 0.4rem;
 }
 
 .sidebarHeader {

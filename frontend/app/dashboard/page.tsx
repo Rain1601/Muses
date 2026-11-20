@@ -871,154 +871,16 @@ export default function Dashboard() {
     return dbArticles.filter(a => a.title.toLowerCase().includes(q)).slice(0, 20);
   })();
 
-  return (
-    <div className={s.shell}>
-      {/* Selection task menu (⌘K) */}
-      {selMenu && typeof window !== "undefined" && createPortal(
-        <SelectionTaskMenu
-          anchor={selMenu.anchor}
-          selectedText={selMenu.selectedText}
-          onSubmit={submitSelectionTask}
-          onClose={() => setSelMenu(null)}
-        />,
-        document.body,
-      )}
-      {/* Quick switcher (⌘P) — Notion-style article finder */}
-      {quickSwitcherOpen && (
-        <div className={s.qsBackdrop} onClick={() => setQuickSwitcherOpen(false)}>
-          <div className={s.qsPanel} onClick={e => e.stopPropagation()}>
-            <div className={s.qsSearchRow}>
-              <svg className={s.qsSearchIcon} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-              <input
-                autoFocus
-                className={s.qsSearchInput}
-                placeholder="Find an article…"
-                value={qsQuery}
-                onChange={e => { setQsQuery(e.target.value); setQsIndex(0); }}
-                onKeyDown={e => {
-                  if (e.key === "ArrowDown") { e.preventDefault(); setQsIndex(i => Math.min(qsResults.length - 1, i + 1)); }
-                  else if (e.key === "ArrowUp") { e.preventDefault(); setQsIndex(i => Math.max(0, i - 1)); }
-                  else if (e.key === "Enter") {
-                    e.preventDefault();
-                    const target = qsResults[qsIndex];
-                    if (target) {
-                      openDbArticle(target);
-                      setQuickSwitcherOpen(false);
-                    }
-                  } else if (e.key === "Escape") {
-                    e.preventDefault();
-                    setQuickSwitcherOpen(false);
-                  }
-                }}
-              />
-            </div>
-            <div className={s.qsList}>
-              {qsResults.length === 0 ? (
-                <div className={s.qsEmpty}>无匹配文章</div>
-              ) : qsResults.map((a, i) => (
-                <div
-                  key={a.id}
-                  className={i === qsIndex ? s.qsItemActive : s.qsItem}
-                  onMouseEnter={() => setQsIndex(i)}
-                  onClick={() => { openDbArticle(a); setQuickSwitcherOpen(false); }}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                  <span className={s.qsItemTitle}>{a.title}</span>
-                  <span className={s.qsItemBadge}>{a.publishStatus === "published" ? "已发布" : "草稿"}</span>
-                </div>
-              ))}
-            </div>
-            <div className={s.qsFooter}>
-              <span><kbd>↑</kbd><kbd>↓</kbd> navigate</span>
-              <span><kbd>↵</kbd> open</span>
-              <span><kbd>esc</kbd> close</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Publish history modal */}
-      {showPublishHistory && activeDbArticle && (
-        <PublishHistoryPanel
-          articleId={activeDbArticle.id}
-          articleTitle={activeDbArticle.title}
-          onClose={() => setShowPublishHistory(false)}
-          onChanged={async () => {
-            // Re-fetch list; if the active article no longer appears (deleted or unpublished), clear the editor
-            try {
-              const token = localStorage.getItem("token");
-              if (!token) return;
-              const res = await fetch(`${API_BASE}/api/articles?page_size=50`, {
-                headers: { Authorization: `Bearer ${token}` },
-              });
-              const data = await res.json();
-              const articles: DBArticle[] = data.articles || [];
-              setDbArticles(articles);
-              const stillThere = articles.find(a => a.id === activeDbArticle.id);
-              if (!stillThere) {
-                setActiveDbArticle(null);
-                setContent("");
-                setSavedContent("");
-                setMarkdownContent("");
-              } else {
-                setActiveDbArticle(stillThere);
-              }
-            } catch (e) { console.error("Refresh after publish action failed:", e); }
-          }}
-        />
-      )}
-      {/* File import modal */}
-      {showImport && (
-        <div
-          style={{
-            position: "fixed", inset: 0, zIndex: 1000,
-            background: "rgba(0, 0, 0, 0.55)", backdropFilter: "blur(4px)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            padding: "2rem",
-          }}
-          onClick={() => setShowImport(false)}
-        >
-          <div
-            style={{
-              width: "520px", maxWidth: "100%", maxHeight: "92vh", overflow: "auto",
-              background: "var(--m-n925)", border: "1px solid var(--m-n750)", borderRadius: 12,
-              boxShadow: "0 24px 60px rgba(0,0,0,0.55)",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <FileImport
-              onClose={() => setShowImport(false)}
-              onImportComplete={() => loadDbArticles()}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Toast: success / error / info */}
-      {publishStatus && (
-        <div
-          className={publishStatus.type === "success" ? s.toastSuccess : publishStatus.type === "error" ? s.toastError : s.toastSuccess}
-          style={publishStatus.type === "info" ? {
-            background: "rgba(165, 180, 252, 0.12)",
-            border: "1px solid rgba(165, 180, 252, 0.3)",
-            color: "#a5b4fc",
-          } : undefined}
-        >
-          {publishStatus.type === "success" ? (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
-          ) : publishStatus.type === "error" ? (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
-          ) : (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-          )}
-          {publishStatus.msg}
-        </div>
-      )}
-      {/* Top bar */}
-      <div className={s.topbar}>
+  // Toolbar: in the article view it sits at the top of the center column and shares the editor's surface.
+  const topBar = (full: boolean) => (
+      <div className={full ? `${s.topbar} ${s.topbarFull}` : s.topbar}>
         <div className={s.topbarLeft}>
-          <img src="/materials/images/icons/logo-muses.svg" alt="Muses" className={s.logoIcon} />
-          <span className={s.logo}>Muses</span>
+          {full && (
+            <>
+              <img src="/materials/images/icons/logo-muses.svg" alt="Muses" className={s.logoIcon} />
+              <span className={s.logo}>Muses</span>
+            </>
+          )}
         </div>
         <div className={s.topbarActions}>
           {sidebarTab === "article" && (activeFile || activeDbArticle) && (
@@ -1215,6 +1077,153 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+  );
+
+  return (
+    <div className={s.shell}>
+      {/* Selection task menu (⌘K) */}
+      {selMenu && typeof window !== "undefined" && createPortal(
+        <SelectionTaskMenu
+          anchor={selMenu.anchor}
+          selectedText={selMenu.selectedText}
+          onSubmit={submitSelectionTask}
+          onClose={() => setSelMenu(null)}
+        />,
+        document.body,
+      )}
+      {/* Quick switcher (⌘P) — Notion-style article finder */}
+      {quickSwitcherOpen && (
+        <div className={s.qsBackdrop} onClick={() => setQuickSwitcherOpen(false)}>
+          <div className={s.qsPanel} onClick={e => e.stopPropagation()}>
+            <div className={s.qsSearchRow}>
+              <svg className={s.qsSearchIcon} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+              <input
+                autoFocus
+                className={s.qsSearchInput}
+                placeholder="Find an article…"
+                value={qsQuery}
+                onChange={e => { setQsQuery(e.target.value); setQsIndex(0); }}
+                onKeyDown={e => {
+                  if (e.key === "ArrowDown") { e.preventDefault(); setQsIndex(i => Math.min(qsResults.length - 1, i + 1)); }
+                  else if (e.key === "ArrowUp") { e.preventDefault(); setQsIndex(i => Math.max(0, i - 1)); }
+                  else if (e.key === "Enter") {
+                    e.preventDefault();
+                    const target = qsResults[qsIndex];
+                    if (target) {
+                      openDbArticle(target);
+                      setQuickSwitcherOpen(false);
+                    }
+                  } else if (e.key === "Escape") {
+                    e.preventDefault();
+                    setQuickSwitcherOpen(false);
+                  }
+                }}
+              />
+            </div>
+            <div className={s.qsList}>
+              {qsResults.length === 0 ? (
+                <div className={s.qsEmpty}>无匹配文章</div>
+              ) : qsResults.map((a, i) => (
+                <div
+                  key={a.id}
+                  className={i === qsIndex ? s.qsItemActive : s.qsItem}
+                  onMouseEnter={() => setQsIndex(i)}
+                  onClick={() => { openDbArticle(a); setQuickSwitcherOpen(false); }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                  <span className={s.qsItemTitle}>{a.title}</span>
+                  <span className={s.qsItemBadge}>{a.publishStatus === "published" ? "已发布" : "草稿"}</span>
+                </div>
+              ))}
+            </div>
+            <div className={s.qsFooter}>
+              <span><kbd>↑</kbd><kbd>↓</kbd> navigate</span>
+              <span><kbd>↵</kbd> open</span>
+              <span><kbd>esc</kbd> close</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Publish history modal */}
+      {showPublishHistory && activeDbArticle && (
+        <PublishHistoryPanel
+          articleId={activeDbArticle.id}
+          articleTitle={activeDbArticle.title}
+          onClose={() => setShowPublishHistory(false)}
+          onChanged={async () => {
+            // Re-fetch list; if the active article no longer appears (deleted or unpublished), clear the editor
+            try {
+              const token = localStorage.getItem("token");
+              if (!token) return;
+              const res = await fetch(`${API_BASE}/api/articles?page_size=50`, {
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              const data = await res.json();
+              const articles: DBArticle[] = data.articles || [];
+              setDbArticles(articles);
+              const stillThere = articles.find(a => a.id === activeDbArticle.id);
+              if (!stillThere) {
+                setActiveDbArticle(null);
+                setContent("");
+                setSavedContent("");
+                setMarkdownContent("");
+              } else {
+                setActiveDbArticle(stillThere);
+              }
+            } catch (e) { console.error("Refresh after publish action failed:", e); }
+          }}
+        />
+      )}
+      {/* File import modal */}
+      {showImport && (
+        <div
+          style={{
+            position: "fixed", inset: 0, zIndex: 1000,
+            background: "rgba(0, 0, 0, 0.55)", backdropFilter: "blur(4px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: "2rem",
+          }}
+          onClick={() => setShowImport(false)}
+        >
+          <div
+            style={{
+              width: "520px", maxWidth: "100%", maxHeight: "92vh", overflow: "auto",
+              background: "var(--m-n925)", border: "1px solid var(--m-n750)", borderRadius: 12,
+              boxShadow: "0 24px 60px rgba(0,0,0,0.55)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <FileImport
+              onClose={() => setShowImport(false)}
+              onImportComplete={() => loadDbArticles()}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Toast: success / error / info */}
+      {publishStatus && (
+        <div
+          className={publishStatus.type === "success" ? s.toastSuccess : publishStatus.type === "error" ? s.toastError : s.toastSuccess}
+          style={publishStatus.type === "info" ? {
+            background: "rgba(165, 180, 252, 0.12)",
+            border: "1px solid rgba(165, 180, 252, 0.3)",
+            color: "#a5b4fc",
+          } : undefined}
+        >
+          {publishStatus.type === "success" ? (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+          ) : publishStatus.type === "error" ? (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+          ) : (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          )}
+          {publishStatus.msg}
+        </div>
+      )}
+      {/* Agent / Skill views keep a full-width bar; the article view puts it inside the center column. */}
+      {sidebarTab !== "article" && topBar(true)}
 
       {/* Main */}
       <div className={s.main}>
@@ -1231,12 +1240,17 @@ export default function Dashboard() {
           {sidebarCollapsed ? (
             /* Collapsed: single expand button */
             <div className={s.collapsedIcons}>
+              <img src="/materials/images/icons/logo-muses.svg" alt="Muses" className={s.logoIcon} style={{ margin: "0.5rem 0 0.75rem" }} />
               <button onClick={() => setSidebarCollapsed(false)} className={s.collapsedIconBtn} title="Expand">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
               </button>
             </div>
           ) : (
             <>
+              <div className={s.sidebarBrand}>
+                <img src="/materials/images/icons/logo-muses.svg" alt="" className={s.logoIcon} />
+                <span className={s.logo}>Muses</span>
+              </div>
               {/* Sidebar header with collapse + actions */}
               <div className={s.sidebarContent}>
                   <>
@@ -1559,6 +1573,7 @@ export default function Dashboard() {
 
         {/* Editor */}
         <div className={s.editorArea}>
+          {topBar(false)}
           {showSettings ? (
             <SettingsPanel onClose={() => setShowSettings(false)} />
           ) : (activeFile || activeDbArticle) ? (
