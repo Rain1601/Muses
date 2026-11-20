@@ -548,9 +548,12 @@ async def _translate_article_background(
                     sibling.string = translation
                     node.insert_after(sibling)
             else:
-                # translated 模式:纯译文,替换原文
+                # translated 模式:纯译文,替换原文 —— 块里的图片保留(放在译文之后)
+                images = [img.extract() for img in node.find_all('img')]
                 node.clear()
-                node.string = translation
+                node.append(translation)
+                for img in images:
+                    node.append(img)
 
         if mode == "bilingual":
             notice = BeautifulSoup('<blockquote><p>💡 本文为双语对照版本 | This is a bilingual version</p></blockquote>', 'html.parser')

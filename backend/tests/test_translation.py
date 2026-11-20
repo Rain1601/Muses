@@ -138,3 +138,17 @@ async def test_list_items_translated_once_and_structure_kept(translation_db, mon
     assert '<ul><li><p>' in html and '<ol><li>' in html and html.count('<li>') == 3
     assert html.index('T[Gamma]') < html.index('<img src="x.png"/>') < html.index('T[Delta]')
     assert '&lt;b&gt;&amp;' in html and '<b>' not in html
+
+
+@pytest.mark.asyncio
+async def test_inline_images_survive_translated_mode(translation_db, monkeypatch):
+    """Markdown import puts images inside paragraphs; replacing the text must not drop them."""
+    db, user = translation_db
+    db.get(Article, 'source').content = '<p>Caption <img src="x.png" alt="chart"> more</p>'
+    db.commit()
+    monkeypatch.setattr(EnhancedAIService, 'perform_text_action', AsyncMock(return_value={'processedText': '译文'}))
+    task = articles.task_tracker.create_task('translate_article', user_id=user.id)
+    await articles._translate_article_background(task, 'source', 'user', 'zh-CN', 'translated')
+    state = articles.task_tracker.get_task(task)
+    html = db.get(Article, state['result']['article_id']).content
+    assert html == '<p>译文<img alt="chart" src="x.png"/></p>'

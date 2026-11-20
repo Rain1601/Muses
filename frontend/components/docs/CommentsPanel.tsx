@@ -147,7 +147,9 @@ function useMarginLayout(
       const next: Record<string, number> = {};
       const pivot = placed.findIndex((p) => p.key === activeKey);
       if (pivot >= 0) {
-        next[placed[pivot].key] = placed[pivot].want;
+        // The active card follows its words but never leaves the margin, so its reply box and buttons stay reachable.
+        const room = container.clientHeight - placed[pivot].h;
+        next[placed[pivot].key] = room > 0 ? Math.min(Math.max(placed[pivot].want, 0), room) : 0;
         for (let i = pivot + 1; i < placed.length; i++) {
           const prev = placed[i - 1];
           next[placed[i].key] = Math.max(placed[i].want, next[prev.key] + prev.h + GAP);
