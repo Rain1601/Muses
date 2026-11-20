@@ -159,28 +159,28 @@
 .chart-csv:focus { border-color: #d97149; }
 .chart-data-row { display: flex; align-items: center; gap: 8px; justify-content: space-between; margin-top: 6px; }
 
-/* Toolbar row above the editor: Let-Claude-write + export */
-.doc-toolbar { display: flex; align-items: flex-start; gap: 8px; }
-.doc-toolbar-main { flex: 1; min-width: 0; }
-.export-menu { position: relative; flex: none; }
-.export-pop {
+/* Top-bar ⋯ document menu (components/docs/DocMenu.tsx) */
+.doc-menu { position: relative; display: inline-flex; }
+.doc-menu-pop {
   position: absolute;
   right: 0;
   top: calc(100% + 6px);
-  z-index: 50;
-  width: 250px;
+  z-index: 60;
+  width: 260px;
   padding: 4px;
   border-radius: 8px;
-  border: 1px solid hsl(var(--border));
+  border: 1px solid var(--m-n750);
   background: var(--m-n845);
-  box-shadow: 0 8px 24px #0007;
+  box-shadow: 0 10px 28px rgb(0 0 0 / 0.28);
+  font-family: Inter, system-ui, sans-serif;
 }
-.export-item {
+.doc-menu-item {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  gap: 1px;
   width: 100%;
-  padding: 6px 8px;
+  padding: 7px 9px;
   border: none;
   border-radius: 5px;
   background: none;
@@ -188,7 +188,10 @@
   font: inherit;
   text-align: left;
 }
-.export-item:hover { background: hsl(var(--foreground) / 0.07); }
-.export-label { font-size: 0.82rem; color: hsl(var(--foreground)); }
-.export-hint { font-size: 0.7rem; color: hsl(var(--muted-foreground)); }
-.export-foot { font-size: 0.68rem; color: hsl(var(--muted-foreground)); padding: 6px 8px 4px; border-top: 1px solid hsl(var(--border)); margin-top: 4px; }
+.doc-menu-item:hover,
+.doc-menu-item:focus-visible { background: var(--m-n800); outline: none; }
+.doc-menu-label { font-size: 0.82rem; color: var(--m-n50); }
+.doc-menu-label .spark { color: #d97149; margin-right: 2px; }
+.doc-menu-hint { font-size: 0.7rem; color: var(--m-n400); }
+.doc-menu-sep { height: 1px; margin: 4px 2px; background: var(--m-n750); }
+.doc-menu-foot { font-size: 0.68rem; color: var(--m-n400); padding: 6px 9px 4px; border-top: 1px solid var(--m-n750); margin-top: 4px; }

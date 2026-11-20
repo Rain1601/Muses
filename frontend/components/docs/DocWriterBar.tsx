@@ -2,7 +2,8 @@
 
 /**
  * DocWriterBar — the "让 Claude 写" composer above the editor.
- * Collapsed it is a small pill; open, a dropdown under the pill takes a topic
+ * Hidden until opened from the top-bar ⋯ menu or the "/" slash menu (both fire
+ * OPEN_DOC_WRITER_EVENT); open, a panel at the top of the doc takes a topic
  * (+ optional writing skill) and runs useDocWriter.draft: outline as pending
  * blocks at the end of the doc, then fill. Enter writes, Esc / click outside closes.
  * The slash command "让 Claude 写" opens it via the `muses:open-doc-writer` event.
@@ -81,24 +82,15 @@ export default function DocWriterBar({ editor, title, insertTitle = true }: { ed
     );
   }
 
+  // Closed: nothing above the doc. It opens from the top-bar ⋯ menu or the "/" slash menu.
   if (!open) {
-    return (
-      <div className="doc-writer">
-        <button type="button" className="doc-writer-trigger" aria-expanded="false" onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 0); }}>
-          <span className="spark">✦</span> 让 Claude 写
-        </button>
-        {writer.error && <span className="doc-writer-error" style={{ marginLeft: 10 }}>{writer.error}</span>}
-      </div>
-    );
+    return writer.error ? <div className="doc-writer"><span className="doc-writer-error">{writer.error}</span></div> : null;
   }
 
   const appending = !!editor && !editor.isDestroyed && editor.getText().trim().length > 0;
 
   return (
     <div className="doc-writer" ref={rootRef}>
-      <button type="button" className="doc-writer-trigger active" aria-expanded="true" onClick={() => setOpen(false)}>
-        <span className="spark">✦</span> 让 Claude 写
-      </button>
       <div className="doc-writer-panel" role="dialog" aria-label="让 Claude 写">
         <textarea
           ref={inputRef}

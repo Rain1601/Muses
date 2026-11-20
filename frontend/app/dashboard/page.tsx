@@ -2,6 +2,7 @@
 
 import { EXTENSION_BLOCKED_EVENT } from "@/lib/tiptap-extensions/ExtensionGuard";
 import ThemeToggle from "@/components/ThemeToggle";
+import DocMenu from "@/components/docs/DocMenu";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { isTextSelection } from "@tiptap/core";
 import { BubbleMenu, type BubbleMenuProps } from "@tiptap/react/menus";
@@ -27,7 +28,6 @@ import { isActiveTask, useArticleTasks } from "@/lib/hooks/useArticleTasks";
 import { useSuggestions } from "@/lib/hooks/useSuggestions";
 import DocTabs, { type DocTab } from "@/components/docs/DocTabs";
 import VersionHistory from "@/components/docs/VersionHistory";
-import ExportMenu from "@/components/docs/ExportMenu";
 import { createPortal } from "react-dom";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import s from "./dashboard.module.css";
@@ -1028,6 +1028,20 @@ export default function Dashboard() {
           )}
         </div>
         <div className={s.topbarActions}>
+          {sidebarTab === "article" && (activeFile || activeDbArticle) && (
+            <DocMenu
+              className={s.iconBtn}
+              editor={editorState}
+              title={[
+                activeDbArticle?.title || activeFile?.replace(/\.md$/, "") || "muses-doc",
+                activeTabId !== "main" ? tabs.find(t => t.id === activeTabId)?.name : null,
+              ].filter(Boolean).join(" - ")}
+              onAddTab={activeDbArticle ? addTab : undefined}
+              historyOpen={showHistory}
+              onToggleHistory={activeDbArticle ? () => setShowHistory(v => !v) : undefined}
+              onError={(msg) => { setPublishStatus({ type: "error", msg }); setTimeout(() => setPublishStatus(null), 4000); }}
+            />
+          )}
           <ThemeToggle className={s.iconBtn} />
           {sidebarTab === "article" && (
             <>
@@ -1549,7 +1563,8 @@ export default function Dashboard() {
             <div className={s.editorScroll} ref={setEditorScroll}>
               <div className={s.editorPage}>
                 <div className={s.editorInner}>
-                  {activeDbArticle && (
+                  {/* The tab strip only shows once there is more than the main tab; new tabs come from the ⋯ menu. */}
+                  {activeDbArticle && tabs.length > 1 && (
                     <DocTabs
                       tabs={tabs}
                       activeId={activeTabId}
@@ -1557,23 +1572,10 @@ export default function Dashboard() {
                       onAdd={addTab}
                       onRename={renameTab}
                       onDelete={deleteTab}
-                      historyOpen={showHistory}
-                      onToggleHistory={() => setShowHistory(v => !v)}
                     />
                   )}
                   {editorState && (
-                    <div className="doc-toolbar">
-                      <div className="doc-toolbar-main">
-                        <DocWriterBar key={`${activeFile || activeDbArticle?.id || "empty"}:${activeTabId}`} editor={editorState} title={activeDbArticle?.title || activeFile || undefined} insertTitle={!activeDbArticle} />
-                      </div>
-                      <ExportMenu
-                        editor={editorState}
-                        title={[
-                          activeDbArticle?.title || activeFile?.replace(/\.md$/, "") || "muses-doc",
-                          activeTabId !== "main" ? tabs.find(t => t.id === activeTabId)?.name : null,
-                        ].filter(Boolean).join(" - ")}
-                      />
-                    </div>
+                    <DocWriterBar key={`${activeFile || activeDbArticle?.id || "empty"}:${activeTabId}`} editor={editorState} title={activeDbArticle?.title || activeFile || undefined} insertTitle={!activeDbArticle} />
                   )}
                   <NotionEditor
                     key={`${activeFile || activeDbArticle?.id || "empty"}:${activeTabId}:${editorEpoch}`}

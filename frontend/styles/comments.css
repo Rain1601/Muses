@@ -314,7 +314,6 @@
 .doc-tab.on { border-bottom-color: #d97149; }
 .doc-tab-label,
 .doc-tab-add,
-.doc-tab-history,
 .doc-tab-x,
 .doc-tab-confirm button {
   background: none;
@@ -348,10 +347,7 @@
   outline: none;
 }
 .doc-tab-add { padding: 4px 8px; font-size: 0.85rem; }
-.doc-tab-add:hover, .doc-tab-history:hover { color: var(--m-accent-soft); }
-.doc-tabs-spacer { flex: 1; }
-.doc-tab-history { padding: 4px 8px; font-size: 0.75rem; white-space: nowrap; }
-.doc-tab-history.on { color: var(--m-accent-soft); }
+.doc-tab-add:hover { color: var(--m-accent-soft); }
 
 /* Version history (components/docs/VersionHistory.tsx) */
 .vh-row { display: flex; align-items: baseline; gap: 8px; }
