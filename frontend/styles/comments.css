@@ -98,11 +98,6 @@
   @apply outline outline-2 outline-offset-2 outline-ring;
 }
 
-.cm-chip:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
 .cm-quote {
   border-left: 2px solid #d97149;
   padding-left: 0.5rem;
@@ -123,7 +118,7 @@
 .cm-meta { font-size: 0.7rem; color: var(--m-n400); margin: -0.25rem 0 0.4rem; }
 
 .cm-comment { padding: 0.3rem 0; }
-.cm-comment + .cm-comment { border-top: 1px solid #36312d; }
+.cm-comment + .cm-comment { border-top: 1px solid var(--m-n800); }
 .cm-author {
   font-size: 0.72rem;
   font-weight: 600;
@@ -198,17 +193,6 @@
 .cm-btn.primary { border-color: #d97149; color: var(--m-accent-soft); }
 .cm-btn.primary:hover:not(:disabled) { background: #d9714920; color: var(--m-accent-strong); }
 .cm-btn:disabled { opacity: 0.55; cursor: not-allowed; }
-.cm-chip {
-  padding: 2px 8px;
-  font-size: 0.7rem;
-  border-radius: 999px;
-  border: 1px solid var(--m-n750);
-  background: transparent;
-  @apply text-stone-400;
-  cursor: pointer;
-  font-family: inherit;
-}
-.cm-chip.on { border-color: #d97149; color: var(--m-accent-soft); background: #d9714918; }
 
 .cm-spinner {
   display: inline-block;
@@ -419,3 +403,27 @@
   .cm-slot > .cm-thread, .cm-thread.cm-slot { transition: none; }
 }
 .cm-panel > .sg-bulk { padding: 0.4rem 0.8rem; border-bottom: 1px solid var(--m-n850); }
+
+/* Comment requests to Muses: a small tag instead of raw "@Muses" text */
+.cm-ask-tag {
+  margin-left: 4px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 500;
+  color: var(--m-accent-soft);
+  background: #d9714918;
+  border: 1px solid #d9714955;
+}
+.cm-ask-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.74rem;
+  color: var(--m-n400);
+  cursor: pointer;
+  user-select: none;
+}
+.cm-ask-toggle.on { color: var(--m-accent-soft); }
+.cm-ask-toggle input { accent-color: #d97149; width: 14px; height: 14px; margin: 0; cursor: inherit; }
+.cm-ask-toggle:has(input:disabled) { cursor: default; }

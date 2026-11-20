@@ -31,7 +31,8 @@ function Composer({
   const [sending, setSending] = useState(false);
   const ref = useRef<HTMLTextAreaElement>(null);
   useEffect(() => { if (autoFocus) ref.current?.focus(); }, [autoFocus]);
-  const willAsk = askMuses || mentionsMuses(body);
+  const mentioned = mentionsMuses(body);
+  const willAsk = askMuses || mentioned;
   const send = async () => {
     if (sending || !body.trim()) return;
     setSending(true);
@@ -60,20 +61,20 @@ function Composer({
         }}
       />
       <div className="cm-row">
-        <button
-          type="button"
-          className={`cm-chip${willAsk ? ' on' : ''}`}
-          aria-pressed={willAsk}
-          disabled={sending}
-          onClick={() => setAskMuses((v) => !v)}
-          title="请 Muses 回复或建议修改"
-        >
-          @Muses
-        </button>
+        {/* "Send to Muses": ticked automatically when the text mentions @Muses. */}
+        <label className={`cm-ask-toggle${willAsk ? ' on' : ''}`} title={mentioned ? '正文里提到了 @Muses，会发给它' : '请 Muses 回复，或建议修改这段'}>
+          <input
+            type="checkbox"
+            checked={willAsk}
+            disabled={sending || mentioned}
+            onChange={(e) => setAskMuses(e.target.checked)}
+          />
+          <span>发给 Muses</span>
+        </label>
         <span className="cm-spacer" />
         {onCancel && <button type="button" className="cm-btn" disabled={sending} onClick={onCancel}>取消</button>}
         <button type="button" className="cm-btn primary" disabled={sending || !body.trim()} onClick={send}>
-          {sending ? '发送中…' : submitLabel}
+          {sending ? '发送中…' : willAsk ? `${submitLabel}并发给 Muses` : submitLabel}
         </button>
       </div>
     </div>
@@ -219,13 +220,20 @@ function SuggestionCard({ sg, sugs, threads, hovered, onHover }: {
   );
 }
 
+/** "@Claude 压缩成一句" → "压缩成一句": the request to Muses is shown as a tag instead of raw @ text. */
+const MENTION_TOKEN = /@(?:muses|claude)\b[\s,，:：]*/gi;
+
 function CommentItem({ c }: { c: DocThread['comments'][number] }) {
+  const fromMuses = c.author === 'claude';
+  const asked = !fromMuses && mentionsMuses(c.body);
+  const body = asked ? c.body.replace(MENTION_TOKEN, '').trim() : c.body;
   return (
-    <div className={`cm-comment${c.author === 'claude' ? ' claude' : ''}`}>
+    <div className={`cm-comment${fromMuses ? ' claude' : ''}`}>
       <div className="cm-author">
-        {c.author === 'claude' ? <><span className="cm-spark">✦</span> Muses</> : (c.authorName || '我')}
+        {fromMuses ? <><span className="cm-spark">✦</span> Muses</> : (c.authorName || '我')}
+        {asked && <span className="cm-ask-tag" title="这条评论请 Muses 处理">请 Muses</span>}
       </div>
-      <div className="cm-body">{c.body}</div>
+      {body && <div className="cm-body">{body}</div>}
     </div>
   );
 }
@@ -285,7 +293,7 @@ function ThreadCard({ t, api, detached, sugs, inMargin, hovered, onHover }: {
       ))}
       {active && !t.resolved && (
         <div onClick={(e) => e.stopPropagation()}>
-          <Composer placeholder="回复，或 @Muses 让它改这段" submitLabel="回复" onSubmit={(b, ai) => api.reply(t.id, b, ai)} />
+          <Composer placeholder="回复…" submitLabel="回复" onSubmit={(b, ai) => api.reply(t.id, b, ai)} />
         </div>
       )}
       {(!compact || hovered) && (
@@ -418,7 +426,7 @@ export default function CommentsPanel({ api, suggestions, editor, scrollArea }: 
             <div className="cm-quote">{api.draft.text || '选中的文字已删除'}</div>
             <Composer
               autoFocus
-              placeholder="写评论，或 @Muses 让它回答或改这段"
+              placeholder="写评论…"
               submitLabel="评论"
               onSubmit={api.submitDraft}
               onCancel={api.cancelDraft}
@@ -447,7 +455,7 @@ export default function CommentsPanel({ api, suggestions, editor, scrollArea }: 
         {!items.length && !api.loading && (
           <div className="cm-empty">
             <div className="cm-empty-title">还没有评论</div>
-            <div>选中文字后点「评论」，或按 <kbd>⌘⇧M</kbd>。<br />在评论里写 @Muses 可以请它回复或建议修改。</div>
+            <div>选中文字后点「评论」，或按 <kbd>⌘⇧M</kbd>。<br />勾选「发给 Muses」可以请它回复或建议修改。</div>
           </div>
         )}
       </div>
