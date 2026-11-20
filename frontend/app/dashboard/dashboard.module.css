@@ -62,21 +62,14 @@
   color: var(--m-n50);
 }
 
-.breadcrumbSep {
-  font-size: 0.75rem;
-  color: var(--m-n500);
-}
-
-.breadcrumbFile {
-  font-size: 0.75rem;
-  color: var(--m-n400);
-  letter-spacing: 0.01em;
-}
-
 .unsavedDot {
-  font-size: 0.875rem;
-  color: #D97149;
-  font-weight: 700;
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: #D97149;
+  vertical-align: 1px;
 }
 
 .topbarActions {
@@ -1023,11 +1016,14 @@
 
 .editorInner {
   width: 100%;
-  padding: 2.5rem 3rem 4rem;
+  padding: 1rem 3rem 4rem;
   color: var(--m-n50);
   /* Light theme: secondary editor controls need more contrast than the page default */
   --muted-foreground: 25 6% 36%;
 }
+
+/* The doc starts right under the top bar: no extra gap above its first block. */
+.editorInner :global(.ProseMirror > :first-child) { margin-top: 0; }
 
 /* Dark theme: the editor uses the workspace's warm dark surface, not the page default. */
 :global(.dark) .editorInner {

@@ -1019,13 +1019,6 @@ export default function Dashboard() {
         <div className={s.topbarLeft}>
           <img src="/materials/images/icons/logo-muses.svg" alt="Muses" className={s.logoIcon} />
           <span className={s.logo}>Muses</span>
-          {sidebarTab === "article" && (
-            <>
-              <span className={s.breadcrumbSep}>/</span>
-              <span className={s.breadcrumbFile}>{activeFile || activeDbArticle?.title || "Studio"}</span>
-              {content !== savedContent && <span className={s.unsavedDot}>*</span>}
-            </>
-          )}
         </div>
         <div className={s.topbarActions}>
           {sidebarTab === "article" && (activeFile || activeDbArticle) && (
@@ -1045,7 +1038,16 @@ export default function Dashboard() {
           <ThemeToggle className={s.iconBtn} />
           {sidebarTab === "article" && (
             <>
-              <button onClick={() => saveFile()} className={s.btnGhost}>Save</button>
+              {/* The title lives in the doc itself; the top bar only says whether there is something to save. */}
+              <button
+                onClick={() => saveFile()}
+                className={s.btnGhost}
+                title={content !== savedContent ? "有未保存的修改（⌘S）" : "已保存"}
+                aria-label={content !== savedContent ? "保存（有未保存的修改）" : "保存"}
+              >
+                {content !== savedContent && <span className={s.unsavedDot} aria-hidden="true" />}
+                Save
+              </button>
 
               {/* Translate — only enabled for DB articles */}
               <Popover modal open={showTranslate} onOpenChange={(open) => { setShowTranslate(open); if (open) setTranslateError(null); }}>
