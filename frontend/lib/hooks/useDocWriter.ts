@@ -144,6 +144,12 @@ export function useDocWriter(editor: any, opts: { title?: string; insertTitle?: 
       } else {
         editor.commands.setContent({ type: 'doc', content }, { emitUpdate: true });
       }
+      // The outline lands at the end of the doc; bring it into view so the user sees where Claude writes.
+      requestAnimationFrame(() => {
+        const first = !editor.isDestroyed && findPendingBlock(editor, ids[0]);
+        const dom = first && editor.view.nodeDOM(first.pos);
+        if (dom instanceof HTMLElement) dom.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      });
       if (!fillAll) {
         setState({ busy: false, phase: 'idle', done: 0, total: ids.length, error: null });
         return;

@@ -30,6 +30,7 @@ import CommentAnchor from '@/lib/tiptap-extensions/CommentAnchor';
 import { SuggestionInsert, SuggestionDelete, proposeReplacement } from '@/lib/tiptap-extensions/Suggestion';
 import { DateChip, StatusChip } from '@/lib/tiptap-extensions/Chips';
 import ChartBlock, { tableNodeToCsv } from '@/lib/tiptap-extensions/ChartBlock';
+import ExtensionGuard, { EXTENSION_OPT_OUT_ATTRS } from '@/lib/tiptap-extensions/ExtensionGuard';
 // Dropcursor 已包含在 StarterKit 中，无需单独导入
 import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
@@ -960,6 +961,7 @@ export function NotionEditor({ initialContent = '', onChange, agentId, onSelecti
       onEditorReady?.(editor);
     },
     extensions: [
+      ExtensionGuard,
       Placeholder.configure({
         placeholder: ({ node }) => {
           // 为不同的节点类型设置不同的占位符
@@ -1122,7 +1124,8 @@ export function NotionEditor({ initialContent = '', onChange, agentId, onSelecti
     },
     editorProps: {
       attributes: {
-        class: 'prose prose-lg max-w-none focus:outline-none dark:prose-invert min-h-[400px] px-6 py-6',
+        ...EXTENSION_OPT_OUT_ATTRS,
+        class: 'notranslate prose prose-lg max-w-none focus:outline-none dark:prose-invert min-h-[400px] px-6 py-6',
         style: 'font-family: "Times New Roman", "SimSun", "宋体", Times, serif;',
       },
       handleKeyDown,

@@ -1,118 +1,11 @@
 "use client";
 
+import ThemeToggle from "@/components/ThemeToggle";
+import MusesMark from "@/components/MusesMark";
 import { useUserStore } from "@/store/user";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import s from "./page.module.css";
-
-/* Hand-drawn Muses pen + paper illustration — Anthropic warm minimalism style */
-function MusesIllustration({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 420 500" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-      {/* === Paper / Notepad — tilted, hand-drawn rectangle === */}
-      <g transform="rotate(-6, 200, 220)">
-        {/* Paper fill — subtle terracotta tint */}
-        <path
-          d="M95 72 C155 66, 275 64, 325 70 C332 140, 335 280, 330 380 C270 388, 150 390, 92 384 C86 280, 84 140, 95 72Z"
-          fill="rgba(217,119,87,0.08)"
-        />
-        {/* Paper outline — bold white */}
-        <path
-          d="M95 72 C155 66, 275 64, 325 70 C332 140, 335 280, 330 380 C270 388, 150 390, 92 384 C86 280, 84 140, 95 72Z"
-          stroke="rgba(255,255,255,0.9)" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" fill="none"
-        />
-        {/* Page fold — corner detail */}
-        <path
-          d="M290 68 C295 68, 322 65, 325 70 C326 78, 326 95, 324 108 C312 100, 298 92, 290 88 C290 80, 290 72, 290 68Z"
-          fill="rgba(217,119,87,0.15)" stroke="rgba(255,255,255,0.4)" strokeWidth="3" strokeLinecap="round"
-        />
-
-        {/* === Written lines on paper (animated — stroke-dasharray drawing effect) === */}
-        {/* Line 1 */}
-        <path
-          d="M130 130 C165 126, 245 125, 290 129"
-          stroke="rgba(255,255,255,0.55)" strokeWidth="6" strokeLinecap="round"
-          className={`${s.writingLine} ${s.writingLine1}`}
-        />
-        {/* Line 2 */}
-        <path
-          d="M128 170 C170 166, 260 165, 295 169"
-          stroke="rgba(255,255,255,0.45)" strokeWidth="5" strokeLinecap="round"
-          className={`${s.writingLine} ${s.writingLine2}`}
-        />
-        {/* Line 3 */}
-        <path
-          d="M132 210 C168 207, 240 206, 280 210"
-          stroke="rgba(255,255,255,0.4)" strokeWidth="5" strokeLinecap="round"
-          className={`${s.writingLine} ${s.writingLine3}`}
-        />
-        {/* Line 4 — shorter, paragraph end */}
-        <path
-          d="M130 250 C155 247, 200 246, 225 249"
-          stroke="rgba(255,255,255,0.35)" strokeWidth="5" strokeLinecap="round"
-          className={`${s.writingLine} ${s.writingLine4}`}
-        />
-        {/* Line 5 */}
-        <path
-          d="M128 298 C168 294, 255 293, 292 297"
-          stroke="rgba(255,255,255,0.45)" strokeWidth="5" strokeLinecap="round"
-          className={`${s.writingLine} ${s.writingLine5}`}
-        />
-        {/* Line 6 — shorter, trailing off */}
-        <path
-          d="M132 338 C158 335, 210 334, 248 337"
-          stroke="rgba(255,255,255,0.35)" strokeWidth="5" strokeLinecap="round"
-          className={`${s.writingLine} ${s.writingLine6}`}
-        />
-      </g>
-
-      {/* === Pen — angled as if writing, terracotta fill + white outline === */}
-      <g>
-        {/* Pen barrel — bold terracotta, angled ~40 degrees */}
-        <path
-          d="M280 130 C284 126, 290 128, 292 132 L338 310 C340 318, 336 322, 330 320 L318 316 C312 314, 310 310, 312 304 L280 130Z"
-          fill="#d97757"
-        />
-        {/* Pen barrel outline */}
-        <path
-          d="M280 130 C284 126, 290 128, 292 132 L338 310 C340 318, 336 322, 330 320 L318 316 C312 314, 310 310, 312 304 L280 130Z"
-          stroke="rgba(255,255,255,0.9)" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" fill="none"
-        />
-        {/* Pen grip band */}
-        <path d="M314 278 C318 274, 332 284, 328 288"
-          stroke="rgba(255,255,255,0.5)" strokeWidth="4" strokeLinecap="round" />
-        <path d="M312 268 C316 264, 330 274, 326 278"
-          stroke="rgba(255,255,255,0.4)" strokeWidth="4" strokeLinecap="round" />
-        {/* Pen nib — pointed tip touching paper */}
-        <path
-          d="M280 130 C278 125, 273 118, 268 108 C265 102, 272 98, 276 104 C279 110, 282 120, 285 128"
-          fill="#d97757" stroke="rgba(255,255,255,0.85)" strokeWidth="4" strokeLinecap="round"
-        />
-        {/* Nib slit */}
-        <path d="M274 112 L280 130"
-          stroke="rgba(255,255,255,0.3)" strokeWidth="2.5" strokeLinecap="round" />
-      </g>
-
-      {/* === Ink dot — where pen meets paper === */}
-      <path d="M266 106 C270 102, 275 106, 273 110 C271 114, 264 112, 266 106Z"
-        fill="#d97757" />
-
-      {/* === Decorative Squiggle (signature Anthropic hand motif) === */}
-      {/* Wavy M-shape — thick cream, pressure variation */}
-      <path d="M62 430 C70 407, 82 435, 95 413 C108 391, 97 433, 119 415 C141 397, 125 433, 145 420"
-        stroke="rgba(255,255,255,0.92)" strokeWidth="10" strokeLinecap="round" />
-      {/* Loop */}
-      <path d="M145 420 C162 435, 177 420, 172 403 C167 386, 149 393, 152 413"
-        stroke="rgba(255,255,255,0.88)" strokeWidth="9" strokeLinecap="round" />
-      {/* Tail — pressure decreasing */}
-      <path d="M152 413 C167 435, 185 432, 198 445"
-        stroke="rgba(255,255,255,0.82)" strokeWidth="7" strokeLinecap="round" />
-      {/* Terracotta dot at loop junction */}
-      <path d="M150 411 C157 405, 161 411, 155 417 C149 423, 143 417, 150 411Z"
-        fill="#d97757" />
-    </svg>
-  );
-}
 
 /* GitHub mark SVG */
 function GitHubIcon({ className }: { className?: string }) {
@@ -155,9 +48,10 @@ export default function HomePage() {
 
   return (
     <div className={s.scene}>
+      <ThemeToggle className={s.themeToggle} />
       <div className={s.glow} />
       <div className={s.card}>
-        <MusesIllustration className={s.illustration} />
+        <MusesMark className={s.illustration} />
         <h1 className={s.title}>Muses</h1>
         <p className={s.tagline}>Read to Inspire, Create to Shine</p>
         <button onClick={login} className={s.loginBtn}>

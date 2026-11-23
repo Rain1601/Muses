@@ -3,7 +3,8 @@
 /**
  * DocTabs — the tab strip above the editor for a DB article (Claude Docs: a
  * doc holds tabs). The main tab is the article's own content and can be
- * renamed but not deleted. Double-click a tab to rename it.
+ * renamed but not deleted. Double-click a tab to rename it. Shown only once
+ * the article has more than its main tab; version history lives in the ⋯ menu.
  */
 import { useState } from 'react';
 
@@ -15,7 +16,7 @@ export interface DocTab {
 }
 
 export default function DocTabs({
-  tabs, activeId, onSelect, onAdd, onRename, onDelete, historyOpen, onToggleHistory,
+  tabs, activeId, onSelect, onAdd, onRename, onDelete,
 }: {
   tabs: DocTab[];
   activeId: string;
@@ -23,8 +24,6 @@ export default function DocTabs({
   onAdd: () => void;
   onRename: (id: string, name: string) => void;
   onDelete: (id: string) => void;
-  historyOpen: boolean;
-  onToggleHistory: () => void;
 }) {
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
@@ -78,10 +77,6 @@ export default function DocTabs({
         </div>
       ))}
       <button type="button" className="doc-tab-add" title="新建 tab" onClick={onAdd}>＋</button>
-      <span className="doc-tabs-spacer" />
-      <button type="button" className={`doc-tab-history${historyOpen ? ' on' : ''}`} onClick={onToggleHistory} title="这个 tab 的版本历史">
-        版本历史
-      </button>
     </div>
   );
 }

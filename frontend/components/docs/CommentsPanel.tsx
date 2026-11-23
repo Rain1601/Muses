@@ -2,15 +2,16 @@
 
 /**
  * CommentsPanel — the right rail's comment threads (Claude Docs model).
+ * Laid out as a margin: each card sits level with the words it is anchored to,
+ * follows the editor as it scrolls, and lights up together with those words.
  * Threads are anchored to words in the doc; a comment that mentions @Muses
  * (or is sent with the Muses toggle on) gets a reply in the thread,
  * and a requested rewrite lands as a suggestion: the old words struck, the new
  * ones inserted, until someone accepts or rejects it (here or on its card).
  */
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { CSSProperties, RefObject } from 'react';
+import type { CSSProperties } from 'react';
 import type { Editor } from '@tiptap/core';
-import { X } from 'lucide-react';
 import type { CommentsApi, DraftThread, DocThread } from '@/lib/hooks/useComments';
 import type { SuggestionsApi } from '@/lib/hooks/useSuggestions';
 import type { SuggestionInfo } from '@/lib/tiptap-extensions/Suggestion';
@@ -26,18 +27,25 @@ function Composer({
   onCancel?: () => void;
 }) {
   const [body, setBody] = useState('');
-  const [askMuses, setAskMuses] = useState(false);
+  // "Send to Muses" is on by default (like Claude Docs) and remembers the last choice.
+  const [askMuses, setAskMusesState] = useState(() => {
+    try { return localStorage.getItem('muses.sendToMuses') !== '0'; } catch { return true; }
+  });
+  const setAskMuses = (on: boolean) => {
+    setAskMusesState(on);
+    try { localStorage.setItem('muses.sendToMuses', on ? '1' : '0'); } catch { /* storage blocked */ }
+  };
   const [sending, setSending] = useState(false);
   const ref = useRef<HTMLTextAreaElement>(null);
   useEffect(() => { if (autoFocus) ref.current?.focus(); }, [autoFocus]);
-  const willAsk = askMuses || mentionsMuses(body);
+  const mentioned = mentionsMuses(body);
+  const willAsk = askMuses || mentioned;
   const send = async () => {
     if (sending || !body.trim()) return;
     setSending(true);
     try {
       if (await onSubmit(body, willAsk)) {
         setBody('');
-        setAskMuses(false);
       }
     } finally {
       setSending(false);
@@ -59,20 +67,20 @@ function Composer({
         }}
       />
       <div className="cm-row">
-        <button
-          type="button"
-          className={`cm-chip${willAsk ? ' on' : ''}`}
-          aria-pressed={willAsk}
-          disabled={sending}
-          onClick={() => setAskMuses((v) => !v)}
-          title="请 Muses 回复或建议修改"
-        >
-          @Muses
-        </button>
+        {/* "Send to Muses": ticked automatically when the text mentions @Muses. */}
+        <label className={`cm-ask-toggle${willAsk ? ' on' : ''}`} title={mentioned ? '正文里提到了 @Muses，会发给它' : '请 Muses 回复，或建议修改这段'}>
+          <input
+            type="checkbox"
+            checked={willAsk}
+            disabled={sending || mentioned}
+            onChange={(e) => setAskMuses(e.target.checked)}
+          />
+          <span>发给 Muses</span>
+        </label>
         <span className="cm-spacer" />
         {onCancel && <button type="button" className="cm-btn" disabled={sending} onClick={onCancel}>取消</button>}
         <button type="button" className="cm-btn primary" disabled={sending || !body.trim()} onClick={send}>
-          {sending ? '发送中…' : submitLabel}
+          {sending ? '发送中…' : willAsk ? `${submitLabel}并发给 Muses` : submitLabel}
         </button>
       </div>
     </div>
@@ -88,10 +96,119 @@ function SuggestionDiff({ sg }: { sg: SuggestionInfo }) {
   );
 }
 
-function SuggestionCard({ sg, sugs, threads }: { sg: SuggestionInfo; sugs: SuggestionsApi; threads: CommentsApi }) {
+/* ── Margin layout ──────────────────────────────────────────────
+   Every open card sits level with the words it is anchored to and follows
+   the editor as it scrolls. Overlapping cards push each other apart; the
+   active card keeps its exact spot and the others make room around it. */
+
+type MarginItem =
+  | { key: string; kind: 'draft' }
+  | { key: string; kind: 'thread'; id: string }
+  | { key: string; kind: 'suggestion'; id: string };
+
+const GAP = 8;
+
+function anchorTop(editor: Editor, item: MarginItem, draft: DraftThread | null): number | null {
+  const dom = editor.view.dom as HTMLElement;
+  try {
+    if (item.kind === 'draft') return draft ? editor.view.coordsAtPos(draft.from).top : null;
+    const sel = item.kind === 'thread'
+      ? `[data-comment-id="${CSS.escape(item.id)}"]`
+      : `[data-suggestion-id="${CSS.escape(item.id)}"]`;
+    const el = dom.querySelector(sel);
+    const rect = el?.getClientRects()[0];
+    return rect ? rect.top : null;
+  } catch {
+    return null;
+  }
+}
+
+function useMarginLayout(
+  editor: Editor | null,
+  scrollArea: HTMLElement | null,
+  container: HTMLElement | null,
+  items: MarginItem[],
+  activeKey: string | null,
+  draft: DraftThread | null,
+  cards: Map<string, HTMLElement>,
+) {
+  const [tops, setTops] = useState<Record<string, number>>({});
+  const itemsKey = items.map((i) => i.key).join('|');
+
+  useLayoutEffect(() => {
+    if (!editor || editor.isDestroyed || !container || !scrollArea) { setTops({}); return; }
+    let frame = 0;
+
+    const compute = () => {
+      frame = 0;
+      if (editor.isDestroyed) return;
+      const base = container.getBoundingClientRect().top;
+      const placed = items
+        .map((item, order) => {
+          const top = anchorTop(editor, item, draft);
+          return top == null ? null : { key: item.key, want: top - base, h: cards.get(item.key)?.offsetHeight ?? 0, order };
+        })
+        .filter((x): x is { key: string; want: number; h: number; order: number } => !!x)
+        .sort((a, b) => a.want - b.want || a.order - b.order);
+
+      const next: Record<string, number> = {};
+      const pivot = placed.findIndex((p) => p.key === activeKey);
+      if (pivot >= 0) {
+        // The active card follows its words but never leaves the margin, so its reply box and buttons stay reachable.
+        const room = container.clientHeight - placed[pivot].h;
+        next[placed[pivot].key] = room > 0 ? Math.min(Math.max(placed[pivot].want, 0), room) : 0;
+        for (let i = pivot + 1; i < placed.length; i++) {
+          const prev = placed[i - 1];
+          next[placed[i].key] = Math.max(placed[i].want, next[prev.key] + prev.h + GAP);
+        }
+        for (let i = pivot - 1; i >= 0; i--) {
+          const below = placed[i + 1];
+          next[placed[i].key] = Math.min(placed[i].want, next[below.key] - placed[i].h - GAP);
+        }
+      } else {
+        let floor = -Infinity;
+        for (const p of placed) {
+          next[p.key] = Math.max(p.want, floor);
+          floor = next[p.key] + p.h + GAP;
+        }
+      }
+      setTops((prev) => {
+        const keys = Object.keys(next);
+        const same = keys.length === Object.keys(prev).length && keys.every((k) => Math.abs((prev[k] ?? NaN) - next[k]) < 0.5);
+        return same ? prev : next;
+      });
+    };
+    const schedule = () => { if (!frame) frame = requestAnimationFrame(compute); };
+
+    compute();
+    const observer = new ResizeObserver(schedule);
+    observer.observe(container);
+    observer.observe(editor.view.dom);
+    cards.forEach((el) => observer.observe(el));
+    scrollArea.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
+    editor.on('update', schedule);
+    return () => {
+      observer.disconnect();
+      scrollArea.removeEventListener('scroll', schedule);
+      window.removeEventListener('resize', schedule);
+      editor.off('update', schedule);
+      cancelAnimationFrame(frame);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor, scrollArea, container, itemsKey, activeKey, draft]);
+
+  return tops;
+}
+
+function SuggestionCard({ sg, sugs, threads, hovered, onHover }: {
+  sg: SuggestionInfo; sugs: SuggestionsApi; threads: CommentsApi; hovered: boolean; onHover: (on: boolean) => void;
+}) {
   const active = sugs.activeId === sg.id;
   return (
-    <div className={`cm-thread sg-card${active ? ' active' : ''}`} onClick={() => sugs.reveal(sg.id)}>
+    <div className={`cm-thread sg-card${active ? ' active' : ''}${hovered ? ' hover' : ''}`}
+      onClick={() => { threads.setActiveId(null); sugs.reveal(sg.id); }}
+      onMouseEnter={() => onHover(true)} onMouseLeave={() => onHover(false)}>
       <div className="cm-author">
         <span className="cm-spark">✦</span> {sg.author === 'claude' ? 'Muses' : sg.author} 建议
         {sg.label && <span className="sg-label">· {sg.label}</span>}
@@ -109,44 +226,65 @@ function SuggestionCard({ sg, sugs, threads }: { sg: SuggestionInfo; sugs: Sugge
   );
 }
 
-function ThreadCard({ t, api, detached, sugs, inlineStyle, cardRef }: {
+/** "@Claude 压缩成一句" → "压缩成一句": the request to Muses is shown as a tag instead of raw @ text. */
+const MENTION_TOKEN = /@(?:muses|claude)\b[\s,，:：]*/gi;
+
+function CommentItem({ c }: { c: DocThread['comments'][number] }) {
+  const fromMuses = c.author === 'claude';
+  const asked = !fromMuses && mentionsMuses(c.body);
+  const body = asked ? c.body.replace(MENTION_TOKEN, '').trim() : c.body;
+  return (
+    <div className={`cm-comment${fromMuses ? ' claude' : ''}`}>
+      <div className="cm-author">
+        {fromMuses ? <><span className="cm-spark">✦</span> Muses</> : (c.authorName || '我')}
+        {asked && <span className="cm-ask-tag" title="这条评论请 Muses 处理">请 Muses</span>}
+      </div>
+      {body && <div className="cm-body">{body}</div>}
+    </div>
+  );
+}
+
+function ThreadCard({ t, api, detached, sugs, inMargin, hovered, onHover }: {
   t: DocThread;
   api: CommentsApi;
   detached: boolean;
   sugs: SuggestionsApi;
-  inlineStyle?: CSSProperties;
-  cardRef?: RefObject<HTMLDivElement>;
+  /** In the margin the card sits beside its words, so the quote is left out. */
+  inMargin?: boolean;
+  hovered?: boolean;
+  onHover?: (on: boolean) => void;
 }) {
   const pending = sugs.items.filter((sg) => sg.threadId === t.id);
   const active = api.activeId === t.id;
   const busy = api.claudeBusy.has(t.id);
   const notice = api.notices[t.id];
+  // Inactive margin cards stay compact: first comment, a reply count, the latest reply.
+  const compact = inMargin && !active;
+  const shown = compact && t.comments.length > 2 ? [t.comments[0], t.comments[t.comments.length - 1]] : t.comments;
+  const hidden = t.comments.length - shown.length;
   return (
     <div
-      ref={cardRef}
-      className={`cm-thread${active ? ' active' : ''}${t.resolved ? ' resolved' : ''}${inlineStyle ? ' cm-thread-inline' : ''}`}
-      style={inlineStyle}
-      role={inlineStyle ? 'region' : undefined}
-      aria-label={inlineStyle ? '正文旁的评论线程' : undefined}
-      onClick={() => api.focusThread(t.id)}
+      className={`cm-thread${active ? ' active' : ''}${t.resolved ? ' resolved' : ''}${hovered ? ' hover' : ''}${compact ? ' compact' : ''}`}
+      onClick={() => { sugs.setActiveId(null); api.focusThread(t.id); }}
+      onMouseEnter={() => onHover?.(true)}
+      onMouseLeave={() => onHover?.(false)}
       onKeyDown={(e) => { if (active && e.key === 'Escape') { e.stopPropagation(); api.closeThread(); } }}
     >
-      <div className="cm-thread-heading">
-        <button type="button" className={`cm-quote cm-quote-trigger${detached ? ' detached' : ''}`} title={detached ? '这段文字已从文档删除' : undefined}>
-          {(!detached && api.currentText(t.id)) || t.anchorText}
-        </button>
-        {inlineStyle && <button type="button" aria-label="关闭评论线程" className="cm-link" onClick={(e) => { e.stopPropagation(); api.closeThread(); }}><X className="size-4" /></button>}
-      </div>
-      {detached && !t.resolved && <div className="cm-meta">原文已删除</div>}
-      {t.comments.map((c) => (
-        <div key={c.id} className={`cm-comment${c.author === 'claude' ? ' claude' : ''}`}>
-          <div className="cm-author">
-            {c.author === 'claude' ? <><span className="cm-spark">✦</span> Muses</> : (c.authorName || '我')}
-          </div>
-          <div className="cm-body">{c.body}</div>
+      {!inMargin && (
+        <div className="cm-thread-heading">
+          <button type="button" className={`cm-quote cm-quote-trigger${detached ? ' detached' : ''}`} title={detached ? '这段文字已从文档删除' : undefined}>
+            {(!detached && api.currentText(t.id)) || t.anchorText}
+          </button>
         </div>
+      )}
+      {detached && !t.resolved && <div className="cm-meta">原文已删除</div>}
+      {shown.map((c, i) => (
+        <Fragment key={c.id}>
+          {i === 1 && hidden > 0 && <div className="cm-more">另有 {hidden} 条回复</div>}
+          <CommentItem c={c} />
+        </Fragment>
       ))}
-      {busy && <div className="cm-comment claude"><div className="cm-author"><span className="cm-spinner" /> Muses 正在回复…</div></div>}
+      {busy && <div className="cm-comment claude"><div className="cm-author"><span className="cm-spinner" /> Muses 正在处理…</div></div>}
       {notice && <div className="cm-notice">{notice}</div>}
       {pending.map((sg) => (
         <div key={sg.id} className="sg-inline" onClick={(e) => e.stopPropagation()}>
@@ -161,115 +299,100 @@ function ThreadCard({ t, api, detached, sugs, inlineStyle, cardRef }: {
       ))}
       {active && !t.resolved && (
         <div onClick={(e) => e.stopPropagation()}>
-          <Composer placeholder="回复，或 @Muses 让它改这段" submitLabel="回复" onSubmit={(b, ai) => api.reply(t.id, b, ai)} />
+          <Composer placeholder="回复…" submitLabel="回复" onSubmit={(b, ai) => api.reply(t.id, b, ai)} />
         </div>
       )}
-      <div className="cm-actions" onClick={(e) => e.stopPropagation()}>
-        {t.resolved ? (
-          <button type="button" className="cm-link" onClick={() => api.setResolved(t.id, false)}>重新打开</button>
-        ) : (
-          <button type="button" className="cm-link" onClick={() => api.setResolved(t.id, true)}>解决</button>
-        )}
-        <button type="button" className="cm-link danger" onClick={() => api.remove(t.id)}>删除</button>
-      </div>
+      {(!compact || hovered) && (
+        <div className="cm-actions" onClick={(e) => e.stopPropagation()}>
+          {t.resolved ? (
+            <button type="button" className="cm-link" onClick={() => api.setResolved(t.id, false)}>重新打开</button>
+          ) : (
+            <button type="button" className="cm-link" onClick={() => api.setResolved(t.id, true)}>解决</button>
+          )}
+          <button type="button" className="cm-link danger" onClick={() => api.remove(t.id)}>删除</button>
+        </div>
+      )}
     </div>
   );
 }
 
-function useInlineCommentPosition(
-  editor: Editor | null,
-  scrollArea: HTMLElement | null,
-  gutter: HTMLElement | null,
-  cardRef: RefObject<HTMLDivElement>,
-  draft: DraftThread | null,
-  threadId: string | null,
-) {
-  const [position, setPosition] = useState<{ left: number; width: number; top: number; maxHeight: number; hidden: boolean }>();
-
-  useLayoutEffect(() => {
-    if (!editor || editor.isDestroyed || !scrollArea || !gutter || (!draft && !threadId)) {
-      setPosition(undefined);
-      return;
-    }
-
-    let frame = 0;
-    const update = () => {
-      frame = 0;
-      const column = gutter.getBoundingClientRect();
-      if (!column.width || editor.isDestroyed || (draft && draft.from === draft.to)) {
-        setPosition(undefined);
-        return;
-      }
-      const viewport = scrollArea.getBoundingClientRect();
-      const marks = threadId && editor.view.dom.querySelectorAll(`[data-comment-id="${CSS.escape(threadId)}"]`);
-      const first = marks && marks[0];
-      const last = marks && marks[marks.length - 1];
-      const start = draft ? editor.view.coordsAtPos(draft.from) : first && first.getClientRects()[0];
-      const end = draft ? editor.view.coordsAtPos(draft.to, -1) : last && last.getBoundingClientRect();
-      if (!start || !end) {
-        setPosition(undefined);
-        return;
-      }
-
-      const maxHeight = viewport.height;
-      const height = Math.min(cardRef.current?.offsetHeight ?? 0, maxHeight);
-      const next = {
-        left: column.left,
-        width: column.width,
-        top: Math.max(viewport.top, Math.min(start.top, viewport.bottom - height)),
-        maxHeight,
-        hidden: !draft && (end.bottom <= viewport.top || start.top >= viewport.bottom),
-      };
-      setPosition((previous) => previous && previous.left === next.left && previous.width === next.width &&
-        previous.top === next.top && previous.maxHeight === next.maxHeight && previous.hidden === next.hidden ? previous : next);
-    };
-    const schedule = () => { if (!frame) frame = requestAnimationFrame(update); };
-
-    update();
-    const observer = new ResizeObserver(schedule);
-    observer.observe(scrollArea);
-    observer.observe(gutter);
-    observer.observe(editor.view.dom);
-    if (cardRef.current) observer.observe(cardRef.current);
-    scrollArea.addEventListener('scroll', schedule, { capture: true, passive: true });
-    editor.on('update', schedule);
-    return () => {
-      observer.disconnect();
-      scrollArea.removeEventListener('scroll', schedule, true);
-      editor.off('update', schedule);
-      cancelAnimationFrame(frame);
-    };
-  }, [cardRef, draft, editor, gutter, scrollArea, threadId]);
-
-  if (!position) return undefined;
-  const { hidden, ...rect } = position;
-  return { ...rect, visibility: hidden ? 'hidden' : undefined } satisfies CSSProperties;
-}
-
-export default function CommentsPanel({ api, suggestions, editor, scrollArea, gutter }: {
+export default function CommentsPanel({ api, suggestions, editor, scrollArea }: {
   api: CommentsApi;
   suggestions: SuggestionsApi;
   editor: Editor | null;
   scrollArea: HTMLElement | null;
-  gutter: HTMLElement | null;
 }) {
   const [showResolved, setShowResolved] = useState(false);
-  const cardRef = useRef<HTMLDivElement>(null);
-  const activeThreadId = !api.draft && api.activeId && api.anchored.has(api.activeId) &&
-    api.open.some((thread) => thread.id === api.activeId) ? api.activeId : null;
-  const inlineStyle = useInlineCommentPosition(editor, scrollArea, gutter, cardRef, api.draft, activeThreadId);
-  useEffect(() => {
-    if (activeThreadId && !gutter?.getBoundingClientRect().width) {
-      cardRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-    }
-  }, [activeThreadId, gutter]);
+  const [hover, setHover] = useState<string | null>(null); // margin key: thread:<id> / sg:<id>
+  const [margin, setMargin] = useState<HTMLDivElement | null>(null);
+  const cards = useRef(new Map<string, HTMLElement>()).current;
 
-  // Highlight: open threads tinted, the active one stronger, resolved ones plain.
+  const standalone = suggestions.items.filter((sg) => !sg.threadId || !api.open.some((t) => t.id === sg.threadId));
+  const anchoredOpen = api.open.filter((t) => api.anchored.has(t.id));
+  const detachedOpen = api.open.filter((t) => !api.anchored.has(t.id));
+
+  const items: MarginItem[] = [
+    ...(api.draft ? [{ key: 'draft', kind: 'draft' as const }] : []),
+    ...anchoredOpen.map((t) => ({ key: `thread:${t.id}`, kind: 'thread' as const, id: t.id })),
+    ...standalone.map((sg) => ({ key: `sg:${sg.id}`, kind: 'suggestion' as const, id: sg.id })),
+  ];
+  const activeKey = api.draft ? 'draft'
+    : api.activeId && anchoredOpen.some((t) => t.id === api.activeId) ? `thread:${api.activeId}`
+    : suggestions.activeId ? `sg:${suggestions.activeId}` : null;
+
+  const tops = useMarginLayout(editor, scrollArea, margin, items, activeKey, api.draft, cards);
+  const setCard = (key: string) => (el: HTMLDivElement | null) => { if (el) cards.set(key, el); else cards.delete(key); };
+
+  // Hovering the words lights up their card (and the card lights up the words, via the CSS below).
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return;
+    const dom = editor.view.dom as HTMLElement;
+    const keyAt = (target: EventTarget | null) => {
+      const el = target as HTMLElement | null;
+      const sg = el?.closest?.('[data-suggestion-id]');
+      if (sg) return `sg:${sg.getAttribute('data-suggestion-id')}`;
+      const cm = el?.closest?.('[data-comment-id]');
+      return cm ? `thread:${cm.getAttribute('data-comment-id')}` : null;
+    };
+    const onOver = (e: MouseEvent) => setHover(keyAt(e.target));
+    const onLeave = () => setHover(null);
+    const onClick = (e: MouseEvent) => {
+      const key = keyAt(e.target);
+      if (key?.startsWith('sg:')) { api.setActiveId(null); suggestions.setActiveId(key.slice(3)); }
+      else if (key?.startsWith('thread:')) suggestions.setActiveId(null);
+    };
+    dom.addEventListener('mouseover', onOver);
+    dom.addEventListener('mouseleave', onLeave);
+    dom.addEventListener('click', onClick);
+    return () => {
+      dom.removeEventListener('mouseover', onOver);
+      dom.removeEventListener('mouseleave', onLeave);
+      dom.removeEventListener('click', onClick);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor]);
+
+  // Scrolling over the margin scrolls the document (cards follow it), unless a tall card can scroll itself.
+  const onWheel = (e: React.WheelEvent) => {
+    const card = (e.target as HTMLElement).closest('.cm-thread') as HTMLElement | null;
+    if (card && card.scrollHeight > card.clientHeight) return;
+    scrollArea?.scrollBy({ top: e.deltaY });
+  };
+
+  const esc = (id: string) => CSS.escape(id);
+  const hoverId = hover?.split(':').slice(1).join(':');
   const css = [
-    ...api.resolvedThreads.map((t) => `.comment-anchor[data-comment-id="${t.id}"]{background:none!important;border-bottom:none!important}`),
-    api.activeId ? `.comment-anchor[data-comment-id="${api.activeId}"]{background:#d9714940!important;border-bottom-color:#d97149!important}` : '',
-    suggestions.activeId ? `[data-suggestion-id="${suggestions.activeId}"]{outline:1px solid #d97149;outline-offset:1px;border-radius:2px}` : '',
+    ...api.resolvedThreads.map((t) => `.comment-anchor[data-comment-id="${esc(t.id)}"],.comment-anchor[data-comment-id="${esc(t.id)}"]:hover{background:none!important;cursor:text}`),
+    hover?.startsWith('thread:') && hoverId !== api.activeId && api.open.some((t) => t.id === hoverId) ? `.comment-anchor[data-comment-id="${esc(hoverId!)}"]{background:#d9714945!important}` : '',
+    api.activeId ? `.comment-anchor[data-comment-id="${esc(api.activeId)}"]{background:#d9714960!important}` : '',
+    hover?.startsWith('sg:') ? `[data-suggestion-id="${esc(hoverId!)}"]{outline:1px dashed #d97149;outline-offset:1px;border-radius:2px}` : '',
+    suggestions.activeId ? `[data-suggestion-id="${esc(suggestions.activeId)}"]{outline:1px solid #d97149;outline-offset:1px;border-radius:2px}` : '',
   ].join('\n');
+
+  const placedStyle = (key: string): CSSProperties =>
+    key in tops ? { transform: `translateY(${tops[key]}px)` } : { visibility: 'hidden' };
+
+  const offMargin = detachedOpen.length + api.resolvedThreads.length;
 
   return (
     <div className="cm-panel">
@@ -288,26 +411,28 @@ export default function CommentsPanel({ api, suggestions, editor, scrollArea, gu
           + 评论所选
         </button>
       </div>
-      <div className="cm-list">
-        {!api.draft && api.error && <div className="cm-notice" role="alert">{api.error}</div>}
-        {suggestions.items.length > 1 && (
-          <div className="cm-row sg-bulk">
-            <span className="cm-meta" style={{ margin: 0 }}>{suggestions.items.length} 条建议</span>
-            <span className="cm-spacer" />
-            <button type="button" className="cm-link" onClick={suggestions.rejectAll}>全部拒绝</button>
-            <button type="button" className="cm-link" onClick={suggestions.acceptAll}>全部接受</button>
-          </div>
-        )}
-        {suggestions.items
-          .filter((sg) => !sg.threadId || !api.open.some((t) => t.id === sg.threadId))
-          .map((sg) => <SuggestionCard key={sg.id} sg={sg} sugs={suggestions} threads={api} />)}
+      {!api.draft && api.error && <div className="cm-notice cm-banner" role="alert">{api.error}</div>}
+      {suggestions.items.length > 1 && (
+        <div className="cm-row sg-bulk">
+          <span className="cm-meta" style={{ margin: 0 }}>{suggestions.items.length} 条建议</span>
+          <span className="cm-spacer" />
+          <button type="button" className="cm-link" onClick={suggestions.rejectAll}>全部拒绝</button>
+          <button type="button" className="cm-link" onClick={suggestions.acceptAll}>全部接受</button>
+        </div>
+      )}
+
+      <div
+        className="cm-margin"
+        ref={setMargin}
+        onWheel={onWheel}
+        onClick={(e) => { if (e.target === e.currentTarget) { api.closeThread(); suggestions.setActiveId(null); } }}
+      >
         {api.draft && (
-          <div key={api.draft.id} ref={cardRef} className={`cm-thread active${inlineStyle ? ' cm-thread-inline' : ''}`}
-            style={inlineStyle} role={inlineStyle ? 'region' : undefined} aria-label={inlineStyle ? '正文旁的新评论' : undefined}>
+          <div ref={setCard('draft')} className="cm-thread cm-slot active" style={placedStyle('draft')}>
             <div className="cm-quote">{api.draft.text || '选中的文字已删除'}</div>
             <Composer
               autoFocus
-              placeholder="写评论，或 @Muses 让它回答或改这段"
+              placeholder="写评论…"
               submitLabel="评论"
               onSubmit={api.submitDraft}
               onCancel={api.cancelDraft}
@@ -315,36 +440,49 @@ export default function CommentsPanel({ api, suggestions, editor, scrollArea, gu
             {api.error && <div className="cm-notice" role="alert">{api.error}</div>}
           </div>
         )}
-        {api.open.map((t) => (
-          <Fragment key={t.id}>
-            {activeThreadId === t.id && inlineStyle && (
-              <button type="button" className="cm-thread cm-thread-preview active" aria-current="true" onClick={() => api.focusThread(t.id)}>
-                <span className="cm-quote">{api.currentText(t.id) || t.anchorText}</span>
-                <span className="cm-body line-clamp-2">{t.comments[0]?.body}</span>
-              </button>
-            )}
-            <ThreadCard t={t} api={api} sugs={suggestions} detached={!api.anchored.has(t.id)}
-              cardRef={activeThreadId === t.id ? cardRef : undefined}
-              inlineStyle={activeThreadId === t.id ? inlineStyle : undefined} />
-          </Fragment>
-        ))}
-        {!api.draft && !api.open.length && !suggestions.items.length && !api.loading && (
+        {anchoredOpen.map((t) => {
+          const key = `thread:${t.id}`;
+          return (
+            <div key={key} ref={setCard(key)} className={`cm-slot${activeKey === key ? ' front' : ''}`} style={placedStyle(key)}>
+              <ThreadCard t={t} api={api} sugs={suggestions} detached={false} inMargin
+                hovered={hover === key} onHover={(on) => setHover(on ? key : null)} />
+            </div>
+          );
+        })}
+        {standalone.map((sg) => {
+          const key = `sg:${sg.id}`;
+          return (
+            <div key={key} ref={setCard(key)} className={`cm-slot${activeKey === key ? ' front' : ''}`} style={placedStyle(key)}>
+              <SuggestionCard sg={sg} sugs={suggestions} threads={api}
+                hovered={hover === key} onHover={(on) => setHover(on ? key : null)} />
+            </div>
+          );
+        })}
+        {!items.length && !api.loading && (
           <div className="cm-empty">
             <div className="cm-empty-title">还没有评论</div>
-            <div>选中文字后点「评论」，或按 <kbd>⌘⇧M</kbd>。<br />在评论里写 @Muses 可以请它回复或建议修改。</div>
-          </div>
-        )}
-        {api.resolvedThreads.length > 0 && (
-          <div className="cm-resolved">
-            <button type="button" className="cm-link" onClick={() => setShowResolved((v) => !v)}>
-              {showResolved ? '▾' : '▸'} 已解决 {api.resolvedThreads.length}
-            </button>
-            {showResolved && api.resolvedThreads.map((t) => (
-              <ThreadCard key={t.id} t={t} api={api} sugs={suggestions} detached={!api.anchored.has(t.id)} />
-            ))}
+            <div>选中文字后点「评论」，或按 <kbd>⌘⇧M</kbd>。<br />勾选「发给 Muses」可以请它回复或建议修改。</div>
           </div>
         )}
       </div>
+
+      {offMargin > 0 && (
+        <div className="cm-footer">
+          <button type="button" className="cm-link" onClick={() => setShowResolved((v) => !v)}>
+            {showResolved ? '▾' : '▸'} {[
+              detachedOpen.length ? `原文已删除 ${detachedOpen.length}` : '',
+              api.resolvedThreads.length ? `已解决 ${api.resolvedThreads.length}` : '',
+            ].filter(Boolean).join(' · ')}
+          </button>
+          {showResolved && (
+            <div className="cm-footer-list">
+              {[...detachedOpen, ...api.resolvedThreads].map((t) => (
+                <ThreadCard key={t.id} t={t} api={api} sugs={suggestions} detached={!api.anchored.has(t.id)} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

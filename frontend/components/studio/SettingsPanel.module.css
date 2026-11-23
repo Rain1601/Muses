@@ -18,22 +18,22 @@
 .title {
   font-size: 1.25rem;
   font-weight: 600;
-  color: #FAFAF9;
+  color: var(--m-n50);
   letter-spacing: -0.01em;
 }
 
 .closeBtn {
   background: none;
   border: none;
-  color: #78716C;
+  color: var(--m-n400);
   cursor: pointer;
   padding: 0.375rem;
   border-radius: 4px;
   transition: color 0.15s, background 0.15s;
 }
 .closeBtn:hover {
-  color: #FAFAF9;
-  background: #292524;
+  color: var(--m-n50);
+  background: var(--m-n880);
 }
 
 /* Tabs */
@@ -41,7 +41,7 @@
   display: flex;
   gap: 0;
   padding: 0 2rem;
-  border-bottom: 1px solid #292524;
+  border-bottom: 1px solid var(--m-n880);
   flex-shrink: 0;
 }
 
@@ -52,12 +52,12 @@
   font-size: 0.8125rem;
   font-weight: 500;
   cursor: pointer;
-  color: #78716C;
+  color: var(--m-n400);
   border-bottom: 2px solid transparent;
   transition: color 0.15s, border-color 0.15s;
 }
 .tab:hover {
-  color: #A8A29E;
+  color: var(--m-n300);
 }
 .tabActive {
   color: #D97149;
@@ -84,8 +84,8 @@
   top: 56px;
   left: 50%;
   transform: translateX(-50%);
-  background: #292524;
-  border: 1px solid #3F3A36;
+  background: var(--m-n880);
+  border: 1px solid var(--m-n750);
   color: #4ade80;
   font-size: 0.8125rem;
   padding: 0.375rem 1rem;
@@ -111,18 +111,18 @@
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  border: 2px solid #3F3A36;
+  border: 2px solid var(--m-n750);
 }
 
 .accountName {
   font-size: 1.125rem;
   font-weight: 600;
-  color: #FAFAF9;
+  color: var(--m-n50);
 }
 
 .accountEmail {
   font-size: 0.8125rem;
-  color: #78716C;
+  color: var(--m-n400);
   margin-top: 0.125rem;
 }
 
@@ -134,8 +134,8 @@
 }
 
 .statCard {
-  background: #292524;
-  border: 1px solid #3F3A36;
+  background: var(--m-n880);
+  border: 1px solid var(--m-n750);
   border-radius: 6px;
   padding: 1rem;
   text-align: center;
@@ -144,12 +144,12 @@
 .statValue {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #FAFAF9;
+  color: var(--m-n50);
 }
 
 .statLabel {
   font-size: 0.75rem;
-  color: #78716C;
+  color: var(--m-n400);
   margin-top: 0.25rem;
 }
 
@@ -163,16 +163,16 @@
 .label {
   font-size: 0.8125rem;
   font-weight: 500;
-  color: #A8A29E;
+  color: var(--m-n300);
 }
 
 .input {
-  background: #292524;
-  border: 1px solid #3F3A36;
+  background: var(--m-n880);
+  border: 1px solid var(--m-n750);
   border-radius: 6px;
   padding: 0.5rem 0.75rem;
   font-size: 0.875rem;
-  color: #FAFAF9;
+  color: var(--m-n50);
   outline: none;
   transition: border-color 0.15s;
   font-family: inherit;
@@ -185,8 +185,8 @@
   opacity: 0.5;
 }
 .input option {
-  background: #292524;
-  color: #FAFAF9;
+  background: var(--m-n880);
+  color: var(--m-n50);
 }
 
 .inputRow {
@@ -199,12 +199,12 @@
 
 .hint {
   font-size: 0.75rem;
-  color: #57534E;
+  color: var(--m-n450);
   line-height: 1.5;
 }
 
 .code {
-  background: #292524;
+  background: var(--m-n880);
   padding: 0.125rem 0.375rem;
   border-radius: 3px;
   font-size: 0.6875rem;
@@ -223,7 +223,7 @@
 /* Buttons */
 .saveBtn {
   background: #D97149;
-  color: #FAFAF9;
+  color: var(--m-n50);
   border: none;
   border-radius: 6px;
   padding: 0.5rem 1.25rem;
@@ -243,12 +243,12 @@
 }
 
 .testBtn {
-  background: #292524;
-  border: 1px solid #3F3A36;
+  background: var(--m-n880);
+  border: 1px solid var(--m-n750);
   border-radius: 6px;
   padding: 0.5rem 0.75rem;
   font-size: 0.75rem;
-  color: #A8A29E;
+  color: var(--m-n300);
   cursor: pointer;
   transition: border-color 0.15s, color 0.15s;
   min-width: 56px;
@@ -257,8 +257,8 @@
   justify-content: center;
 }
 .testBtn:hover {
-  border-color: #57534E;
-  color: #FAFAF9;
+  border-color: var(--m-n600);
+  color: var(--m-n50);
 }
 .testBtn:disabled {
   opacity: 0.5;
@@ -268,7 +268,7 @@
 .spinner {
   width: 14px;
   height: 14px;
-  border: 2px solid #3F3A36;
+  border: 2px solid var(--m-n750);
   border-top-color: #D97149;
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
@@ -279,24 +279,24 @@
 
 .outlineBtn {
   background: none;
-  border: 1px solid #3F3A36;
+  border: 1px solid var(--m-n750);
   border-radius: 6px;
   padding: 0.5rem 1rem;
   font-size: 0.8125rem;
-  color: #A8A29E;
+  color: var(--m-n300);
   cursor: pointer;
   transition: border-color 0.15s, color 0.15s;
   align-self: flex-start;
 }
 .outlineBtn:hover {
-  border-color: #57534E;
-  color: #FAFAF9;
+  border-color: var(--m-n600);
+  color: var(--m-n50);
 }
 
 /* Data cards */
 .dataCard {
-  background: #292524;
-  border: 1px solid #3F3A36;
+  background: var(--m-n880);
+  border: 1px solid var(--m-n750);
   border-radius: 6px;
   padding: 1rem 1.25rem;
   display: flex;
@@ -307,11 +307,11 @@
 .dataCardTitle {
   font-size: 0.875rem;
   font-weight: 500;
-  color: #FAFAF9;
+  color: var(--m-n50);
 }
 
 .dataCardDesc {
   font-size: 0.75rem;
-  color: #78716C;
+  color: var(--m-n400);
   margin: 0;
 }

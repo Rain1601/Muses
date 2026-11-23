@@ -1,0 +1,89 @@
+/* MusesMark — hand-drawn classical illustration. Ink follows the --m-*
+   palette (globals.css) so it reads on light and dark; terracotta accents.
+   Timeline: 0s scroll unrolls → 0.8s illuminated M → 1.15–3.1s handwriting
+   (the quill jiggles while writing) → 3.1s laurel grows → quill sways (loop). */
+
+.mark { overflow: visible; }
+
+.halo { fill: #d97149; opacity: 0.06; }
+
+/* Shared ink */
+.ink { stroke: var(--m-n200); stroke-linecap: round; stroke-linejoin: round; }
+.thin { stroke-width: 1.6; }
+.edge {
+  stroke-width: 2.2;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: draw 0.9s ease-out 0.15s forwards;
+}
+.hand { stroke-width: 1.8; opacity: 0.85; }
+.write {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: draw 0.42s linear forwards;
+}
+
+/* Scroll */
+.scroll {
+  transform-box: fill-box;
+  transform-origin: 50% 0%;
+  animation: unroll 0.7s cubic-bezier(.2,.8,.2,1) both;
+}
+.parchment { fill: var(--m-n875); }
+.roll { fill: var(--m-n850); }
+
+/* Illuminated initial */
+.initial { stroke: #d97149; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.serif { stroke-width: 2; opacity: 0; animation: fadeIn 0.3s ease 1.1s forwards; }
+.initialDot { fill: #d97149; opacity: 0; animation: fadeIn 0.3s ease 1.15s forwards; }
+
+/* Inkwell */
+.inkwell { opacity: 0; animation: fadeIn 0.5s ease 0.5s forwards; }
+.wellBody { fill: var(--m-n600); opacity: 0.55; }
+.wellRim { fill: var(--m-n850); }
+.shine { stroke: var(--m-n875); stroke-linecap: round; opacity: 0.9; }
+
+/* Quill */
+.quill {
+  transform-box: fill-box;
+  transform-origin: 0% 100%; /* the nib */
+  opacity: 0;
+  animation:
+    fadeIn 0.4s ease 0.6s forwards,
+    scribble 0.42s ease-in-out 1.15s 5,
+    sway 4s ease-in-out 4.2s infinite;
+}
+.vane { fill: var(--m-n875); stroke: var(--m-n200); stroke-width: 1.8; stroke-linejoin: round; }
+.shaft { stroke-width: 2.2; }
+.barb { stroke-width: 1.1; opacity: 0.55; }
+.nib { fill: var(--m-n200); }
+
+/* Laurel */
+.laurelStem { stroke: #d97149; stroke-width: 2; stroke-linecap: round; }
+.leaf {
+  fill: #d97149;
+  opacity: 0;
+  animation: leaf 0.3s cubic-bezier(.3,1.5,.5,1) forwards;
+}
+.berry { fill: #d97149; opacity: 0; animation: fadeIn 0.3s ease 4s forwards; }
+
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes fadeIn { to { opacity: 1; } }
+@keyframes unroll { from { opacity: 0; transform: scaleY(0.15); } to { opacity: 1; transform: scaleY(1); } }
+@keyframes leaf { from { opacity: 0; } to { opacity: 0.85; } }
+@keyframes scribble {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  30% { transform: translate(3px, -1px) rotate(-1.2deg); }
+  60% { transform: translate(6px, 1px) rotate(0.8deg); }
+}
+@keyframes sway {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(-2deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll, .quill, .inkwell { animation: none; opacity: 1; transform: none; }
+  .edge, .write { animation: none; stroke-dashoffset: 0; }
+  .serif, .initialDot, .berry { animation: none; opacity: 1; }
+  .leaf { animation: none; opacity: 0.85; }
+}

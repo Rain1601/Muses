@@ -1,9 +1,12 @@
 "use client";
 
+import { EXTENSION_BLOCKED_EVENT } from "@/lib/tiptap-extensions/ExtensionGuard";
+import ThemeToggle from "@/components/ThemeToggle";
+import DocMenu from "@/components/docs/DocMenu";
+import SelectionToolbar from "@/components/docs/SelectionToolbar";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { isTextSelection } from "@tiptap/core";
 import { BubbleMenu, type BubbleMenuProps } from "@tiptap/react/menus";
-import { MessageSquare } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { marked } from "marked";
 import { useUserStore } from "@/store/user";
@@ -25,7 +28,6 @@ import { isActiveTask, useArticleTasks } from "@/lib/hooks/useArticleTasks";
 import { useSuggestions } from "@/lib/hooks/useSuggestions";
 import DocTabs, { type DocTab } from "@/components/docs/DocTabs";
 import VersionHistory from "@/components/docs/VersionHistory";
-import ExportMenu from "@/components/docs/ExportMenu";
 import { createPortal } from "react-dom";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import s from "./dashboard.module.css";
@@ -200,6 +202,17 @@ export default function Dashboard() {
   const { tasks, addTask, cancelTask, removeHistory } = useArticleTasks(isAuthenticated);
   const [publishingFile, setPublishingFile] = useState<string | null>(null);
   const [publishStatus, setPublishStatus] = useState<{ type: "success" | "error" | "info"; msg: string } | null>(null);
+  // Browser extensions caught writing into the editor (ExtensionGuard) → one notice per extension.
+  useEffect(() => {
+    const onBlocked = (e: Event) => {
+      const name = (e as CustomEvent<{ name: string }>).detail?.name;
+      if (!name) return;
+      setPublishStatus({ type: "info", msg: `已拦截「${name}」改写正文，它的内容不会保存进文章` });
+      setTimeout(() => setPublishStatus(null), 5000);
+    };
+    window.addEventListener(EXTENSION_BLOCKED_EVENT, onBlocked);
+    return () => window.removeEventListener(EXTENSION_BLOCKED_EVENT, onBlocked);
+  }, []);
   const [translateError, setTranslateError] = useState<string | null>(null);
   const translationPending = useRef(false);
   const runningTaskIdsRef = useRef<Set<string>>(new Set());
@@ -210,11 +223,6 @@ export default function Dashboard() {
   const savedContentRef = useRef(savedContent);
   contentRef.current = content;
   savedContentRef.current = savedContent;
-
-  // ===== Theme (dark-only) =====
-  useEffect(() => {
-    document.documentElement.classList.add("dark");
-  }, []);
 
   // ===== Trigger translation =====
   const doTranslate = useCallback(async () => {
@@ -786,7 +794,6 @@ export default function Dashboard() {
     : activeFile ? `file:${activeFile}` : null;
   const comments = useComments(docKey, editorState);
   const [editorScroll, setEditorScroll] = useState<HTMLDivElement | null>(null);
-  const [commentGutter, setCommentGutter] = useState<HTMLDivElement | null>(null);
   const begin = comments.begin;
   const beginComment = useCallback(() => {
     if (!begin()) return false;
@@ -821,29 +828,34 @@ export default function Dashboard() {
 
   // We intercept at capture phase so we win over the existing dashboard ⌘K
   // listener (no selection → that one focuses the chat as before).
+  /** Open the ask-Muses menu on the current selection; false when nothing is selected. */
+  const openSelMenu = useCallback(() => {
+    if (!editorState) return false;
+    const { from, to } = editorState.state.selection;
+    if (from === to) return false;
+    const text = editorState.state.doc.textBetween(from, to, " ");
+    if (!text.trim()) return false;
+    const coords = editorState.view.coordsAtPos(to);
+    setSelMenu({
+      anchor: {
+        top: Math.min(window.innerHeight - 360, coords.bottom + 8),
+        left: Math.min(window.innerWidth - 380, coords.left),
+      },
+      selectedText: text,
+      range: { from, to },
+    });
+    return true;
+  }, [editorState]);
   useEffect(() => {
-    if (!editorState) return;
     const onKey = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.key !== "k") return;
-      const { from, to } = editorState.state.selection;
-      if (from === to) return;
-      const text = editorState.state.doc.textBetween(from, to, " ");
-      if (!text.trim()) return;
+      if (!openSelMenu()) return;
       e.preventDefault();
       e.stopPropagation();
-      const coords = editorState.view.coordsAtPos(to);
-      setSelMenu({
-        anchor: {
-          top: Math.min(window.innerHeight - 360, coords.bottom + 8),
-          left: Math.min(window.innerWidth - 380, coords.left),
-        },
-        selectedText: text,
-        range: { from, to },
-      });
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [editorState]);
+  }, [openSelMenu]);
 
   const submitSelectionTask = useCallback(async (input: { instruction: string; selectedText: string }) => {
     if (!selMenu) return;
@@ -863,6 +875,214 @@ export default function Dashboard() {
     if (!q) return dbArticles.slice(0, 20);
     return dbArticles.filter(a => a.title.toLowerCase().includes(q)).slice(0, 20);
   })();
+
+  // Toolbar: in the article view it sits at the top of the center column and shares the editor's surface.
+  const topBar = (full: boolean) => (
+      <div className={full ? `${s.topbar} ${s.topbarFull}` : s.topbar}>
+        <div className={s.topbarLeft}>
+          {full && (
+            <>
+              <img src="/materials/images/icons/logo-muses.svg" alt="Muses" className={s.logoIcon} />
+              <span className={s.logo}>Muses</span>
+            </>
+          )}
+        </div>
+        <div className={s.topbarActions}>
+          {sidebarTab === "article" && (activeFile || activeDbArticle) && (
+            <DocMenu
+              className={s.iconBtn}
+              editor={editorState}
+              title={[
+                activeDbArticle?.title || activeFile?.replace(/\.md$/, "") || "muses-doc",
+                activeTabId !== "main" ? tabs.find(t => t.id === activeTabId)?.name : null,
+              ].filter(Boolean).join(" - ")}
+              onAddTab={activeDbArticle ? addTab : undefined}
+              historyOpen={showHistory}
+              onToggleHistory={activeDbArticle ? () => setShowHistory(v => !v) : undefined}
+              onError={(msg) => { setPublishStatus({ type: "error", msg }); setTimeout(() => setPublishStatus(null), 4000); }}
+            />
+          )}
+          <ThemeToggle className={s.iconBtn} />
+          {sidebarTab === "article" && (
+            <>
+              {/* The title lives in the doc itself; the top bar only says whether there is something to save. */}
+              <button
+                onClick={() => saveFile()}
+                className={s.btnGhost}
+                title={content !== savedContent ? "有未保存的修改（⌘S）" : "已保存"}
+                aria-label={content !== savedContent ? "保存（有未保存的修改）" : "保存"}
+              >
+                {content !== savedContent && <span className={s.unsavedDot} aria-hidden="true" />}
+                Save
+              </button>
+
+              {/* Translate — only enabled for DB articles */}
+              <Popover modal open={showTranslate} onOpenChange={(open) => { setShowTranslate(open); if (open) setTranslateError(null); }}>
+                <PopoverTrigger asChild>
+                <button
+                  aria-label="翻译文章"
+                  disabled={!activeDbArticle}
+                  className={s.iconBtn}
+                  title={activeDbArticle ? "翻译这篇文章" : "选中文章后可翻译"}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M5 8l6 6"/>
+                    <path d="M4 14l6-6 2-3"/>
+                    <path d="M2 5h12"/>
+                    <path d="M7 2h1"/>
+                    <path d="M22 22l-5-10-5 10"/>
+                    <path d="M14 18h6"/>
+                  </svg>
+                </button>
+                </PopoverTrigger>
+                {activeDbArticle && (
+                  <PopoverContent
+                    align="end" sideOffset={8} collisionPadding={12}
+                    aria-labelledby="translate-title"
+                    aria-describedby="translate-description"
+                    className={s.translatePopover}
+                    style={{
+                      zIndex: 400, width: "min(320px, calc(100vw - 24px))", padding: "0.875rem",
+                      maxHeight: "var(--radix-popover-content-available-height)", overflowY: "auto",
+                      background: "var(--m-n925)", border: "1px solid var(--m-n750)", borderRadius: 10,
+                      boxShadow: "0 12px 32px rgba(0,0,0,0.5)",
+                    }}
+                  >
+                    <div id="translate-title" style={{ fontSize: "0.625rem", letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--m-n400)", marginBottom: "0.5rem", fontWeight: 500 }}>
+                      翻译文章
+                    </div>
+                    <div id="translate-description" style={{ fontSize: "0.75rem", color: "var(--m-n300)", marginBottom: "0.75rem", lineHeight: 1.5 }}>
+                      保存当前内容，翻译完成后生成新文章。
+                    </div>
+
+                    <label style={{ display: "block", fontSize: "0.625rem", letterSpacing: "0.02em", color: "var(--m-n400)", marginBottom: "0.375rem" }}>
+                      翻译模式
+                    </label>
+                    <div style={{ display: "flex", gap: 0, background: "var(--m-n880)", border: "1px solid var(--m-n750)", borderRadius: 6, padding: 3, marginBottom: "0.75rem" }}>
+                      {([
+                        { v: "translated", label: "整篇翻译", hint: "纯译文" },
+                        { v: "bilingual", label: "双语对照", hint: "原文 + 译文" },
+                      ] as const).map(opt => (
+                        <button
+                          key={opt.v}
+                          onClick={() => setTranslateMode(opt.v)}
+                          aria-pressed={translateMode === opt.v}
+                          disabled={translating}
+                          style={{
+                            flex: 1,
+                            display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+                            padding: "0.375rem 0.5rem",
+                            borderRadius: 4,
+                            border: "none",
+                            background: translateMode === opt.v ? "var(--m-n750)" : "transparent",
+                            color: translateMode === opt.v ? "var(--m-n50)" : "var(--m-n500)",
+                            cursor: "pointer",
+                            fontFamily: "inherit",
+                            transition: "all 0.15s ease",
+                          }}
+                        >
+                          <span style={{ fontSize: "0.6875rem", fontWeight: 500 }}>{opt.label}</span>
+                          <span style={{ fontSize: "0.5625rem", color: translateMode === opt.v ? "var(--m-n400)" : "var(--m-n600)" }}>{opt.hint}</span>
+                        </button>
+                      ))}
+                    </div>
+
+                    <label style={{ display: "block", fontSize: "0.625rem", letterSpacing: "0.02em", color: "var(--m-n400)", marginBottom: "0.375rem" }}>
+                      目标语言
+                    </label>
+                    <select
+                      aria-label="目标语言"
+                      disabled={translating}
+                      value={translateLang}
+                      onChange={(e) => setTranslateLang(e.target.value)}
+                      style={{
+                        width: "100%", background: "var(--m-n880)", border: "1px solid var(--m-n750)", borderRadius: 6,
+                        padding: "0.4375rem 0.5rem", color: "var(--m-n50)", fontSize: "0.75rem",
+                        fontFamily: "inherit", outline: "none", marginBottom: "0.75rem",
+                      }}
+                    >
+                      <option value="en">English</option>
+                      <option value="zh-CN">简体中文</option>
+                      <option value="zh-TW">繁體中文</option>
+                      <option value="ja">日本語</option>
+                      <option value="ko">한국어</option>
+                      <option value="fr">Français</option>
+                      <option value="de">Deutsch</option>
+                      <option value="es">Español</option>
+                    </select>
+                    <label htmlFor="translation-model" style={{ display: "block", fontSize: "0.625rem", color: "var(--m-n400)", marginBottom: "0.375rem" }}>翻译模型</label>
+                    <select
+                      id="translation-model"
+                      value={translateModel}
+                      onChange={(e) => setTranslateModel(e.target.value)}
+                      disabled={translating}
+                      style={{ width: "100%", background: "var(--m-n880)", border: "1px solid var(--m-n750)", borderRadius: 6, padding: "0.4375rem 0.5rem", color: "var(--m-n50)", fontSize: "0.75rem", marginBottom: "0.75rem" }}
+                    >
+                      <option value="">自动（已配置的服务商）</option>
+                      <option value="deepseek-flash">DeepSeek V4.1 Flash</option>
+                      <option value="deepseek-v4-pro">DeepSeek V4 Pro</option>
+                    </select>
+                    {translateError && <p role="alert" className={s.translateError}>{translateError}</p>}
+                    <div style={{ display: "flex", gap: "0.4375rem" }}>
+                      <button
+                        onClick={doTranslate}
+                        disabled={translating}
+                        style={{
+                          flex: 1, fontSize: "0.6875rem", padding: "0.4375rem 0.75rem", borderRadius: 6,
+                          border: "1px solid #D97149", background: "#D97149", color: "white",
+                          cursor: translating ? "not-allowed" : "pointer", fontFamily: "inherit", fontWeight: 500,
+                          opacity: translating ? 0.6 : 1,
+                        }}
+                      >
+                        {translating ? "启动中…" : "开始翻译"}
+                      </button>
+                      <button
+                        onClick={() => setShowTranslate(false)}
+                        style={{
+                          fontSize: "0.6875rem", padding: "0.4375rem 0.75rem", borderRadius: 6,
+                          border: "1px solid var(--m-n750)", background: "transparent", color: "var(--m-n300)",
+                          cursor: "pointer", fontFamily: "inherit",
+                        }}
+                      >
+                        取消
+                      </button>
+                    </div>
+                  </PopoverContent>
+                )}
+              </Popover>
+
+              <TaskDropdown tasks={tasks} onCancel={cancelTask} onRemove={removeHistory}
+                triggerClassName={s.iconBtn} disabled={!isAuthenticated}
+                onArticleClick={async (articleId) => {
+                  const known = dbArticles.find((article) => article.id === articleId);
+                  if (known) { await openDbArticle(known); return; }
+                  const token = localStorage.getItem("token");
+                  if (!token) return;
+                  try {
+                    const res = await fetch(`${API_BASE}/api/articles/${articleId}`, {
+                      headers: { Authorization: `Bearer ${token}` },
+                      signal: AbortSignal.timeout(30000),
+                    });
+                    if (!res.ok) throw new Error("文章无法打开");
+                    const data = await res.json();
+                    await openDbArticle(data.article);
+                  } catch {
+                    toast({ title: "文章无法打开", variant: "destructive" });
+                  }
+                }} />
+              <button
+                onClick={() => activeDbArticle && setShowPublishHistory(true)}
+                disabled={!activeDbArticle}
+                className={s.btnPrimary}
+                title={activeDbArticle ? "发布、同步、下架、删除、翻译" : "选中文章后可发布"}
+              >
+                Publish
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+  );
 
   return (
     <div className={s.shell}>
@@ -974,7 +1194,7 @@ export default function Dashboard() {
           <div
             style={{
               width: "520px", maxWidth: "100%", maxHeight: "92vh", overflow: "auto",
-              background: "#1C1917", border: "1px solid #3F3A36", borderRadius: 12,
+              background: "var(--m-n925)", border: "1px solid var(--m-n750)", borderRadius: 12,
               boxShadow: "0 24px 60px rgba(0,0,0,0.55)",
             }}
             onClick={(e) => e.stopPropagation()}
@@ -1007,200 +1227,8 @@ export default function Dashboard() {
           {publishStatus.msg}
         </div>
       )}
-      {/* Top bar */}
-      <div className={s.topbar}>
-        <div className={s.topbarLeft}>
-          <img src="/materials/images/icons/logo-muses.svg" alt="Muses" className={s.logoIcon} />
-          <span className={s.logo}>Muses</span>
-          {sidebarTab === "article" && (
-            <>
-              <span className={s.breadcrumbSep}>/</span>
-              <span className={s.breadcrumbFile}>{activeFile || activeDbArticle?.title || "Studio"}</span>
-              {content !== savedContent && <span className={s.unsavedDot}>*</span>}
-            </>
-          )}
-        </div>
-        {/* Centered tabs (Claude Cowork style) */}
-        <div className={s.topbarCenter}>
-          <div className={s.topTabGroup}>
-            {(["article", "agent", "skill"] as const).map(tab => (
-              <button key={tab} onClick={() => goToTab(tab)} className={sidebarTab === tab ? s.topTabActive : s.topTab}>
-                {tab === "article" ? "Article" : tab === "agent" ? "Agent" : "Skill"}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className={s.topbarActions}>
-          {sidebarTab === "article" && (
-            <>
-              <button onClick={() => saveFile()} className={s.btnGhost}>Save</button>
-
-              {/* Translate — only enabled for DB articles */}
-              <Popover modal open={showTranslate} onOpenChange={(open) => { setShowTranslate(open); if (open) setTranslateError(null); }}>
-                <PopoverTrigger asChild>
-                <button
-                  aria-label="翻译文章"
-                  disabled={!activeDbArticle}
-                  className={s.iconBtn}
-                  title={activeDbArticle ? "翻译这篇文章" : "选中文章后可翻译"}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M5 8l6 6"/>
-                    <path d="M4 14l6-6 2-3"/>
-                    <path d="M2 5h12"/>
-                    <path d="M7 2h1"/>
-                    <path d="M22 22l-5-10-5 10"/>
-                    <path d="M14 18h6"/>
-                  </svg>
-                </button>
-                </PopoverTrigger>
-                {activeDbArticle && (
-                  <PopoverContent
-                    align="end" sideOffset={8} collisionPadding={12}
-                    aria-labelledby="translate-title"
-                    aria-describedby="translate-description"
-                    className={s.translatePopover}
-                    style={{
-                      zIndex: 400, width: "min(320px, calc(100vw - 24px))", padding: "0.875rem",
-                      maxHeight: "var(--radix-popover-content-available-height)", overflowY: "auto",
-                      background: "#1C1917", border: "1px solid #3F3A36", borderRadius: 10,
-                      boxShadow: "0 12px 32px rgba(0,0,0,0.5)",
-                    }}
-                  >
-                    <div id="translate-title" style={{ fontSize: "0.625rem", letterSpacing: "0.12em", textTransform: "uppercase", color: "#78716C", marginBottom: "0.5rem", fontWeight: 500 }}>
-                      翻译文章
-                    </div>
-                    <div id="translate-description" style={{ fontSize: "0.75rem", color: "#A8A29E", marginBottom: "0.75rem", lineHeight: 1.5 }}>
-                      保存当前内容，翻译完成后生成新文章。
-                    </div>
-
-                    <label style={{ display: "block", fontSize: "0.625rem", letterSpacing: "0.02em", color: "#78716C", marginBottom: "0.375rem" }}>
-                      翻译模式
-                    </label>
-                    <div style={{ display: "flex", gap: 0, background: "#292524", border: "1px solid #3F3A36", borderRadius: 6, padding: 3, marginBottom: "0.75rem" }}>
-                      {([
-                        { v: "translated", label: "整篇翻译", hint: "纯译文" },
-                        { v: "bilingual", label: "双语对照", hint: "原文 + 译文" },
-                      ] as const).map(opt => (
-                        <button
-                          key={opt.v}
-                          onClick={() => setTranslateMode(opt.v)}
-                          aria-pressed={translateMode === opt.v}
-                          disabled={translating}
-                          style={{
-                            flex: 1,
-                            display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
-                            padding: "0.375rem 0.5rem",
-                            borderRadius: 4,
-                            border: "none",
-                            background: translateMode === opt.v ? "#3F3A36" : "transparent",
-                            color: translateMode === opt.v ? "#FAFAF9" : "#78716C",
-                            cursor: "pointer",
-                            fontFamily: "inherit",
-                            transition: "all 0.15s ease",
-                          }}
-                        >
-                          <span style={{ fontSize: "0.6875rem", fontWeight: 500 }}>{opt.label}</span>
-                          <span style={{ fontSize: "0.5625rem", color: translateMode === opt.v ? "#A8A29E" : "#57534E" }}>{opt.hint}</span>
-                        </button>
-                      ))}
-                    </div>
-
-                    <label style={{ display: "block", fontSize: "0.625rem", letterSpacing: "0.02em", color: "#78716C", marginBottom: "0.375rem" }}>
-                      目标语言
-                    </label>
-                    <select
-                      aria-label="目标语言"
-                      disabled={translating}
-                      value={translateLang}
-                      onChange={(e) => setTranslateLang(e.target.value)}
-                      style={{
-                        width: "100%", background: "#292524", border: "1px solid #3F3A36", borderRadius: 6,
-                        padding: "0.4375rem 0.5rem", color: "#FAFAF9", fontSize: "0.75rem",
-                        fontFamily: "inherit", outline: "none", marginBottom: "0.75rem",
-                      }}
-                    >
-                      <option value="en">English</option>
-                      <option value="zh-CN">简体中文</option>
-                      <option value="zh-TW">繁體中文</option>
-                      <option value="ja">日本語</option>
-                      <option value="ko">한국어</option>
-                      <option value="fr">Français</option>
-                      <option value="de">Deutsch</option>
-                      <option value="es">Español</option>
-                    </select>
-                    <label htmlFor="translation-model" style={{ display: "block", fontSize: "0.625rem", color: "#78716C", marginBottom: "0.375rem" }}>翻译模型</label>
-                    <select
-                      id="translation-model"
-                      value={translateModel}
-                      onChange={(e) => setTranslateModel(e.target.value)}
-                      disabled={translating}
-                      style={{ width: "100%", background: "#292524", border: "1px solid #3F3A36", borderRadius: 6, padding: "0.4375rem 0.5rem", color: "#FAFAF9", fontSize: "0.75rem", marginBottom: "0.75rem" }}
-                    >
-                      <option value="">自动（已配置的服务商）</option>
-                      <option value="deepseek-flash">DeepSeek V4.1 Flash</option>
-                      <option value="deepseek-v4-pro">DeepSeek V4 Pro</option>
-                    </select>
-                    {translateError && <p role="alert" className={s.translateError}>{translateError}</p>}
-                    <div style={{ display: "flex", gap: "0.4375rem" }}>
-                      <button
-                        onClick={doTranslate}
-                        disabled={translating}
-                        style={{
-                          flex: 1, fontSize: "0.6875rem", padding: "0.4375rem 0.75rem", borderRadius: 6,
-                          border: "1px solid #D97149", background: "#D97149", color: "white",
-                          cursor: translating ? "not-allowed" : "pointer", fontFamily: "inherit", fontWeight: 500,
-                          opacity: translating ? 0.6 : 1,
-                        }}
-                      >
-                        {translating ? "启动中…" : "开始翻译"}
-                      </button>
-                      <button
-                        onClick={() => setShowTranslate(false)}
-                        style={{
-                          fontSize: "0.6875rem", padding: "0.4375rem 0.75rem", borderRadius: 6,
-                          border: "1px solid #3F3A36", background: "transparent", color: "#A8A29E",
-                          cursor: "pointer", fontFamily: "inherit",
-                        }}
-                      >
-                        取消
-                      </button>
-                    </div>
-                  </PopoverContent>
-                )}
-              </Popover>
-
-              <TaskDropdown tasks={tasks} onCancel={cancelTask} onRemove={removeHistory}
-                triggerClassName={s.iconBtn} disabled={!isAuthenticated}
-                onArticleClick={async (articleId) => {
-                  const known = dbArticles.find((article) => article.id === articleId);
-                  if (known) { await openDbArticle(known); return; }
-                  const token = localStorage.getItem("token");
-                  if (!token) return;
-                  try {
-                    const res = await fetch(`${API_BASE}/api/articles/${articleId}`, {
-                      headers: { Authorization: `Bearer ${token}` },
-                      signal: AbortSignal.timeout(30000),
-                    });
-                    if (!res.ok) throw new Error("文章无法打开");
-                    const data = await res.json();
-                    await openDbArticle(data.article);
-                  } catch {
-                    toast({ title: "文章无法打开", variant: "destructive" });
-                  }
-                }} />
-              <button
-                onClick={() => activeDbArticle && setShowPublishHistory(true)}
-                disabled={!activeDbArticle}
-                className={s.btnPrimary}
-                title={activeDbArticle ? "发布、同步、下架、删除、翻译" : "选中文章后可发布"}
-              >
-                Publish
-              </button>
-            </>
-          )}
-        </div>
-      </div>
+      {/* Agent / Skill views keep a full-width bar; the article view puts it inside the center column. */}
+      {sidebarTab !== "article" && topBar(true)}
 
       {/* Main */}
       <div className={s.main}>
@@ -1217,12 +1245,17 @@ export default function Dashboard() {
           {sidebarCollapsed ? (
             /* Collapsed: single expand button */
             <div className={s.collapsedIcons}>
+              <img src="/materials/images/icons/logo-muses.svg" alt="Muses" className={s.logoIcon} style={{ margin: "0.5rem 0 0.75rem" }} />
               <button onClick={() => setSidebarCollapsed(false)} className={s.collapsedIconBtn} title="Expand">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
               </button>
             </div>
           ) : (
             <>
+              <div className={s.sidebarBrand}>
+                <img src="/materials/images/icons/logo-muses.svg" alt="" className={s.logoIcon} />
+                <span className={s.logo}>Muses</span>
+              </div>
               {/* Sidebar header with collapse + actions */}
               <div className={s.sidebarContent}>
                   <>
@@ -1370,7 +1403,7 @@ export default function Dashboard() {
                       ))}
                       {files.length === 0 && folders.length === 0 && dbArticles.length === 0 && !creating && (
                         <div className={s.emptyState}>
-                          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#3F3A36" strokeWidth="1.5" strokeLinecap="round" style={{ marginBottom: "0.5rem" }}>
+                          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" style={{ marginBottom: "0.5rem", color: "var(--m-n750)" }}>
                             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
                             <line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>
                           </svg>
@@ -1545,13 +1578,15 @@ export default function Dashboard() {
 
         {/* Editor */}
         <div className={s.editorArea}>
+          {topBar(false)}
           {showSettings ? (
             <SettingsPanel onClose={() => setShowSettings(false)} />
           ) : (activeFile || activeDbArticle) ? (
             <div className={s.editorScroll} ref={setEditorScroll}>
               <div className={s.editorPage}>
                 <div className={s.editorInner}>
-                  {activeDbArticle && (
+                  {/* The tab strip only shows once there is more than the main tab; new tabs come from the ⋯ menu. */}
+                  {activeDbArticle && tabs.length > 1 && (
                     <DocTabs
                       tabs={tabs}
                       activeId={activeTabId}
@@ -1559,23 +1594,10 @@ export default function Dashboard() {
                       onAdd={addTab}
                       onRename={renameTab}
                       onDelete={deleteTab}
-                      historyOpen={showHistory}
-                      onToggleHistory={() => setShowHistory(v => !v)}
                     />
                   )}
                   {editorState && (
-                    <div className="doc-toolbar">
-                      <div className="doc-toolbar-main">
-                        <DocWriterBar key={`${activeFile || activeDbArticle?.id || "empty"}:${activeTabId}`} editor={editorState} title={activeDbArticle?.title || activeFile || undefined} insertTitle={!activeDbArticle} />
-                      </div>
-                      <ExportMenu
-                        editor={editorState}
-                        title={[
-                          activeDbArticle?.title || activeFile?.replace(/\.md$/, "") || "muses-doc",
-                          activeTabId !== "main" ? tabs.find(t => t.id === activeTabId)?.name : null,
-                        ].filter(Boolean).join(" - ")}
-                      />
-                    </div>
+                    <DocWriterBar key={`${activeFile || activeDbArticle?.id || "empty"}:${activeTabId}`} editor={editorState} title={activeDbArticle?.title || activeFile || undefined} insertTitle={!activeDbArticle} />
                   )}
                   <NotionEditor
                     key={`${activeFile || activeDbArticle?.id || "empty"}:${activeTabId}:${editorEpoch}`}
@@ -1589,16 +1611,10 @@ export default function Dashboard() {
                   {editorState && editorScroll && !comments.draft && !selMenu && (
                     <BubbleMenu editor={editorState} pluginKey="commentMenu" updateDelay={60}
                       appendTo={commentMenuParent} shouldShow={showCommentButton} options={commentMenuOptions} className="z-30">
-                      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={beginComment}
-                        aria-keyshortcuts="Meta+Shift+M Control+Shift+M" title="评论所选文字（⌘⇧M）"
-                        className="flex items-center gap-2 rounded-md border border-stone-600 bg-stone-800 px-3 py-2 text-sm text-stone-100 hover:bg-stone-700 focus-visible:outline focus-visible:outline-ring active:bg-stone-900">
-                        <MessageSquare className="size-4" aria-hidden="true" />
-                        评论
-                      </button>
+                      <SelectionToolbar editor={editorState} onComment={beginComment} onAskMuses={() => { openSelMenu(); }} />
                     </BubbleMenu>
                   )}
                 </div>
-                <div className={s.commentGutter} ref={setCommentGutter} aria-hidden="true" />
               </div>
             </div>
           ) : (
@@ -1630,7 +1646,7 @@ export default function Dashboard() {
             />
           ) : (
             <CommentsPanel api={comments} suggestions={suggestions} editor={editorScroll ? editorState : null}
-              scrollArea={editorScroll} gutter={commentGutter} />
+              scrollArea={editorScroll} />
           )}
         </div>
         </>

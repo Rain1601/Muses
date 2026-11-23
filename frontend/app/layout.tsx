@@ -33,7 +33,7 @@ export default function RootLayout({
       <body className={`${inter.className} font-serif`} style={{ fontFamily: '"Times New Roman", Times, serif' }}>
         <ThemeProvider
           attribute="class"
-          defaultTheme="light"
+          defaultTheme="dark"
           enableSystem
           disableTransitionOnChange={false}
         >

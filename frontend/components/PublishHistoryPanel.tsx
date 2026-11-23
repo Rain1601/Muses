@@ -52,7 +52,7 @@ function statusBadge(status: string): { text: string; color: string; bg: string 
   if (status === "published") return { text: "已发布", color: "#86efac", bg: "rgba(34, 197, 94, 0.12)" };
   if (status === "unpublished") return { text: "已下架", color: "#fbbf24", bg: "rgba(245, 158, 11, 0.12)" };
   if (status === "scheduled") return { text: "已排期", color: "#a5b4fc", bg: "rgba(99, 102, 241, 0.12)" };
-  return { text: "草稿", color: "#A8A29E", bg: "rgba(120, 113, 108, 0.12)" };
+  return { text: "草稿", color: "var(--m-n300)", bg: "rgba(120, 113, 108, 0.12)" };
 }
 
 export default function PublishHistoryPanel({ articleId, articleTitle, onClose, onChanged }: PublishHistoryPanelProps) {
@@ -195,8 +195,8 @@ export default function PublishHistoryPanel({ articleId, articleTitle, onClose, 
         {/* Header */}
         <div style={headerStyle}>
           <div>
-            <div style={{ fontSize: "0.6875rem", color: "#78716C", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: "0.25rem" }}>Publish History</div>
-            <div style={{ fontSize: "0.9375rem", color: "#FAFAF9", fontWeight: 500, lineHeight: 1.3 }}>{articleTitle}</div>
+            <div style={{ fontSize: "0.6875rem", color: "var(--m-n400)", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: "0.25rem" }}>Publish History</div>
+            <div style={{ fontSize: "0.9375rem", color: "var(--m-n50)", fontWeight: 500, lineHeight: 1.3 }}>{articleTitle}</div>
           </div>
           <button onClick={onClose} style={closeBtnStyle} title="Close">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -208,7 +208,7 @@ export default function PublishHistoryPanel({ articleId, articleTitle, onClose, 
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
             <span style={{ ...badgeStyle, color: badge.color, background: badge.bg }}>{badge.text}</span>
             {info?.syncCount && parseInt(info.syncCount, 10) > 0 && (
-              <span style={{ fontSize: "0.6875rem", color: "#78716C" }}>同步 {info.syncCount} 次</span>
+              <span style={{ fontSize: "0.6875rem", color: "var(--m-n400)" }}>同步 {info.syncCount} 次</span>
             )}
           </div>
           {info?.githubUrl && (
@@ -218,7 +218,7 @@ export default function PublishHistoryPanel({ articleId, articleTitle, onClose, 
             </a>
           )}
           {info?.lastSyncAt && (
-            <div style={{ fontSize: "0.6875rem", color: "#78716C", marginTop: "0.375rem" }}>
+            <div style={{ fontSize: "0.6875rem", color: "var(--m-n400)", marginTop: "0.375rem" }}>
               上次同步: {formatTime(info.lastSyncAt)}
             </div>
           )}
@@ -253,7 +253,7 @@ export default function PublishHistoryPanel({ articleId, articleTitle, onClose, 
         {/* Confirm */}
         {confirmAction && (
           <div style={confirmBoxStyle}>
-            <span style={{ fontSize: "0.75rem", color: "#FAFAF9" }}>
+            <span style={{ fontSize: "0.75rem", color: "var(--m-n50)" }}>
               {confirmAction === "unpublish" ? "下架后文章将从 GitHub 移除并隐藏。确认？" : "删除后无法恢复，且会从 GitHub 删除（如已发布）。确认？"}
             </span>
             <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
@@ -271,13 +271,13 @@ export default function PublishHistoryPanel({ articleId, articleTitle, onClose, 
 
         {/* History timeline */}
         <div style={timelineHeaderStyle}>
-          <span style={{ fontSize: "0.6875rem", color: "#78716C", letterSpacing: "0.05em", textTransform: "uppercase" }}>History · {history.length}</span>
+          <span style={{ fontSize: "0.6875rem", color: "var(--m-n400)", letterSpacing: "0.05em", textTransform: "uppercase" }}>History · {history.length}</span>
         </div>
         <div style={timelineStyle}>
           {loading ? (
-            <div style={{ padding: "1rem", textAlign: "center", color: "#78716C", fontSize: "0.75rem" }}>加载中...</div>
+            <div style={{ padding: "1rem", textAlign: "center", color: "var(--m-n400)", fontSize: "0.75rem" }}>加载中...</div>
           ) : history.length === 0 ? (
-            <div style={{ padding: "1rem", textAlign: "center", color: "#57534E", fontSize: "0.75rem" }}>暂无历史记录</div>
+            <div style={{ padding: "1rem", textAlign: "center", color: "var(--m-n450)", fontSize: "0.75rem" }}>暂无历史记录</div>
           ) : (
             history.map(h => (
               <div key={h.id} style={historyItemStyle}>
@@ -289,9 +289,9 @@ export default function PublishHistoryPanel({ articleId, articleTitle, onClose, 
                     background: h.syncStatus === "success" ? "rgba(34, 197, 94, 0.12)" : h.syncStatus === "failed" ? "rgba(239, 68, 68, 0.12)" : "rgba(245, 158, 11, 0.12)",
                     color: h.syncStatus === "success" ? "#86efac" : h.syncStatus === "failed" ? "#fca5a5" : "#fbbf24",
                   }}>{h.syncStatus}</span>
-                  <span style={{ fontSize: "0.75rem", color: "#E7E5E4" }}>{syncTypeLabel(h.syncType)}</span>
+                  <span style={{ fontSize: "0.75rem", color: "var(--m-n200)" }}>{syncTypeLabel(h.syncType)}</span>
                 </div>
-                <div style={{ fontSize: "0.6875rem", color: "#78716C" }}>
+                <div style={{ fontSize: "0.6875rem", color: "var(--m-n400)" }}>
                   {formatTime(h.createdAt)}
                   {h.syncDuration ? ` · ${h.syncDuration}ms` : ""}
                 </div>
@@ -339,8 +339,8 @@ const overlayStyle: React.CSSProperties = {
 const panelStyle: React.CSSProperties = {
   width: "440px",
   maxHeight: "82vh",
-  background: "#1C1917",
-  border: "1px solid #3F3A36",
+  background: "var(--m-n925)",
+  border: "1px solid var(--m-n750)",
   borderRadius: "10px",
   display: "flex",
   flexDirection: "column",
@@ -351,7 +351,7 @@ const panelStyle: React.CSSProperties = {
 
 const headerStyle: React.CSSProperties = {
   padding: "1rem 1.25rem",
-  borderBottom: "1px solid #292524",
+  borderBottom: "1px solid var(--m-n880)",
   display: "flex",
   alignItems: "flex-start",
   justifyContent: "space-between",
@@ -361,7 +361,7 @@ const headerStyle: React.CSSProperties = {
 const closeBtnStyle: React.CSSProperties = {
   background: "transparent",
   border: "none",
-  color: "#78716C",
+  color: "var(--m-n400)",
   cursor: "pointer",
   padding: "0.25rem",
   borderRadius: "4px",
@@ -373,7 +373,7 @@ const closeBtnStyle: React.CSSProperties = {
 
 const statusSectionStyle: React.CSSProperties = {
   padding: "1rem 1.25rem",
-  borderBottom: "1px solid #292524",
+  borderBottom: "1px solid var(--m-n880)",
 };
 
 const badgeStyle: React.CSSProperties = {
@@ -388,7 +388,7 @@ const linkStyle: React.CSSProperties = {
   alignItems: "center",
   gap: "0.375rem",
   fontSize: "0.6875rem",
-  color: "#A8A29E",
+  color: "var(--m-n300)",
   textDecoration: "none",
   fontFamily: "monospace",
 };
@@ -398,7 +398,7 @@ const actionsStyle: React.CSSProperties = {
   display: "flex",
   gap: "0.5rem",
   flexWrap: "wrap",
-  borderBottom: "1px solid #292524",
+  borderBottom: "1px solid var(--m-n880)",
 };
 
 const primaryActionStyle: React.CSSProperties = {
@@ -424,9 +424,9 @@ const secondaryActionStyle: React.CSSProperties = {
   fontSize: "0.6875rem",
   padding: "0.375rem 0.75rem",
   borderRadius: "6px",
-  border: "1px solid #3F3A36",
+  border: "1px solid var(--m-n750)",
   background: "transparent",
-  color: "#A8A29E",
+  color: "var(--m-n300)",
   cursor: "pointer",
   fontFamily: "inherit",
   transition: "all 0.15s ease",
@@ -471,7 +471,7 @@ const timelineStyle: React.CSSProperties = {
 
 const historyItemStyle: React.CSSProperties = {
   padding: "0.625rem 0.75rem",
-  background: "#292524",
-  border: "1px solid #3F3A36",
+  background: "var(--m-n880)",
+  border: "1px solid var(--m-n750)",
   borderRadius: "6px",
 };
